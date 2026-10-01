@@ -1,0 +1,322 @@
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import type { Atividade, Dados, Gate, NovoProjeto, Pendencia, Projeto, Risco } from '../types/models';
+import { PROXIMA_FASE } from '../lib/constantes';
+import { diasUteis } from '../lib/datas';
+import type { FonteDados } from '../services/FonteDados';
+import { criarFonte } from '../services/criarFonte';
+import { config } from '../config/config';
+import { horaAgora } from '../lib/datas';
+import { emailNovoProjeto } from '../lib/emailProjeto';
+import { gatesFaltantes } from '../lib/gates';
+import { useToast } from './ToastContext';
+import { Carregando } from '../components/ui/Carregando';
+import { Mensagem } from '../components/ui/Mensagem';
+
+interface PortalValor {
+  fonte: FonteDados;
+  dados: Dados;
+  usuario: string;
+  email: string;
+  hoje: string;
+  sincronizando: boolean;
+  atualizadoEm: string;
+  atualizar(manual?: boolean): Promise<void>;
+  salvarAtividade(cod: string, codigo: string, campos: Partial<Atividade>): Promise<void>;
+  salvarRisco(cod: string, codigo: string, campos: Partial<Risco>): Promise<void>;
+  salvarPendencia(cod: string, codigo: string, campos: Partial<Pendencia>): Promise<void>;
+  aprovarCadastro(cod: string, parecer?: string): Promise<void>;
+  /** GP pede a aprovação: Pendente → Aguardando aprovação */
+  solicitarGate(cod: string, gate: string): Promise<void>;
+  /** PMO decide. Aprovar avança a fase do projeto; no G2 pode congelar a baseline. */
+  decidirGate(cod: string, gate: string, decisao: { aprovar: boolean; parecer: string; congelarBaseline?: boolean }): Promise<void>;
+  editarProjeto(cod: string, campos: Partial<Projeto>): Promise<void>;
+  criarAtividade(cod: string, atv: Atividade): Promise<void>;
+  excluirAtividade(cod: string, codigo: string): Promise<void>;
+  removerGatesRepetidos(cod: string): Promise<number>;
+  excluirProjeto(cod: string, opcoes: { documentos: boolean }): Promise<void>;
+  criarProjeto(novo: NovoProjeto): Promise<void>;
+  /** teste: avisa por e-mail; devolve o destinatário */
+  enviarEmailCriacao(novo: NovoProjeto): Promise<string>;
+  restaurarPiloto(): Promise<void>;
+  /** telas de edição pedem para a releitura automática esperar */
+  bloquear(id: string, ativo: boolean): void;
+}
+
+const PortalContext = createContext<PortalValor | null>(null);
+
+/** Gates já criados nesta sessão (chave "PROJETO|G1"), para nunca criar o mesmo duas vezes. */
+const gatesCriados = new Map<string, Gate>();
+let filaGates: Promise<unknown> = Promise.resolve();
+
+/**
+ * Todo projeto precisa dos gates G1–G4. Os que faltarem na lista são criados no SharePoint.
+ * As execuções entram numa fila (StrictMode, abas e releituras não criam em dobro).
+ * Se a pessoa não tiver permissão de escrita, o gate aparece na tela e é criado na primeira aprovação.
+ */
+function garantirGates(fonte: FonteDados, d: Dados): Promise<Dados> {
+  const tarefa = filaGates.then(async () => {
+    if (!d.projetos.some(p => gatesFaltantes(p).length)) return d;
+    const projetos = [];
+    for (const p of d.projetos) {
+      const faltam = gatesFaltantes(p);
+      if (!faltam.length) { projetos.push(p); continue; }
+      const novos: Gate[] = [];
+      for (const g of faltam) {
+        const chave = `${p.codigo}|${g.gate}`;
+        const ja = gatesCriados.get(chave);
+        if (ja) { novos.push(ja); continue; }
+        try { const criado = await fonte.criarGate(p, g); gatesCriados.set(chave, criado); novos.push(criado); }
+        catch { novos.push(g); }
+      }
+      projetos.push({ ...p, fases: [...p.fases, ...novos].sort((a, b) => a.gate.localeCompare(b.gate)) });
+    }
+    return { ...d, projetos };
+  });
+  filaGates = tarefa.catch(() => undefined);
+  return tarefa;
+}
+
+const assinar = (d: Dados) => JSON.stringify([d.projetos, d.atividades, d.riscos, d.pendencias, d.decisoes]);
+type ChaveItens = 'atividades' | 'riscos' | 'pendencias';
+
+/** Copia os dados trocando os campos de um item (sem mutar o estado anterior). */
+function comItem<T extends { codigo: string }>(d: Dados, chave: ChaveItens, cod: string, codigo: string, campos: Partial<T>): Dados {
+  const lista = (d[chave][cod] || []) as unknown as T[];
+  return { ...d, [chave]: { ...d[chave], [cod]: lista.map(x => (x.codigo === codigo ? { ...x, ...campos } : x)) } };
+}
+
+export function PortalProvider({ children }: { children: ReactNode }) {
+  const [fonte, setFonte] = useState<FonteDados | null>(null);
+  const toast = useToast();
+  const [dados, setDados] = useState<Dados | null>(null);
+  const [erro, setErro] = useState('');
+  const [usuario, setUsuario] = useState('');
+  const [sincronizando, setSincronizando] = useState(false);
+  const [atualizadoEm, setAtualizadoEm] = useState('');
+  const assinatura = useRef('');
+  const ultimaSync = useRef(0);
+  const bloqueios = useRef(new Set<string>());
+  const emSync = useRef(false);
+
+  /** Aplica um novo estado: guarda (piloto) e marca como "já visto" para a releitura. */
+  const bloquear = useCallback((id: string, ativo: boolean) => {
+    if (ativo) bloqueios.current.add(id); else bloqueios.current.delete(id);
+  }, []);
+
+  const aplicar = useCallback((novo: Dados) => {
+    setDados(novo);
+    assinatura.current = assinar(novo);
+    fonte?.persistir?.(novo);
+  }, [fonte]);
+
+  // carga inicial (inclui o login no modo SharePoint)
+  useEffect(() => {
+    let vivo = true;
+    (async () => {
+      try {
+        const f = await criarFonte();
+        const nome = await f.entrar();
+        const d = await garantirGates(f, await f.carregar());
+        if (!vivo) return;
+        setFonte(f);
+        setUsuario(nome);
+        setDados(d);
+        assinatura.current = assinar(d);
+        ultimaSync.current = Date.now();
+        setAtualizadoEm(horaAgora());
+      } catch (e) {
+        if (vivo) setErro((e as Error).message);
+      }
+    })();
+    return () => { vivo = false; };
+  }, []);
+
+  const editando = () => {
+    const el = document.activeElement as HTMLElement | null;
+    const digitando = !!el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) && el.getAttribute('data-busca') === null;
+    return bloqueios.current.size > 0 || digitando;
+  };
+
+  const atualizar = useCallback(async (manual = false) => {
+    if (!fonte || fonte.modo !== 'sharepoint' || emSync.current) return;
+    if (!manual && (document.hidden || editando())) return;
+    emSync.current = true;
+    setSincronizando(true);
+    try {
+      const novo = await garantirGates(fonte, await fonte.carregar());
+      const nova = assinar(novo), mudou = nova !== assinatura.current;
+      ultimaSync.current = Date.now();
+      setAtualizadoEm(horaAgora());
+      if (mudou) { setDados(novo); assinatura.current = nova; }
+      if (manual) toast(mudou ? 'Dados atualizados do SharePoint.' : 'Nada mudou desde a última leitura.');
+      else if (mudou) toast('Há alterações novas no SharePoint. A tela foi atualizada.');
+    } catch (e) {
+      if (manual) toast('Não foi possível atualizar: ' + (e as Error).message);
+    } finally {
+      emSync.current = false;
+      setSincronizando(false);
+    }
+  }, [fonte, toast]);
+
+  // releitura automática: intervalo + ao voltar para a aba
+  useEffect(() => {
+    if (!fonte || fonte.modo !== 'sharepoint') return;
+    const t = setInterval(() => atualizar(false), Math.max(15, config.sincronizarSegundos) * 1000);
+    const aoVoltar = () => { if (!document.hidden && Date.now() - ultimaSync.current > 15000) atualizar(false); };
+    document.addEventListener('visibilitychange', aoVoltar);
+    window.addEventListener('focus', aoVoltar);
+    return () => { clearInterval(t); document.removeEventListener('visibilitychange', aoVoltar); window.removeEventListener('focus', aoVoltar); };
+  }, [fonte, atualizar]);
+
+  const valor = useMemo<PortalValor | null>(() => {
+    if (!dados || !fonte) return null;
+    const projeto = (cod: string) => {
+      const p = dados.projetos.find(x => x.codigo === cod);
+      if (!p) throw new Error(`Projeto ${cod} não encontrado.`);
+      return p;
+    };
+    const v: PortalValor = {
+      fonte, dados, usuario, email: fonte.email(), hoje: fonte.hoje(), sincronizando, atualizadoEm, atualizar,
+      bloquear,
+
+      async salvarAtividade(cod, codigo, campos) {
+        const atv = (dados.atividades[cod] || []).find(a => a.codigo === codigo)!;
+        if (campos.inicio && campos.termino) campos = { ...campos, duracao: Math.max(1, diasUteis(campos.inicio, campos.termino)) };
+        await fonte.salvarAtividade(cod, atv, campos);
+        let novo = comItem<Atividade>(dados, 'atividades', cod, codigo, campos);
+        // subatividades acompanham a atividade macro
+        const herdado = Object.fromEntries(Object.entries({ status: campos.status, percentual: campos.percentual, inicio: campos.inicio, termino: campos.termino, fase: campos.fase }).filter(([, v]) => v !== undefined));
+        novo = { ...novo, atividades: { ...novo.atividades, [cod]: novo.atividades[cod].map(a => (a.pai === codigo ? { ...a, ...herdado } as Atividade : a)) } };
+        aplicar(novo);
+      },
+      async salvarRisco(cod, codigo, campos) {
+        const r = (dados.riscos[cod] || []).find(x => x.codigo === codigo)!;
+        await fonte.salvarRisco(cod, r, campos);
+        aplicar(comItem<Risco>(dados, 'riscos', cod, codigo, campos));
+      },
+      async salvarPendencia(cod, codigo, campos) {
+        const p = (dados.pendencias[cod] || []).find(x => x.codigo === codigo)!;
+        await fonte.salvarPendencia(cod, p, campos);
+        aplicar(comItem<Pendencia>(dados, 'pendencias', cod, codigo, campos));
+      },
+      async aprovarCadastro(cod, parecer = '') {
+        await v.decidirGate(cod, 'G1', { aprovar: true, parecer });
+      },
+      async solicitarGate(cod, gate) {
+        const p = projeto(cod), g = p.fases.find(x => x.gate === gate)!;
+        await fonte.salvarGate(p, g, { situacao: 'Aguardando aprovação' });
+        aplicar({ ...dados, projetos: dados.projetos.map(x => x.codigo !== cod ? x : { ...x, fases: x.fases.map(y => (y.gate === gate ? { ...y, situacao: 'Aguardando aprovação' } : y)) }) });
+      },
+      async decidirGate(cod, gate, { aprovar, parecer, congelarBaseline }) {
+        const p = projeto(cod), g = p.fases.find(x => x.gate === gate)!;
+        const hojeAgora = fonte.hoje();
+        const camposGate = aprovar
+          ? { situacao: 'Aprovado' as const, aprovadoPor: usuario, dataAprovacao: hojeAgora, parecer }
+          : { situacao: 'Pendente' as const, aprovadoPor: '', dataAprovacao: '', parecer };
+        await fonte.salvarGate(p, g, camposGate);
+        let novo: Dados = { ...dados, projetos: dados.projetos.map(x => x.codigo !== cod ? x : { ...x, fases: x.fases.map(y => (y.gate === gate ? { ...y, ...camposGate } : y)) }) };
+        if (aprovar) {
+          // avança a fase oficial; o G4 encerra o projeto
+          const camposProjeto: Partial<Projeto> = gate === 'G4'
+            ? { situacaoCadastro: 'Encerrado' }
+            : { fase: PROXIMA_FASE[g.fase] || p.fase, ...(gate === 'G1' && p.situacaoCadastro !== 'Ativo' ? { situacaoCadastro: 'Ativo' as const } : {}) };
+          if (congelarBaseline) camposProjeto.terminoBaseline = p.terminoPrevisto || p.terminoBaseline;
+          await fonte.salvarProjeto(p, camposProjeto);
+          novo = { ...novo, projetos: novo.projetos.map(x => (x.codigo === cod ? { ...x, ...camposProjeto } : x)) };
+          if (congelarBaseline) {
+            // a linha de base passa a ser o cronograma atual
+            const lista = novo.atividades[cod] || [];
+            for (const a of lista.filter(a => !a.pai && (a.baselineInicio !== a.inicio || a.baselineTermino !== a.termino))) {
+              await fonte.salvarAtividade(cod, a, { baselineInicio: a.inicio, baselineTermino: a.termino });
+            }
+            novo = { ...novo, atividades: { ...novo.atividades, [cod]: lista.map(a => ({ ...a, baselineInicio: a.inicio, baselineTermino: a.termino })) } };
+          }
+        }
+        aplicar(novo);
+      },
+      async editarProjeto(cod, campos) {
+        const p = projeto(cod);
+        await fonte.salvarProjeto(p, campos);
+        aplicar({ ...dados, projetos: dados.projetos.map(x => (x.codigo === cod ? { ...x, ...campos } : x)) });
+      },
+      async criarAtividade(cod, atv) {
+        const p = projeto(cod);
+        if ((dados.atividades[cod] || []).some(a => a.codigo === atv.codigo)) throw new Error(`Já existe uma atividade com o código ${atv.codigo}.`);
+        const completa: Atividade = { ...atv, duracao: atv.duracao || Math.max(1, diasUteis(atv.inicio, atv.termino)) };
+        const criada = await fonte.criarAtividade(p, completa);
+        aplicar({ ...dados, atividades: { ...dados.atividades, [cod]: [...(dados.atividades[cod] || []), criada] } });
+      },
+      async excluirProjeto(cod, opcoes) {
+        const p = projeto(cod);
+        await fonte.excluirProjeto(dados, p, opcoes);
+        for (const k of Array.from(gatesCriados.keys())) if (k.startsWith(cod + '|')) gatesCriados.delete(k);
+        const sem = <T,>(r: Record<string, T>) => { const n = { ...r }; delete n[cod]; return n; };
+        aplicar({
+          ...dados, projetos: dados.projetos.filter(x => x.codigo !== cod),
+          atividades: sem(dados.atividades), riscos: sem(dados.riscos), pendencias: sem(dados.pendencias),
+          decisoes: sem(dados.decisoes), documentos: sem(dados.documentos)
+        });
+      },
+      async removerGatesRepetidos(cod) {
+        const p = projeto(cod), ids = p.gatesRepetidos || [];
+        if (!ids.length || !fonte.excluirGates) return 0;
+        await fonte.excluirGates(ids);
+        aplicar({ ...dados, projetos: dados.projetos.map(x => (x.codigo === cod ? { ...x, gatesRepetidos: [] } : x)) });
+        return ids.length;
+      },
+      async excluirAtividade(cod, codigo) {
+        const lista = dados.atividades[cod] || [];
+        const alvo = lista.filter(a => a.codigo === codigo || a.pai === codigo);
+        for (const a of alvo) await fonte.excluirAtividade(cod, a);
+        aplicar({ ...dados, atividades: { ...dados.atividades, [cod]: lista.filter(a => !alvo.includes(a)) } });
+      },
+      async criarProjeto(novoProjeto) {
+        await fonte.criarProjeto(novoProjeto);
+        if (fonte.modo === 'sharepoint') { aplicar(await garantirGates(fonte, await fonte.carregar())); return; }
+        const c = novoProjeto.projeto.codigo;
+        aplicar({
+          ...dados,
+          projetos: [...dados.projetos, novoProjeto.projeto],
+          atividades: { ...dados.atividades, [c]: novoProjeto.atividades },
+          riscos: { ...dados.riscos, [c]: novoProjeto.riscos },
+          pendencias: { ...dados.pendencias, [c]: [] },
+          decisoes: { ...dados.decisoes, [c]: [] },
+          documentos: { ...dados.documentos, [c]: [] }
+        });
+      },
+      async enviarEmailCriacao(novoProjeto) {
+        if (!fonte.enviarEmail) throw new Error('no modo piloto o e-mail não é enviado; conectado ao SharePoint ele vai para a sua conta');
+        const { assunto, html } = emailNovoProjeto(novoProjeto, usuario);
+        return fonte.enviarEmail(assunto, html, config.emailTeste || undefined);
+      },
+      async restaurarPiloto() {
+        fonte.restaurar?.();
+        aplicar(await garantirGates(fonte, await fonte.carregar()));
+      }
+    };
+    return v;
+  }, [dados, fonte, usuario, sincronizando, atualizadoEm, atualizar, aplicar, bloquear]);
+
+  if (erro) {
+    return (
+      <main className="main">
+        <Mensagem tipo="erro"><b>Não foi possível carregar os dados.</b><br />{erro}</Mensagem>
+        <p className="sub">Confira o arquivo config.js (tenantId, clientId, sharepointHost e sitePath) e se as listas foram criadas pelo script.</p>
+      </main>
+    );
+  }
+  if (!valor) return <Carregando texto="Carregando o portal…" />;
+  return <PortalContext.Provider value={valor}>{children}</PortalContext.Provider>;
+}
+
+export function usePortal(): PortalValor {
+  const v = useContext(PortalContext);
+  if (!v) throw new Error('usePortal precisa estar dentro de <PortalProvider>.');
+  return v;
+}
+
+/** Enquanto `ativo`, a releitura automática não redesenha a tela. */
+export function useBloqueioSincronizacao(id: string, ativo: boolean) {
+  const { bloquear } = usePortal();
+  useEffect(() => { bloquear(id, ativo); return () => bloquear(id, false); }, [id, ativo, bloquear]);
+}
