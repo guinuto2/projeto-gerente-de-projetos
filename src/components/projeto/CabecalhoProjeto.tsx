@@ -13,8 +13,7 @@ export function CabecalhoProjeto({ projeto: p }: { projeto: Projeto }) {
   const [fundo, texto] = SELO_FAROL[p.farol] || SELO_FAROL.Verde;
   const dv = desvio(p);
   const ficha: [string, string][] = [
-    ['Cliente', p.cliente], ['Gerente de projeto', p.gerente], ['Arquiteto', p.arquiteto],
-    ['Patrocinador', p.patrocinador], ['Início', dma(p.inicio)]
+    ['Cliente', p.cliente], ['Gerente de projeto', p.gerente], ['Arquiteto', p.arquiteto], ['Início', dma(p.inicio)]
   ];
   return (
     <section className="card cab">

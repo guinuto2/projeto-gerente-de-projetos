@@ -4,6 +4,7 @@
   v3.2: corrige a coluna Gate, adiciona AprovadoPor/DataAprovacao/Parecer e repara gates antigos.
   v3.6: cria os gates G1..G4 que faltarem para cada projeto da lista.
   v3.7: aponta e (com -LimparGatesDuplicados) remove gates repetidos; cria a visão 'Por projeto'.
+  v3.14: tipos de projeto VMware, Omnissa e Client (substitui 'VMware / EUC').
 
 .EXEMPLOS
   # só a estrutura (listas vazias)
@@ -62,7 +63,18 @@ function Titulo([string]$L, [string]$Rot) { Set-PnPField -List $L -Identity 'Tit
 $L = 'Portal Projetos'; Lista $L 'Lists/PortalProjetos'; Titulo $L 'Nome do projeto'
 Campo $L 'Codigo' 'Código' 'Text'
 Campo $L 'Cliente' 'Cliente' 'Text'
-Campo $L 'TipoProjeto' 'Tipo' 'Choice' @('VMware / EUC', 'Storage', 'Servidores', 'Backup', 'Rede', 'Outros')
+$TIPOS = @('VMware', 'Omnissa', 'Client', 'Storage', 'Servidores', 'Backup', 'Rede')
+Campo $L 'TipoProjeto' 'Tipo' 'Choice' $TIPOS
+# v3.14: atualiza as opções da coluna existente e troca "VMware / EUC" por "VMware" nos projetos gravados
+$ctx = Get-PnPContext
+$campoTipo = $ctx.CastTo((Get-PnPField -List $L -Identity 'TipoProjeto'), [Microsoft.SharePoint.Client.FieldChoice])
+$campoTipo.Choices = [string[]]$TIPOS
+$campoTipo.Update()
+Invoke-PnPQuery
+foreach ($it in (Get-PnPListItem -List $L -PageSize 500 | Where-Object { [string]$_['TipoProjeto'] -eq 'VMware / EUC' })) {
+  Set-PnPListItem -List $L -Identity $it.Id -Values @{ TipoProjeto = 'VMware' } | Out-Null
+  Write-Host "  tipo do projeto $($it['Codigo']) atualizado para VMware" -ForegroundColor Green
+}
 Campo $L 'Fase' 'Fase' 'Choice' $FASES
 Campo $L 'Farol' 'Farol' 'Choice' @('Verde', 'Amarelo', 'Vermelho')
 Campo $L 'Situacao' 'Situação do cadastro' 'Choice' @('Rascunho', 'Em aprovação', 'Ativo', 'Encerrado')

@@ -6,7 +6,10 @@ export const PASTAS = ['01 · Iniciação', '02 · Planejamento', '03 · Execuç
 export const STATUS_ATIVIDADE: StatusAtividade[] = ['Planejado', 'Em andamento', 'Bloqueado', 'Concluído', 'Cancelado'];
 export const NIVEIS: Nivel[] = ['Baixo', 'Médio', 'Alto'];
 export const SITUACOES_RISCO: SituacaoRisco[] = ['Aberto', 'Em tratamento', 'Mitigado', 'Fechado'];
-export const TIPOS_PROJETO = ['VMware / EUC', 'Storage', 'Servidores', 'Backup', 'Rede', 'Outros'];
+export const TIPOS_PROJETO = ['VMware', 'Omnissa', 'Client', 'Storage', 'Servidores', 'Backup', 'Rede'];
+
+/** Nomes antigos de tipo gravados nas listas → nome atual. */
+export const normalizarTipo = (t: string): string => (/^vmware\s*\/\s*euc$/i.test((t || '').trim()) ? 'VMware' : t);
 
 export type Cores = [fundo: string, texto: string];
 
@@ -23,6 +26,9 @@ export const SELO_PENDENCIA: Record<string, Cores> = { 'Aberta': ['#FFF1D1', '#7
 export const GATE_COR: Record<string, string> = { 'Aprovado': '#7E181C', 'Aguardando aprovação': '#D69E2E', 'Pendente': '#A3A6AB' };
 export const GATE_CAIXA: Record<string, string> = { 'Aprovado': '#F6E9EA', 'Aguardando aprovação': '#FFF4DB', 'Pendente': '#F3F3F4' };
 export const COR_EXTENSAO: Record<string, string> = { docx: '#2B579A', doc: '#2B579A', xlsx: '#217346', xls: '#217346', pptx: '#B7472A', pdf: '#C0392B', vsdx: '#3955A3' };
+
+/** Ordena códigos como DA-A2 < DA-A10 (ordem numérica). */
+export const porCodigo = (a: { codigo: string }, b: { codigo: string }) => a.codigo.localeCompare(b.codigo, 'pt-BR', { numeric: true });
 
 /** classe visual da equipe: s = Systech, c = cliente, a = ambos */
 export function classeEquipe(equipe: string): 's' | 'c' | 'a' {

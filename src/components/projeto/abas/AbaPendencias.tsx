@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { Projeto } from '../../../types/models';
 import { usePortal } from '../../../state/PortalContext';
 import { usePapel } from '../../../state/PapelContext';
-import { SELO_PENDENCIA } from '../../../lib/constantes';
+import { SELO_PENDENCIA, porCodigo } from '../../../lib/constantes';
 import { Selo } from '../../ui/Selo';
 import { Vazio } from '../../ui/Vazio';
 import { EditarPendencia } from '../editores/EditarPendencia';
@@ -12,7 +12,7 @@ export function AbaPendencias({ projeto }: { projeto: Projeto }) {
   const [editando, setEditando] = useState<string | null>(null);
   const { pode } = usePapel();
   const abrir = (c: string) => { if (pode('responderPendencia')) setEditando(c); };
-  const L = dados.pendencias[projeto.codigo] || [];
+  const L = [...(dados.pendencias[projeto.codigo] || [])].sort(porCodigo);
   if (!L.length) return <Vazio>Nenhuma pendência registrada.</Vazio>;
   return (
     <>

@@ -1,7 +1,7 @@
 import type { Atividade, Dados, Gate, PastaDocumentos } from '../types/models';
 import type { FonteDados } from './FonteDados';
 import pilotoTrf1 from '../data/piloto-trf1.json';
-import { PASTAS } from '../lib/constantes';
+import { PASTAS, normalizarTipo } from '../lib/constantes';
 
 const CHAVE = 'portal-pmo-piloto-v3';
 const original = pilotoTrf1 as unknown as Dados;
@@ -23,6 +23,7 @@ export class FontePiloto implements FonteDados {
     } catch {
       this.d = structuredClone(original);
     }
+    this.d.projetos = this.d.projetos.map(p => ({ ...p, tipo: normalizarTipo(p.tipo) }));
     return this.d;
   }
 

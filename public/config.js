@@ -8,9 +8,14 @@ window.PORTAL_CONFIG = {
   biblioteca: 'Documentos de Projetos',
   sincronizarSegundos: 60,                                // releitura automática do SharePoint
 
-  // e-mail de teste ao cadastrar projeto (precisa da permissão Mail.Send no app Portal PMO)
-  emailAoCriarProjeto: true,
-  emailTeste: 'guilherme.santos@systechtecnologia.com.br', // destinatário; vazio = a conta logada
+  // ----- e-mails (permissão Mail.Send no app Portal PMO) -----
+  emailRemetente: '',                                     // caixa compartilhada que envia, ex.: 'pmo@systechtecnologia.com.br' (vazio = conta logada)
   urlPortal: '',                                          // endereço do portal nos links (vazio = o endereço aberto agora)
-  emailRemetente: ''                                      // caixa compartilhada que envia, ex.: 'pmo@systechtecnologia.com.br' (vazio = conta logada)
+  emailPatrocinador: 'guilherme.santos@systechtecnologia.com.br', // patrocinador: um ou mais, separados por vírgula
+
+  emailAoSolicitarAprovacao: true,   // PMO pede aprovação de projeto ou gate        → patrocinador
+  emailAoAprovar: true,              // patrocinador aprova gate ou projeto          → gerente do projeto + patrocinador
+  emailAoCriarProjeto: true,         // patrocinador cria projeto (já aprovado)      → gerente do projeto + patrocinador
+
+  emailSomentePara: 'guilherme.santos@systechtecnologia.com.br'   // TESTE: todos os e-mails vão só para este endereço (vazio = destinatários reais)
 };

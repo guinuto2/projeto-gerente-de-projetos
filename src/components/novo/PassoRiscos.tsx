@@ -11,7 +11,7 @@ export function PassoRiscos({ linhas, aoMudar, aoUsarModelo }: Props) {
     <>
       <div className="linha">
         <p className="sub">Registre os riscos conhecidos no início. Depois eles são atualizados na aba Riscos do projeto.</p>
-        <button type="button" className="btn pq" onClick={aoUsarModelo}>Copiar riscos padrão (R-1 a R-13)</button>
+        <button type="button" className="btn pq" onClick={aoUsarModelo}>Usar riscos padrão Systech</button>
       </div>
       <div className="twrap">
         <table className="tbl ftbl">

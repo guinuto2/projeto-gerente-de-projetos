@@ -1,4 +1,40 @@
-# Portal do Escritório de Projetos — v3.13 (React)
+# Portal do Escritório de Projetos — v3.18 (React)
+
+**v3.18 — perfis:** o perfil GP foi unido ao PMO, e o antigo PMO (aprovador) passou a se chamar Patrocinador.
+- **Patrocinador** (sigla PAT): aprova ou devolve gates e projetos, cria projetos já aprovados, exclui projetos.
+- **PMO**: cadastra e edita projetos, cronograma e riscos; envia projetos e solicita gates para o patrocinador.
+- **Técnico** (sigla TO): sem mudança.
+- config.js: `emailPmo` virou `emailPatrocinador` (o nome antigo ainda funciona).
+
+
+**v3.17**
+- Botão dos e-mails "à prova de Outlook": VML no Outlook do Windows e link estilizado nos demais (web, novo Outlook, celular).
+- Ciclo de vida: fases concluídas em tom verde.
+- E-mail para **GP e PMO** quando o PMO aprova um gate ou um projeto (G1), e quando o PMO cria um projeto (já aprovado).
+  O e-mail do GP vem da equipe do projeto (pessoa com função "Gerente de projeto" ou com o mesmo nome do GP).
+- config.js: `emailAoAprovar`; `emailTeste` foi substituído por `emailSomentePara` (teste: manda tudo para um endereço só).
+
+
+**v3.16**
+- Seção **Projetos encerrados** no portfólio (projetos com G4 aprovado). Eles saem da lista principal, dos indicadores,
+  dos próximos marcos e de "em andamento".
+- **E-mail ao PMO** quando o GP envia um projeto para aprovação ou solicita a aprovação de um gate
+  (`emailPmo` e `emailAoSolicitarAprovacao` no config.js; aceita vários endereços separados por vírgula).
+- E-mails no padrão do Outlook: texto e tabelas simples, sem largura fixa (bom no celular), com botão para o portal.
+
+
+**v3.15:** painel lateral com Cancelar à esquerda e as ações (Devolver ao GP, Aprovar) juntas à direita, sem vazar do painel; tipo de projeto "Outros" removido.
+
+**v3.14**
+- IDs das tabelas (pendências, decisões, riscos) não quebram mais e aparecem em ordem numérica.
+- Tipos de projeto: **VMware**, **Omnissa**, **Client**, Storage, Servidores, Backup, Rede, Outros ("VMware / EUC" vira "VMware").
+- Patrocinador removido das telas.
+- Arquiteto escolhido numa lista de técnicos cadastrados (`src/lib/pessoas.ts`; por enquanto só "Arquiteto Teste").
+- Modelo **padrão Systech** no cadastro (cronograma em 5 fases com EAP 1.x–5.x e 8 riscos padrão) no lugar do TRF1.
+- PMO cria projetos e aprova gates direto, com janela de confirmação: projeto criado pelo PMO entra ativo, com G1
+  aprovado e na fase de Planejamento. O GP continua enviando para aprovação.
+- Script: atualiza as opções da coluna Tipo e troca "VMware / EUC" por "VMware" nos projetos gravados.
+
 
 **v3.13:** atividades concluídas em verde no cronograma; indicadores do projeto (avanço, SPI, desvio, riscos, próximo marco) ocultos no perfil PMO e mantidos para GP e Técnico; removida a legenda do ciclo de vida.
 

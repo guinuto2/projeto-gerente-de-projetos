@@ -6,7 +6,8 @@ import type { FonteDados } from '../services/FonteDados';
 import { criarFonte } from '../services/criarFonte';
 import { config } from '../config/config';
 import { horaAgora } from '../lib/datas';
-import { emailNovoProjeto } from '../lib/emailProjeto';
+import { emailGateAprovado, emailProjetoCriadoPeloPmo, emailSolicitacaoGate, emailSolicitacaoProjeto } from '../lib/emailProjeto';
+import { progressoFase } from '../lib/calculos';
 import { gatesFaltantes } from '../lib/gates';
 import { useToast } from './ToastContext';
 import { Carregando } from '../components/ui/Carregando';
@@ -37,12 +38,30 @@ interface PortalValor {
   criarProjeto(novo: NovoProjeto): Promise<void>;
   /** teste: avisa por e-mail; devolve o destinatário */
   enviarEmailCriacao(novo: NovoProjeto): Promise<string>;
+  /** avisa o PMO que o GP pediu aprovação (projeto novo ou gate); devolve os destinatários */
+  avisarPmoProjeto(novo: NovoProjeto): Promise<string>;
+  avisarPmoGate(cod: string, gate: string): Promise<string>;
+  /** depois da aprovação de um gate (ou do projeto, no G1): avisa GP e PMO */
+  avisarAprovacao(cod: string, gate: string, parecer: string): Promise<string>;
   restaurarPiloto(): Promise<void>;
   /** telas de edição pedem para a releitura automática esperar */
   bloquear(id: string, ativo: boolean): void;
 }
 
 const PortalContext = createContext<PortalValor | null>(null);
+
+/** E-mail do gerente do projeto (PMO): membro da equipe com função de gerente, ou com o mesmo nome. */
+const emailPatrocinador = () => config.emailPatrocinador || config.emailPmo;
+function emailDoGp(p: Projeto): string {
+  const m = p.equipe.find(x => x.email && /gerente|^gp$/i.test(x.funcao)) || p.equipe.find(x => x.email && x.nome.trim().toLowerCase() === p.gerente.trim().toLowerCase());
+  return m?.email || '';
+}
+/** Destinatários sem repetição; em teste (emailSomentePara) tudo vai para um endereço só. */
+function destinatarios(...grupos: string[]): string {
+  if (config.emailSomentePara.trim()) return config.emailSomentePara.trim();
+  const lista = grupos.flatMap(g => g.split(/[,;]/)).map(x => x.trim().toLowerCase()).filter(Boolean);
+  return Array.from(new Set(lista)).join(', ');
+}
 
 /** Gates já criados nesta sessão (chave "PROJETO|G1"), para nunca criar o mesmo duas vezes. */
 const gatesCriados = new Map<string, Gate>();
@@ -284,10 +303,36 @@ export function PortalProvider({ children }: { children: ReactNode }) {
           documentos: { ...dados.documentos, [c]: [] }
         });
       },
+      async avisarPmoProjeto(novoProjeto) {
+        if (!fonte.enviarEmail) throw new Error('no modo piloto o e-mail não é enviado');
+        if (!emailPatrocinador()) throw new Error('defina emailPatrocinador no config.js');
+        const { assunto, html } = emailSolicitacaoProjeto(novoProjeto, usuario);
+        return fonte.enviarEmail(assunto, html, destinatarios(emailPatrocinador()));
+      },
+      async avisarPmoGate(cod, gate) {
+        if (!fonte.enviarEmail) throw new Error('no modo piloto o e-mail não é enviado');
+        if (!emailPatrocinador()) throw new Error('defina emailPatrocinador no config.js');
+        const p = projeto(cod), g = p.fases.find(x => x.gate === gate)!;
+        const fases = g.fase === 'Execução' ? ['Execução', 'Monitoramento'] as const : [g.fase];
+        const prog = fases.map(f => progressoFase(dados, cod, f)).reduce((s, x) => ({ feitas: s.feitas + x.feitas, total: s.total + x.total }), { feitas: 0, total: 0 });
+        const { assunto, html } = emailSolicitacaoGate(p, g, prog, usuario);
+        return fonte.enviarEmail(assunto, html, destinatarios(emailPatrocinador()));
+      },
+      async avisarAprovacao(cod, gate, parecer) {
+        if (!fonte.enviarEmail) throw new Error('no modo piloto o e-mail não é enviado');
+        const p = projeto(cod), g = p.fases.find(x => x.gate === gate)!;
+        const para = destinatarios(emailDoGp(p), emailPatrocinador());
+        if (!para) throw new Error('o gerente do projeto não tem e-mail na equipe e emailPatrocinador está vazio');
+        const proxima = gate === 'G4' ? 'Encerrado' : (PROXIMA_FASE[g.fase] || p.fase);
+        const { assunto, html } = emailGateAprovado(p, g, { por: usuario, em: fonte.hoje(), parecer, proximaFase: proxima });
+        return fonte.enviarEmail(assunto, html, para);
+      },
       async enviarEmailCriacao(novoProjeto) {
-        if (!fonte.enviarEmail) throw new Error('no modo piloto o e-mail não é enviado; conectado ao SharePoint ele vai para a sua conta');
-        const { assunto, html } = emailNovoProjeto(novoProjeto, usuario);
-        return fonte.enviarEmail(assunto, html, config.emailTeste || undefined);
+        if (!fonte.enviarEmail) throw new Error('no modo piloto o e-mail não é enviado');
+        // projeto criado pelo PMO já nasce aprovado: avisa GP e PMO
+        const para = destinatarios(emailDoGp(novoProjeto.projeto), emailPatrocinador());
+        const { assunto, html } = emailProjetoCriadoPeloPmo(novoProjeto, usuario);
+        return fonte.enviarEmail(assunto, html, para || undefined);
       },
       async restaurarPiloto() {
         fonte.restaurar?.();

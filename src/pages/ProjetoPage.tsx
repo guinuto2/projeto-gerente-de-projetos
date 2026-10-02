@@ -67,14 +67,17 @@ export function ProjetoPage() {
           }}>{limpando ? 'Removendo…' : 'Remover repetidos'}</button>
         </Mensagem>
       )}
+      {p.situacaoCadastro === 'Encerrado' && (
+        <Mensagem tipo="ok">Projeto encerrado{p.fases.find(g => g.gate === 'G4')?.dataAprovacao ? ` em ${p.fases.find(g => g.gate === 'G4')!.dataAprovacao!.split('-').reverse().join('/')}` : ''}. Ele aparece em “Projetos encerrados” no portfólio.</Mensagem>
+      )}
       {p.situacaoCadastro === 'Em aprovação' && (
         <Mensagem tipo="info" className="linha">
-          <span>Cadastro enviado pelo GP e aguardando aprovação do PMO. A aprovação registra o gate G1 e coloca o projeto no portfólio.</span>
+          <span>Cadastro enviado pelo PMO e aguardando aprovação do patrocinador. A aprovação registra o gate G1 e coloca o projeto no portfólio.</span>
           {g1 && pode('aprovarGate') && <button type="button" className="btn ok pq" onClick={() => { setFaseSel('Iniciação'); decidir(g1); }}>Analisar cadastro (G1)</button>}
         </Mensagem>
       )}
       <CabecalhoProjeto projeto={p} />
-      {papel !== 'PMO' && <IndicadoresProjeto projeto={p} />}
+      {papel !== 'Patrocinador' && <IndicadoresProjeto projeto={p} />}
       <CicloVida projeto={p} faseSel={faseSel} aoSelecionar={selecionarFase} aoDecidir={decidir} />
       <section className="card">
         <Abas abas={abas} ativa={aba} aoMudar={irAba} />

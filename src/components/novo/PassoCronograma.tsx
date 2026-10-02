@@ -11,7 +11,7 @@ export function PassoCronograma({ linhas, aoMudar, aoUsarModelo }: Props) {
     <>
       <div className="linha">
         <p className="sub">Liste as atividades macro. As datas informadas viram a baseline do projeto. Marque como marco as entregas que exigem aceite do cliente.</p>
-        <button type="button" className="btn pq" onClick={aoUsarModelo}>Usar cronograma modelo do TRF1</button>
+        <button type="button" className="btn pq" onClick={aoUsarModelo}>Usar cronograma padrão Systech</button>
       </div>
       <div className="twrap">
         <table className="tbl ftbl">

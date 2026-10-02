@@ -23,7 +23,7 @@ export function IndicadoresPortfolio() {
           ))}
         </div>
       </Kpi>
-      <Kpi rotulo="Aprovações pendentes" valor={aprovacoes} nota="gates e cadastros para o PMO" />
+      <Kpi rotulo="Aprovações pendentes" valor={aprovacoes} nota="gates e cadastros para o patrocinador" />
       <Kpi rotulo="Riscos altos abertos" valor={altos} alerta={altos > 0} nota="impacto alto, probabilidade média ou alta" />
       <Kpi rotulo="Pendências abertas" valor={pend} nota="aguardando definição do cliente" />
     </div>

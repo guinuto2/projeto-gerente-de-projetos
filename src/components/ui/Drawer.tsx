@@ -40,9 +40,11 @@ export function Drawer({ titulo, subtitulo, aberto, salvando, erro, aoFechar, ao
           {erro && <div className="msg erro">{erro}</div>}
         </form>
         <div className="drPe">
-          {acoes && <div style={{ marginRight: 'auto', display: 'flex', gap: 8 }}>{acoes}</div>}
           <button className="btn" type="button" onClick={aoFechar}>Cancelar</button>
-          <button className="btn pri" type="submit" form="drForm" disabled={salvando}>{salvando ? 'Salvando…' : rotuloSalvar}</button>
+          <div className="drPeAcoes">
+            {acoes}
+            <button className="btn pri" type="submit" form="drForm" disabled={salvando}>{salvando ? 'Salvando…' : rotuloSalvar}</button>
+          </div>
         </div>
       </aside>
     </>

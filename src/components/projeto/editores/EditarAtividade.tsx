@@ -95,7 +95,7 @@ export function EditarAtividade({ projeto, codigo, faseInicial, aoFechar }: Prop
       subtitulo={nova ? `${projeto.codigo} · cronograma` : `${projeto.codigo} · ${existente.fase} · ${existente.equipe}${existente.duracao ? ` · ${existente.duracao} dias úteis` : ''}`}
       rotuloSalvar={nova ? 'Incluir atividade' : 'Salvar'}
       acoes={!nova && estrutura && <button type="button" className="btn perigo" disabled={salvando} onClick={excluir}>Excluir</button>}>
-      {!estrutura && <div className="msg info">Perfil {papel}: você atualiza status, % concluído e observação. Datas e escopo da atividade são definidos pelo GP.</div>}
+      {!estrutura && <div className="msg info">Perfil {papel}: você atualiza status, % concluído e observação. Datas e escopo da atividade são definidos pelo PMO.</div>}
       <div className="fg2">
         <label className="campo">Código
           <input className="ctl" value={f.codigo} onChange={muda('codigo')} disabled={!nova} title={nova ? undefined : 'O código identifica a atividade e não pode ser alterado'} />

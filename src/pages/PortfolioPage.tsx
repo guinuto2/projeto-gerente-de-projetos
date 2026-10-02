@@ -9,6 +9,7 @@ import { IndicadoresPortfolio } from '../components/portfolio/IndicadoresPortfol
 import { CardProjeto } from '../components/portfolio/CardProjeto';
 import { ProximosMarcos } from '../components/portfolio/ProximosMarcos';
 import { EmAndamento } from '../components/portfolio/EmAndamento';
+import { ProjetosEncerrados } from '../components/portfolio/ProjetosEncerrados';
 import { Chips } from '../components/ui/Chips';
 import { Vazio } from '../components/ui/Vazio';
 
@@ -17,7 +18,7 @@ type Filtro = typeof FILTROS[number];
 
 export function PortfolioPage() {
   const { dados, fonte } = usePortal();
-  const { projetos, identidade } = useProjetosVisiveis();
+  const { projetos, encerrados, identidade } = useProjetosVisiveis();
   const { papel } = usePapel();
   const [filtro, setFiltro] = useState<Filtro>('Todas');
   const [busca, setBusca] = useState('');
@@ -42,7 +43,7 @@ export function PortfolioPage() {
             {!visiveis.length && (
               <Vazio>
                 {papel === 'Técnico' && !projetos.length
-                  ? <>Você ({identidade.nome || 'conta sem nome'}) ainda não está na equipe de nenhum projeto. Peça ao GP para incluir seu nome ou e-mail na equipe.</>
+                  ? <>Você ({identidade.nome || 'conta sem nome'}) ainda não está na equipe de nenhum projeto. Peça ao PMO para incluir seu nome ou e-mail na equipe.</>
                   : <>{dados.projetos.length ? 'Nenhum projeto com esse filtro.' : 'Nenhum projeto cadastrado ainda.'}
                     {papel !== 'Técnico' && <><br /><br /><Link className="btn pri" to="/novo">Cadastrar projeto</Link></>}</>}
               </Vazio>
@@ -53,6 +54,7 @@ export function PortfolioPage() {
             <EmAndamento />
           </aside>
         </div>
+        <ProjetosEncerrados projetos={encerrados} />
       </main>
     </>
   );

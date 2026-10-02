@@ -2,6 +2,7 @@ import type { EstadoFase, Fase, Gate, Projeto } from '../../types/models';
 import { usePortal } from '../../state/PortalContext';
 import { usePapel } from '../../state/PapelContext';
 import { useToast } from '../../state/ToastContext';
+import { config } from '../../config/config';
 import { estadoFase, progressoFase } from '../../lib/calculos';
 import { FASES, GATE_CAIXA } from '../../lib/constantes';
 import { dma } from '../../lib/datas';
@@ -10,7 +11,7 @@ import { TEMA } from '../../lib/tema';
 
 function cores(selecionada: boolean, e: EstadoFase): [string, string, string] {
   if (selecionada) return [TEMA.preto, '#fff', TEMA.preto];
-  if (e === 'Concluída') return ['#EEEFF1', TEMA.grafite, '#C9CBCF'];
+  if (e === 'Concluída') return ['#E8F5EE', '#145C3C', '#A9D8C6'];   // verde: fase concluída
   if (e === 'Em andamento') return [TEMA.vinhoClaro, TEMA.vinho, TEMA.vinhoBorda];
   return ['#FAFAFB', '#8A8D92', TEMA.borda];
 }
@@ -37,15 +38,20 @@ export const gateDaFase = (p: Projeto, f: Fase): Gate | undefined =>
  * A fase avança quando o gate é aprovado.
  */
 export function CicloVida({ projeto: p, faseSel, aoSelecionar, aoDecidir }: Props) {
-  const { dados, solicitarGate } = usePortal();
+  const { dados, solicitarGate, avisarPmoGate } = usePortal();
   const { pode } = usePapel();
   const toast = useToast();
   const gate = faseSel ? gateDaFase(p, faseSel) : undefined;
   const bloqueio = gate ? gateBloqueante(p, gate) : undefined;
 
   const solicitar = async (g: Gate) => {
-    try { await solicitarGate(p.codigo, g.gate); toast(`${g.gate} enviado para aprovação do PMO.`); }
-    catch (e) { toast((e as Error).message); }
+    try { await solicitarGate(p.codigo, g.gate); toast(`${g.gate} enviado para aprovação do patrocinador.`); }
+    catch (e) { toast((e as Error).message); return; }
+    if (config.emailAoSolicitarAprovacao) {
+      avisarPmoGate(p.codigo, g.gate)
+        .then(para => toast(`${g.gate} enviado. Patrocinador avisado por e-mail (${para}).`))
+        .catch(e => toast(`${g.gate} enviado, mas o e-mail ao patrocinador não saiu: ${(e as Error).message}.`));
+    }
   };
 
   const botaoFase = (f: Fase) => {
@@ -103,12 +109,12 @@ export function CicloVida({ projeto: p, faseSel, aoSelecionar, aoDecidir }: Prop
             )}
             {gate.situacao === 'Pendente' && gate.parecer && <div className="sub" style={{ fontSize: 13, marginTop: 4, color: '#9A2E12' }}>Devolvido: {gate.parecer}</div>}
             {bloqueio && gate.situacao !== 'Aprovado' && <div className="sub" style={{ fontSize: 13, marginTop: 4 }}>Só pode ser aprovado depois do {bloqueio.gate}.</div>}
-            {!bloqueio && gate.situacao === 'Aguardando aprovação' && !pode('aprovarGate') && <div className="sub" style={{ fontSize: 13, marginTop: 4 }}>Aguardando a decisão do PMO.</div>}
+            {!bloqueio && gate.situacao === 'Aguardando aprovação' && !pode('aprovarGate') && <div className="sub" style={{ fontSize: 13, marginTop: 4 }}>Aguardando a decisão do patrocinador.</div>}
           </div>
           {gate.situacao !== 'Aprovado' && !bloqueio && (
             <div className="gateAcoes">
               {gate.situacao === 'Pendente' && pode('solicitarGate') && <button type="button" className="btn pq" onClick={() => solicitar(gate)}>Solicitar aprovação</button>}
-              {pode('aprovarGate') && <button type="button" className="btn pq ok" onClick={() => aoDecidir(gate)}>{gate.situacao === 'Aguardando aprovação' ? 'Analisar e decidir' : 'Aprovar gate'}</button>}
+              {pode('aprovarGate') && <button type="button" className="btn pq ok" onClick={() => aoDecidir(gate)}>{gate.situacao === 'Aguardando aprovação' ? 'Analisar pedido do PMO' : `Aprovar ${gate.gate}`}</button>}
             </div>
           )}
         </div>

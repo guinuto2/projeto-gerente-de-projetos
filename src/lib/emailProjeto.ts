@@ -1,4 +1,8 @@
-import type { NovoProjeto } from '../types/models';
+/**
+ * E-mails do portal no "jeito Outlook": texto e tabelas simples, sem largura fixa (lê bem no celular),
+ * mais um botão para abrir o portal. Estilos inline porque o Outlook ignora CSS externo.
+ */
+import type { Gate, NovoProjeto, Projeto } from '../types/models';
 import { config } from '../config/config';
 import { dma } from './datas';
 
@@ -9,72 +13,152 @@ export function urlDoPortal(): string {
   const base = (config.urlPortal || `${window.location.origin}${window.location.pathname}`).replace(/#.*$/, '');
   return base.endsWith('/') || base.endsWith('.html') ? base : base + '/';
 }
+export const linkProjeto = (cod: string) => `${urlDoPortal()}#/projeto/${encodeURIComponent(cod)}`;
 
-// Cores da identidade Systech. O layout usa tabelas e estilos inline para funcionar no Outlook.
-const C = { preto: '#0B0E13', vinho: '#7E181C', texto: '#181D23', suave: '#575A5F', borda: '#E3E4E6', fundo: '#F5F5F6', claro: '#BABABA' };
+const FONTE = "font-family:Aptos,Calibri,Arial,sans-serif;font-size:14px;color:#222222";
+const BORDA = 'border:1px solid #D0D0D0';
 
-/** E-mail enviado quando um projeto é cadastrado: título, cliente, equipe e link de acesso. */
-export function emailNovoProjeto({ projeto: p }: NovoProjeto, autor: string): { assunto: string; html: string } {
-  const link = `${urlDoPortal()}#/projeto/${encodeURIComponent(p.codigo)}`;
-  const celula = `padding:10px 12px;border-bottom:1px solid ${C.borda};font-size:14px;color:${C.texto}`;
-  const equipe = p.equipe.length
-    ? p.equipe.map(m => `
-          <tr>
-            <td style="${celula};font-weight:600">${esc(m.nome)}</td>
-            <td style="${celula};color:${C.suave}">${esc(m.funcao)}</td>
-            <td style="${celula};color:${C.suave}">${esc(m.empresa)}</td>
-            <td style="${celula}">${m.email ? `<a href="mailto:${esc(m.email)}" style="color:${C.vinho};text-decoration:none">${esc(m.email)}</a>` : '<span style="color:#8A8D92">—</span>'}</td>
-          </tr>`).join('')
-    : `<tr><td colspan="4" style="${celula};color:${C.suave}">Equipe ainda não informada.</td></tr>`;
-  const dado = (rotulo: string, valor: string) => `
-          <td style="padding:0 24px 0 0;vertical-align:top">
-            <div style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:${C.suave}">${rotulo}</div>
-            <div style="font-size:15px;font-weight:600;color:${C.texto};margin-top:3px">${esc(valor) || '—'}</div>
-          </td>`;
+interface Email {
+  titulo: string;
+  intro: string;
+  dados: [string, string][];
+  equipe?: Projeto['equipe'];
+  observacao?: string;
+  botao: { texto: string; url: string };
+  rodape: string;
+}
 
-  const html = `<!doctype html>
-<html lang="pt-BR"><body style="margin:0;padding:0;background:${C.fundo}">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${C.fundo};padding:24px 0">
- <tr><td align="center">
-  <table role="presentation" width="640" cellpadding="0" cellspacing="0" style="max-width:640px;width:100%;background:#ffffff;border:1px solid ${C.borda};font-family:Montserrat,'Segoe UI',Arial,sans-serif">
-   <tr><td style="background:${C.preto};padding:18px 28px;border-bottom:3px solid ${C.vinho}">
-     <span style="display:inline-block;background:${C.vinho};color:#fff;font-weight:700;font-size:12px;padding:5px 8px">PMO</span>
-     <span style="color:#fff;font-weight:600;font-size:15px;margin-left:10px">Systech · Escritório de Projetos</span>
-   </td></tr>
-   <tr><td style="padding:28px 28px 8px">
-     <div style="font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:${C.vinho};font-weight:700">Novo projeto cadastrado</div>
-     <div style="font-size:24px;line-height:1.25;font-weight:700;color:${C.texto};margin-top:8px">${esc(p.nome)}</div>
-     <div style="font-size:13px;color:${C.suave};margin-top:6px;font-family:Consolas,'Courier New',monospace">${esc(p.codigo)}</div>
-   </td></tr>
-   <tr><td style="padding:16px 28px 4px">
-     <table role="presentation" cellpadding="0" cellspacing="0"><tr>
-       ${dado('Cliente', p.cliente)}${dado('Gerente de projeto', p.gerente)}${dado('Período', `${dma(p.inicio)} a ${dma(p.terminoPrevisto)}`)}
-     </tr></table>
-   </td></tr>
-   ${p.objetivo ? `<tr><td style="padding:16px 28px 0;font-size:14px;line-height:1.55;color:${C.suave}">${esc(p.objetivo)}</td></tr>` : ''}
-   <tr><td style="padding:24px 28px 8px">
-     <div style="font-size:15px;font-weight:700;color:${C.texto};margin-bottom:8px">Equipe do projeto</div>
-     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid ${C.borda}">
-       <tr style="background:${C.fundo}">
-         <th align="left" style="padding:8px 12px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:${C.suave}">Nome</th>
-         <th align="left" style="padding:8px 12px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:${C.suave}">Função</th>
-         <th align="left" style="padding:8px 12px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:${C.suave}">Empresa</th>
-         <th align="left" style="padding:8px 12px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:${C.suave}">E-mail</th>
-       </tr>${equipe}
-     </table>
-   </td></tr>
-   <tr><td style="padding:24px 28px 8px">
-     <table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="background:${C.vinho}">
-       <a href="${link}" style="display:inline-block;padding:13px 22px;color:#ffffff;font-weight:700;font-size:14px;text-decoration:none">Acessar o projeto no portal</a>
-     </td></tr></table>
-     <div style="font-size:12px;color:${C.suave};margin-top:10px">Se o botão não abrir, copie o endereço: <a href="${link}" style="color:${C.vinho}">${esc(link)}</a></div>
-   </td></tr>
-   <tr><td style="padding:20px 28px 24px;font-size:12px;color:#8A8D92;border-top:1px solid ${C.borda}">
-     Cadastrado por ${esc(autor)} · situação: ${esc(p.situacaoCadastro)}.<br>Mensagem automática de teste do Portal PMO.
-   </td></tr>
-  </table>
- </td></tr>
+/**
+ * Botão "à prova de Outlook": o Outlook do Windows (motor do Word) ignora padding e tamanho em links,
+ * então recebe um retângulo VML; os demais (Outlook web/novo, celular, Gmail) recebem um link estilizado.
+ */
+function botao(texto: string, url: string): string {
+  const largura = Math.max(200, Math.min(320, texto.length * 9 + 48));
+  return `<div style="margin:20px 0 6px">
+<!--[if mso]>
+<v:rect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="${url}" style="height:42px;v-text-anchor:middle;width:${largura}px;" stroke="f" fillcolor="#7E181C">
+<w:anchorlock/>
+<center style="color:#FFFFFF;font-family:Calibri,Arial,sans-serif;font-size:15px;font-weight:bold;">${esc(texto)}</center>
+</v:rect>
+<![endif]-->
+<!--[if !mso]><!-- -->
+<a href="${url}" target="_blank" style="display:inline-block;background:#7E181C;border:1px solid #7E181C;color:#FFFFFF;font-family:Aptos,Calibri,Arial,sans-serif;font-size:15px;font-weight:bold;line-height:20px;padding:11px 20px;text-decoration:none;border-radius:4px;mso-hide:all">${esc(texto)}</a>
+<!--<![endif]-->
+</div>`;
+}
+
+function montar(e: Email): string {
+  const linhaDado = ([k, v]: [string, string]) =>
+    `<tr><td style="${BORDA};padding:6px 10px;background:#F3F3F3;width:35%;vertical-align:top"><b>${esc(k)}</b></td><td style="${BORDA};padding:6px 10px;vertical-align:top">${esc(v) || '—'}</td></tr>`;
+  const equipe = e.equipe && e.equipe.length
+    ? `<p style="margin:18px 0 6px"><b>Equipe</b></p>
+<table cellpadding="0" cellspacing="0" style="border-collapse:collapse;width:100%;max-width:600px;${FONTE}">
+${e.equipe.map(m => `<tr><td style="${BORDA};padding:6px 10px;vertical-align:top"><b>${esc(m.nome)}</b><br><span style="color:#555555">${esc([m.funcao, m.empresa].filter(Boolean).join(' · '))}</span>${m.email ? `<br><a href="mailto:${esc(m.email)}" style="color:#0563C1">${esc(m.email)}</a>` : ''}</td></tr>`).join('\n')}
+</table>` : '';
+  return `<!doctype html>
+<html lang="pt-BR"><body style="margin:0;padding:12px;${FONTE}">
+<p style="margin:0 0 4px;font-size:18px"><b>${esc(e.titulo)}</b></p>
+<p style="margin:0 0 14px;line-height:1.5">${e.intro}</p>
+<table cellpadding="0" cellspacing="0" style="border-collapse:collapse;width:100%;max-width:600px;${FONTE}">
+${e.dados.map(linhaDado).join('\n')}
 </table>
+${e.observacao ? `<p style="margin:14px 0 0;line-height:1.5">${esc(e.observacao)}</p>` : ''}
+${equipe}
+${botao(e.botao.texto, e.botao.url)}
+<p style="margin:0 0 16px;font-size:12px;color:#555555">Se o botão não abrir: <a href="${e.botao.url}" style="color:#0563C1">${esc(e.botao.url)}</a></p>
+<p style="margin:0;font-size:12px;color:#777777">${esc(e.rodape)}</p>
 </body></html>`;
-  return { assunto: `[Portal PMO] Novo projeto ${p.codigo} · ${p.nome} · ${p.cliente}`, html };
+}
+
+const dadosProjeto = (p: Projeto): [string, string][] => [
+  ['Projeto', `${p.codigo} · ${p.nome}`], ['Cliente', p.cliente], ['Tipo', p.tipo],
+  ['Gerente de projeto', p.gerente], ['Arquiteto', p.arquiteto], ['Período', `${dma(p.inicio)} a ${dma(p.terminoPrevisto || p.terminoBaseline)}`]
+];
+
+/** Projeto criado (PMO) — vai para o destinatário de teste. */
+export function emailNovoProjeto({ projeto: p }: NovoProjeto, autor: string) {
+  return {
+    assunto: `[Portal PMO] Novo projeto ${p.codigo} · ${p.nome} · ${p.cliente}`,
+    html: montar({
+      titulo: `Novo projeto: ${p.nome}`,
+      intro: `O projeto <b>${esc(p.codigo)}</b> foi cadastrado por ${esc(autor)} e está com a situação <b>${esc(p.situacaoCadastro)}</b>.`,
+      dados: dadosProjeto(p), equipe: p.equipe, observacao: p.objetivo,
+      botao: { texto: 'Abrir o projeto no portal', url: linkProjeto(p.codigo) },
+      rodape: 'Mensagem automática do Portal PMO.'
+    })
+  };
+}
+
+/** GP enviou um projeto novo para aprovação do PMO. */
+export function emailSolicitacaoProjeto({ projeto: p, atividades, riscos }: NovoProjeto, autor: string) {
+  return {
+    assunto: `[Portal PMO] Aprovação solicitada · novo projeto ${p.codigo} · ${p.cliente}`,
+    html: montar({
+      titulo: 'Aprovação de projeto solicitada',
+      intro: `${esc(autor)} cadastrou o projeto <b>${esc(p.codigo)} · ${esc(p.nome)}</b> e pediu a aprovação do patrocinador. A aprovação registra o gate <b>G1</b> e coloca o projeto no portfólio.`,
+      dados: [...dadosProjeto(p), ['Cronograma', `${atividades.length} atividades (${atividades.filter(a => a.marco).length} marcos)`], ['Riscos', `${riscos.length} registrados`]],
+      equipe: p.equipe, observacao: p.objetivo,
+      botao: { texto: 'Analisar no portal', url: linkProjeto(p.codigo) },
+      rodape: 'No portal, abra o projeto e clique em "Analisar cadastro (G1)". Mensagem automática do Portal PMO.'
+    })
+  };
+}
+
+/** GP pediu a aprovação de um gate. */
+export function emailSolicitacaoGate(p: Projeto, g: Gate, progresso: { feitas: number; total: number }, autor: string) {
+  return {
+    assunto: `[Portal PMO] Aprovação solicitada · ${g.gate} do projeto ${p.codigo} · ${p.cliente}`,
+    html: montar({
+      titulo: `Aprovação do ${g.gate} solicitada`,
+      intro: `${esc(autor)} pediu a aprovação do gate <b>${esc(g.nome)}</b> no projeto <b>${esc(p.codigo)} · ${esc(p.nome)}</b>.`,
+      dados: [
+        ['Projeto', `${p.codigo} · ${p.nome}`], ['Cliente', p.cliente], ['Gerente de projeto', p.gerente],
+        ['Gate', g.nome], ['Fase', g.fase === 'Execução' ? 'Execução e Monitoramento' : g.fase],
+        ['Atividades da fase', `${progresso.feitas} de ${progresso.total} concluídas`],
+        ['Data prevista do gate', dma(g.data)]
+      ],
+      observacao: g.info,
+      botao: { texto: 'Analisar no portal', url: linkProjeto(p.codigo) },
+      rodape: `No portal, abra o projeto, clique no losango ${g.gate} e em "Analisar pedido do PMO". Mensagem automática do Portal PMO.`
+    })
+  };
+}
+
+/** Gate aprovado pelo PMO (G1 de projeto enviado pelo GP vira "Projeto aprovado"). */
+export function emailGateAprovado(p: Projeto, g: Gate, extra: { por: string; em: string; parecer: string; proximaFase: string }) {
+  const projetoAprovado = g.gate === 'G1';
+  const encerrou = g.gate === 'G4';
+  const titulo = projetoAprovado ? 'Projeto aprovado' : encerrou ? 'Projeto encerrado' : `${g.gate} aprovado`;
+  const resultado = projetoAprovado
+    ? `O projeto entrou no portfólio e está na fase de <b>${esc(extra.proximaFase)}</b>.`
+    : encerrou ? 'O projeto foi encerrado e aparece em “Projetos encerrados” no portfólio.'
+    : `O projeto avançou para a fase de <b>${esc(extra.proximaFase)}</b>.`;
+  return {
+    assunto: `[Portal PMO] ${titulo} · ${p.codigo} · ${p.cliente}`,
+    html: montar({
+      titulo,
+      intro: `${esc(extra.por)} aprovou o gate <b>${esc(g.nome)}</b> do projeto <b>${esc(p.codigo)} · ${esc(p.nome)}</b>. ${resultado}`,
+      dados: [
+        ['Projeto', `${p.codigo} · ${p.nome}`], ['Cliente', p.cliente], ['Gerente de projeto', p.gerente],
+        ['Gate', g.nome], ['Aprovado por', extra.por], ['Data da aprovação', dma(extra.em)],
+        ['Parecer do patrocinador', extra.parecer || '—'], ['Fase atual', encerrou ? 'Encerrado' : extra.proximaFase]
+      ],
+      botao: { texto: 'Abrir o projeto no portal', url: linkProjeto(p.codigo) },
+      rodape: 'Mensagem automática do Portal PMO.'
+    })
+  };
+}
+
+/** Projeto criado pelo PMO (já nasce aprovado). */
+export function emailProjetoCriadoPeloPmo({ projeto: p }: NovoProjeto, autor: string) {
+  return {
+    assunto: `[Portal PMO] Projeto aprovado · ${p.codigo} · ${p.cliente}`,
+    html: montar({
+      titulo: 'Projeto criado e aprovado pelo patrocinador',
+      intro: `${esc(autor)} criou o projeto <b>${esc(p.codigo)} · ${esc(p.nome)}</b>. Ele já está ativo no portfólio, com o G1 aprovado, na fase de <b>Planejamento</b>.`,
+      dados: dadosProjeto(p), equipe: p.equipe, observacao: p.objetivo,
+      botao: { texto: 'Abrir o projeto no portal', url: linkProjeto(p.codigo) },
+      rodape: 'Mensagem automática do Portal PMO.'
+    })
+  };
 }

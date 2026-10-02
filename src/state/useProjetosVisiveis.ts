@@ -34,6 +34,9 @@ export function useProjetosVisiveis() {
       (!!identidade.email && !!m.email && norm(m.email) === norm(identidade.email)));
   }, [papel, identidade]);
 
-  const projetos = useMemo(() => dados.projetos.filter(podeVer), [dados.projetos, podeVer]);
-  return { projetos, podeVer, identidade, membros };
+  const todos = useMemo(() => dados.projetos.filter(podeVer), [dados.projetos, podeVer]);
+  /** projetos em andamento (o que o portfólio, os indicadores e os marcos consideram) */
+  const projetos = useMemo(() => todos.filter(p => p.situacaoCadastro !== 'Encerrado'), [todos]);
+  const encerrados = useMemo(() => todos.filter(p => p.situacaoCadastro === 'Encerrado'), [todos]);
+  return { projetos, encerrados, todos, podeVer, identidade, membros };
 }

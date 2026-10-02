@@ -1,10 +1,11 @@
 import type { Projeto } from '../../../types/models';
 import { usePortal } from '../../../state/PortalContext';
 import { Vazio } from '../../ui/Vazio';
+import { porCodigo } from '../../../lib/constantes';
 
 export function AbaDecisoes({ projeto }: { projeto: Projeto }) {
   const { dados } = usePortal();
-  const L = dados.decisoes[projeto.codigo] || [];
+  const L = [...(dados.decisoes[projeto.codigo] || [])].sort(porCodigo);
   if (!L.length) return <Vazio>Nenhuma decisão de arquitetura registrada.</Vazio>;
   return (
     <div className="twrap">

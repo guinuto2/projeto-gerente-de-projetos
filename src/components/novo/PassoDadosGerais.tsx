@@ -1,5 +1,6 @@
 import type { FormProjeto } from './formulario';
 import { TIPOS_PROJETO } from '../../lib/constantes';
+import { arquitetos } from '../../lib/pessoas';
 
 type Campo = keyof Omit<FormProjeto, 'atividades' | 'riscos' | 'equipe'>;
 interface Props { form: FormProjeto; mudar: (c: Campo, v: string) => void; edicao?: boolean }
@@ -18,12 +19,23 @@ export function PassoDadosGerais({ form, mudar, edicao = false }: Props) {
         {campo('nome', 'Nome do projeto *', { span: true })}
         {campo('cliente', 'Cliente *')}
         <label className="campo">Tipo
-          <select className="ctl" value={form.tipo} onChange={e => mudar('tipo', e.target.value)}>{TIPOS_PROJETO.map(t => <option key={t}>{t}</option>)}</select>
+          <select className="ctl" value={form.tipo} onChange={e => mudar('tipo', e.target.value)}>
+            {TIPOS_PROJETO.map(t => <option key={t}>{t}</option>)}
+            {/* projeto antigo com tipo que saiu da lista: mantém o valor até ser trocado */}
+            {form.tipo && !TIPOS_PROJETO.includes(form.tipo) && <option value={form.tipo}>{form.tipo} (fora da lista)</option>}
+          </select>
         </label>
         {campo('contrato', 'Contrato / pedido')}
         {campo('gerente', 'Gerente de projeto *')}
-        {campo('arquiteto', 'Arquiteto')}
-        {campo('patrocinador', 'Patrocinador')}
+        <label className="campo">Arquiteto
+          <select className="ctl" value={form.arquiteto} onChange={e => mudar('arquiteto', e.target.value)}>
+            <option value="">— selecione —</option>
+            {arquitetos().map(a => <option key={a.email} value={a.nome}>{a.nome} · {a.email}</option>)}
+            {/* mantém o valor atual de projetos antigos, mesmo que não esteja no cadastro */}
+            {form.arquiteto && !arquitetos().some(a => a.nome === form.arquiteto) && <option value={form.arquiteto}>{form.arquiteto} (fora do cadastro)</option>}
+          </select>
+          <span className="dica">Técnicos cadastrados no sistema</span>
+        </label>
         {campo('inicio', 'Início previsto *', { type: 'date' })}
         {campo('termino', edicao ? 'Término previsto *' : 'Término previsto *', { type: 'date' })}
       </div>

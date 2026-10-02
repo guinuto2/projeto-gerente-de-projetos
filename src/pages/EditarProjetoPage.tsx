@@ -47,7 +47,7 @@ export function EditarProjetoPage() {
     try {
       await editarProjeto(p.codigo, {
         nome: form.nome.trim(), cliente: form.cliente.trim(), tipo: form.tipo, contrato: form.contrato.trim(),
-        gerente: form.gerente.trim(), arquiteto: form.arquiteto.trim(), patrocinador: form.patrocinador.trim(),
+        gerente: form.gerente.trim(), arquiteto: form.arquiteto.trim(),
         inicio: form.inicio, terminoPrevisto: form.termino, objetivo: form.objetivo.trim(), farol,
         escopoIncluido: linhas(form.escopoIncluido), escopoExcluido: linhas(form.escopoExcluido),
         premissas: linhas(form.premissas), dependencias: linhas(form.dependencias), restricoes: linhas(form.restricoes),

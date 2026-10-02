@@ -2,7 +2,7 @@ import type { PortalConfig } from '../config/config';
 import type {
   Atividade, Dados, Fase, Gate, MembroEquipe, NovoProjeto, PastaDocumentos, Pendencia, Projeto, Risco
 } from '../types/models';
-import { GATE_DA_FASE, PASTAS } from '../lib/constantes';
+import { GATE_DA_FASE, PASTAS, normalizarTipo } from '../lib/constantes';
 import { hojeIso, isoDeDataHora, iso, linhas } from '../lib/datas';
 import type { Autenticador } from './auth';
 import type { FonteDados } from './FonteDados';
@@ -153,7 +153,7 @@ export class FonteSharePoint implements FonteDados {
       const f = it.fields, cod = txt(f.Codigo);
       codigoPorId[it.id] = cod;
       d.projetos.push({
-        _id: it.id, codigo: cod, nome: txt(f.Title), cliente: txt(f.Cliente), tipo: txt(f.TipoProjeto),
+        _id: it.id, codigo: cod, nome: txt(f.Title), cliente: txt(f.Cliente), tipo: normalizarTipo(txt(f.TipoProjeto)),
         fase: (txt(f.Fase) || 'Iniciação') as Fase, farol: (txt(f.Farol) || 'Verde') as Projeto['farol'],
         situacaoCadastro: (txt(f.Situacao) || 'Rascunho') as Projeto['situacaoCadastro'],
         gerente: txt(f.Gerente), arquiteto: txt(f.Arquiteto), patrocinador: txt(f.Patrocinador), contrato: txt(f.Contrato),
@@ -376,7 +376,8 @@ export class FonteSharePoint implements FonteDados {
     const r = await fetch('https://graph.microsoft.com/v1.0' + endpoint, {
       method: 'POST',
       headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: { subject: assunto, body: { contentType: 'HTML', content: html }, toRecipients: [{ emailAddress: { address: destino } }] }, saveToSentItems: true })
+      body: JSON.stringify({ message: { subject: assunto, body: { contentType: 'HTML', content: html },
+        toRecipients: destino.split(/[,;]/).map(x => x.trim()).filter(Boolean).map(address => ({ emailAddress: { address } })) }, saveToSentItems: true })
     });
     if (!r.ok) {
       let msg = r.statusText, codigo = '';
