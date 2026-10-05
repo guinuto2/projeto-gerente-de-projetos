@@ -54,3 +54,27 @@ export const PROXIMA_FASE: Partial<Record<Fase, Fase>> = {
  * o gate da Execução (G3) fica depois do bloco, antes do Encerramento.
  */
 export const GATE_APOS_FASE: Record<string, Fase> = { 'Iniciação': 'Iniciação', 'Planejamento': 'Planejamento', 'Execução': 'Monitoramento', 'Monitoramento': 'Monitoramento', 'Encerramento': 'Encerramento' };
+
+/** Tipos de reunião do Teams: duração sugerida e se convida só a equipe Systech. */
+export interface TipoReuniao { nome: string; duracaoMin: number; somenteSystech: boolean; descricao: string }
+export const TIPOS_REUNIAO: TipoReuniao[] = [
+  { nome: 'Implementação', duracaoMin: 120, somenteSystech: false, descricao: 'Janela de implantação com a equipe técnica e o cliente' },
+  { nome: 'Alinhamento', duracaoMin: 60, somenteSystech: false, descricao: 'Alinhamento de escopo, prazos e pendências com o cliente' },
+  { nome: 'Interna', duracaoMin: 30, somenteSystech: true, descricao: 'Só a equipe Systech' },
+  { nome: 'Execução', duracaoMin: 60, somenteSystech: false, descricao: 'Acompanhamento da execução das atividades' }
+];
+export const tipoReuniao = (nome?: string) => TIPOS_REUNIAO.find(t => t.nome === nome);
+
+/** Funções possíveis na equipe do projeto (lista fechada). */
+export const FUNCOES_EQUIPE = ['Técnico', 'Gerente de projeto', 'Arquiteto', 'Responsável do cliente', 'Responsável do fornecedor', 'Patrocinador'];
+
+/** Próximo código da sequência (R-7 → R-8, DA-A16 → DA-A17); usa o prefixo mais comum da lista. */
+export function proximoCodigoSeq(codigos: string[], prefixoPadrao: string): string {
+  const partes = codigos.map(c => /^(.*?)(\d+)$/.exec(c.trim())).filter((m): m is RegExpExecArray => !!m);
+  if (!partes.length) return prefixoPadrao + '1';
+  const contagem = new Map<string, number>();
+  for (const m of partes) contagem.set(m[1], (contagem.get(m[1]) || 0) + 1);
+  const prefixo = [...contagem.entries()].sort((a, b) => b[1] - a[1])[0][0];
+  const maior = Math.max(...partes.filter(m => m[1] === prefixo).map(m => Number(m[2])));
+  return prefixo + (maior + 1);
+}

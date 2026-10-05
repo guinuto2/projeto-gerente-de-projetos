@@ -35,7 +35,7 @@ export function Drawer({ titulo, subtitulo, aberto, salvando, erro, aoFechar, ao
           <div><div className="sub">{subtitulo}</div><h2 className="h3" style={{ marginTop: 4 }}>{titulo}</h2></div>
           <button className="fechar" type="button" onClick={aoFechar} aria-label="Fechar">×</button>
         </div>
-        <form className="drCorpo" id="drForm" onSubmit={enviar}>
+        <form className="drCorpo" id="drForm" onSubmit={enviar} noValidate>
           {children}
           {erro && <div className="msg erro">{erro}</div>}
         </form>

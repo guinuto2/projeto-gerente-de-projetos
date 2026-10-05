@@ -11,8 +11,14 @@ export interface PortalConfig {
   emailAoCriarProjeto: boolean;
   /** TESTE: se preenchido, todos os e-mails vão só para este endereço (em vez de GP/PMO) */
   emailSomentePara: string;
+  /** TESTE: se preenchido, os convites de reunião do Teams vão só para este(s) endereço(s); tem prioridade sobre emailSomentePara */
+  reuniaoSomentePara: string;
   /** avisa GP e PMO quando um gate ou projeto é aprovado */
   emailAoAprovar: boolean;
+  /** manda um resumo (antes → agora) aos convidados quando a reunião do Teams é alterada */
+  emailAoAlterarReuniao: boolean;
+  /** avisa equipe, PMO e patrocinador quando um projeto é excluído */
+  emailAoExcluirProjeto: boolean;
   /** endereço do portal usado nos links dos e-mails; vazio = o endereço aberto no navegador */
   urlPortal: string;
   /** caixa compartilhada que envia os e-mails (ex.: pmo@empresa.com.br); vazio = a conta logada */
@@ -38,7 +44,10 @@ export const config: PortalConfig = {
   sincronizarSegundos: 60,
   emailAoCriarProjeto: true,
   emailSomentePara: '',
+  reuniaoSomentePara: '',
   emailAoAprovar: true,
+  emailAoAlterarReuniao: true,
+  emailAoExcluirProjeto: true,
   urlPortal: '',
   emailRemetente: '',
   emailPatrocinador: '',

@@ -5,6 +5,9 @@
   v3.6: cria os gates G1..G4 que faltarem para cada projeto da lista.
   v3.7: aponta e (com -LimparGatesDuplicados) remove gates repetidos; cria a visão 'Por projeto'.
   v3.14: tipos de projeto VMware, Omnissa e Client (substitui 'VMware / EUC').
+  v3.19: colunas da reunião do Teams em Portal Atividades.
+  v3.23: coluna ReuniaoTipo (Implementação, Alinhamento, Interna, Execução).
+  v3.24: lista Portal Tecnicos (Nome, E-mail, Função, Ativo) com os técnicos da Systech.
 
 .EXEMPLOS
   # só a estrutura (listas vazias)
@@ -52,6 +55,20 @@ function CampoData([string]$L, [string]$N, [string]$Rot) {
   if (Tem $L $N) { return }
   Add-PnPFieldFromXml -List $L -FieldXml "<Field Type='DateTime' Format='DateOnly' DisplayName='$Rot' Name='$N' StaticName='$N' />" | Out-Null
 }
+# Troca as opções de uma coluna de escolha editando o esquema (SchemaXml) — funciona em qualquer versão do PnP.
+function Atualizar-Opcoes([string]$Lista, [string]$Interno, [string[]]$Opcoes) {
+  $campo = Get-PnPField -List $Lista -Identity $Interno
+  $xml = [xml]$campo.SchemaXml
+  $no = $xml.DocumentElement.SelectSingleNode('CHOICES')
+  if (-not $no) { $no = $xml.CreateElement('CHOICES'); [void]$xml.DocumentElement.AppendChild($no) }
+  $no.RemoveAll()
+  foreach ($o in $Opcoes) { $c = $xml.CreateElement('CHOICE'); $c.InnerText = $o; [void]$no.AppendChild($c) }
+  $campo.SchemaXml = $xml.OuterXml
+  $campo.Update()
+  Invoke-PnPQuery
+  Write-Host "  opções de ${Interno}: $($Opcoes -join ', ')" -ForegroundColor DarkGray
+}
+
 function Projeto([string]$L) {
   if (Tem $L 'Projeto') { return }
   $alvo = Get-PnPList -Identity 'Portal Projetos'
@@ -66,14 +83,15 @@ Campo $L 'Cliente' 'Cliente' 'Text'
 $TIPOS = @('VMware', 'Omnissa', 'Client', 'Storage', 'Servidores', 'Backup', 'Rede')
 Campo $L 'TipoProjeto' 'Tipo' 'Choice' $TIPOS
 # v3.14: atualiza as opções da coluna existente e troca "VMware / EUC" por "VMware" nos projetos gravados
-$ctx = Get-PnPContext
-$campoTipo = $ctx.CastTo((Get-PnPField -List $L -Identity 'TipoProjeto'), [Microsoft.SharePoint.Client.FieldChoice])
-$campoTipo.Choices = [string[]]$TIPOS
-$campoTipo.Update()
-Invoke-PnPQuery
-foreach ($it in (Get-PnPListItem -List $L -PageSize 500 | Where-Object { [string]$_['TipoProjeto'] -eq 'VMware / EUC' })) {
-  Set-PnPListItem -List $L -Identity $it.Id -Values @{ TipoProjeto = 'VMware' } | Out-Null
-  Write-Host "  tipo do projeto $($it['Codigo']) atualizado para VMware" -ForegroundColor Green
+# (troca as opções editando o esquema da coluna; não interrompe o script se falhar)
+try {
+  Atualizar-Opcoes $L 'TipoProjeto' $TIPOS
+  foreach ($it in (Get-PnPListItem -List $L -PageSize 500 | Where-Object { [string]$_['TipoProjeto'] -eq 'VMware / EUC' })) {
+    Set-PnPListItem -List $L -Identity $it.Id -Values @{ TipoProjeto = 'VMware' } | Out-Null
+    Write-Host "  tipo do projeto $($it['Codigo']) atualizado para VMware" -ForegroundColor Green
+  }
+} catch {
+  Write-Warning "Não foi possível atualizar as opções da coluna Tipo: $($_.Exception.Message). O restante do script continua."
 }
 Campo $L 'Fase' 'Fase' 'Choice' $FASES
 Campo $L 'Farol' 'Farol' 'Choice' @('Verde', 'Amarelo', 'Vermelho')
@@ -110,6 +128,11 @@ Campo $L 'Marco' 'Marco' 'Boolean'
 Campo $L 'AtividadePai' 'Atividade pai (código)' 'Text'
 Campo $L 'Descricao' 'Descrição' 'Note'
 Campo $L 'Observacao' 'Observação' 'Note'
+# v3.19: reunião do Teams ligada à atividade
+Campo $L 'ReuniaoTeams' 'Reunião do Teams (link)' 'Note'
+Campo $L 'ReuniaoInicio' 'Reunião · início' 'Text'
+Campo $L 'ReuniaoId' 'Reunião · ID do evento' 'Text'
+Campo $L 'ReuniaoTipo' 'Reunião · tipo' 'Text'
 
 # ------------------------------------------------------------ Portal Riscos
 $L = 'Portal Riscos'; Lista $L 'Lists/PortalRiscos'; Titulo $L 'Risco'
@@ -219,6 +242,25 @@ Campo $L 'Codigo' 'ID' 'Text'
 Campo $L 'Descricao' 'Descrição' 'Note'
 Campo $L 'Justificativa' 'Justificativa' 'Note'
 Campo $L 'Impacto' 'Impacto / observação' 'Note'
+
+# ------------------------------------------------------------ Portal Tecnicos (tabela de técnicos da Systech)
+$L = 'Portal Tecnicos'; Lista $L 'Lists/PortalTecnicos'; Titulo $L 'Nome'
+Campo $L 'Email' 'E-mail' 'Text'
+Campo $L 'Funcao' 'Função' 'Choice' @('Técnico', 'Arquiteto', 'Gerente de projeto')
+Campo $L 'Ativo' 'Ativo' 'Boolean'
+# cadastro inicial: inclui só quem ainda não está na lista (compara pelo e-mail)
+$TECNICOS = @(
+  @{ Nome = 'Guilherme Santos'; Email = 'guilherme.santos@systech.com.br' },
+  @{ Nome = 'Felipe Cunha';     Email = 'felipe.cunha@systechtecnologia.com.br' },
+  @{ Nome = 'Mario Junior';     Email = 'mario.junior@systechtecnologia.com.br' },
+  @{ Nome = 'Leonardo Costa';   Email = 'leonardo.costa@systechtecnologia.com.br' }
+)
+$jaCadastrados = @(Get-PnPListItem -List $L -PageSize 500 | ForEach-Object { ([string]$_['Email']).Trim().ToLower() })
+foreach ($t in $TECNICOS) {
+  if ($jaCadastrados -contains $t.Email.ToLower()) { continue }
+  Add-PnPListItem -List $L -Values @{ Title = $t.Nome; Email = $t.Email; Funcao = 'Técnico'; Ativo = $true } | Out-Null
+  Write-Host "  técnico cadastrado: $($t.Nome) <$($t.Email)>" -ForegroundColor Green
+}
 
 # ------------------------------------------------------------ biblioteca de documentos
 Lista $BIB 'DocumentosProjetos' 'DocumentLibrary'

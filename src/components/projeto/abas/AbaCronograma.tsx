@@ -8,6 +8,7 @@ import { Chips } from '../../ui/Chips';
 import { Vazio } from '../../ui/Vazio';
 import { Gantt } from './Gantt';
 import { TEMA } from '../../../lib/tema';
+import { ExportarCsv } from './ExportarCsv';
 import { EditarAtividade } from '../editores/EditarAtividade';
 
 interface Props { projeto: Projeto; faseSel: Fase | null; limparFase: () => void }
@@ -28,6 +29,14 @@ export function AbaCronograma({ projeto, faseSel, limparFase }: Props) {
       {editor}
     </>
   );
+  if (!atividades.some(a => a.inicio && a.termino)) return (
+    <>
+      <Vazio>As atividades ainda não têm datas. Abra cada uma para informar início e término.<br /><br />
+        {pode('gerenciarAtividades') && <button type="button" className="btn pri" onClick={() => setEditando('nova')}>+ Nova atividade</button>}</Vazio>
+      <ul className="ul">{atividades.map(a => <li key={a.codigo}><button type="button" className="btn pq" onClick={() => setEditando(a.codigo)}>{a.codigo} · {a.nome}</button></li>)}</ul>
+      {editor}
+    </>
+  );
   const equipes = ['Todas', ...Array.from(new Set(macro(dados, projeto.codigo).map(a => a.equipe)))];
   const legenda: [string, string, number][] = [['Concluído', TEMA.concluido, 8], ['Em curso', TEMA.emCurso, 8], ['Atrasado', TEMA.atrasado, 8], ['Baseline', TEMA.baseline, 3]];
   return (
@@ -35,6 +44,7 @@ export function AbaCronograma({ projeto, faseSel, limparFase }: Props) {
       <div className="linha" style={{ marginBottom: 14 }}>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
           {pode('gerenciarAtividades') && <button type="button" className="btn pri pq" onClick={() => setEditando('nova')}>+ Nova atividade</button>}
+          <ExportarCsv projeto={projeto} tipo="cronograma" />
           <Chips rotulo="Filtrar por equipe" opcoes={equipes} valor={equipe} aoMudar={setEquipe} formatar={e => (e === 'Todas' ? 'Todas as equipes' : e)} />
         </div>
         <div className="legenda">

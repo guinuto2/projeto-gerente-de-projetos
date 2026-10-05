@@ -1,12 +1,12 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import type { Atividade, Dados, Gate, NovoProjeto, Pendencia, Projeto, Risco } from '../types/models';
+import type { Atividade, Dados, Gate, NovaReuniao, NovoProjeto, Pendencia, Projeto, Risco } from '../types/models';
 import { PROXIMA_FASE } from '../lib/constantes';
 import { diasUteis } from '../lib/datas';
 import type { FonteDados } from '../services/FonteDados';
 import { criarFonte } from '../services/criarFonte';
 import { config } from '../config/config';
 import { horaAgora } from '../lib/datas';
-import { emailGateAprovado, emailProjetoCriadoPeloPmo, emailSolicitacaoGate, emailSolicitacaoProjeto } from '../lib/emailProjeto';
+import { corpoReuniao, emailProjetoExcluido, emailReuniaoAlterada, emailGateAprovado, emailProjetoCriadoPeloPmo, emailSolicitacaoGate, emailSolicitacaoProjeto } from '../lib/emailProjeto';
 import { progressoFase } from '../lib/calculos';
 import { gatesFaltantes } from '../lib/gates';
 import { useToast } from './ToastContext';
@@ -31,10 +31,28 @@ interface PortalValor {
   /** PMO decide. Aprovar avança a fase do projeto; no G2 pode congelar a baseline. */
   decidirGate(cod: string, gate: string, decisao: { aprovar: boolean; parecer: string; congelarBaseline?: boolean }): Promise<void>;
   editarProjeto(cod: string, campos: Partial<Projeto>): Promise<void>;
-  criarAtividade(cod: string, atv: Atividade): Promise<void>;
-  excluirAtividade(cod: string, codigo: string): Promise<void>;
+  criarAtividade(cod: string, atv: Atividade): Promise<Atividade>;
+  excluirAtividade(cod: string, codigo: string, opcoes?: { cancelarReunioes?: boolean }): Promise<void>;
+  criarRisco(cod: string, r: Risco): Promise<void>;
+  excluirRisco(cod: string, codigo: string): Promise<void>;
+  criarPendencia(cod: string, x: Pendencia): Promise<void>;
+  excluirPendencia(cod: string, codigo: string): Promise<void>;
+  /** cria a reunião do Teams da atividade e grava o link nela; devolve os convidados */
+  agendarReuniao(cod: string, atividade: Atividade, r: NovaReuniao): Promise<string[]>;
+  /** altera a reunião da atividade (horário, título, participantes); devolve os convidados */
+  atualizarReuniao(cod: string, atividade: Atividade, r: NovaReuniao, anterior?: NovaReuniao): Promise<{ convidados: string[]; email: string }>;
+  /** cancela a reunião no Outlook e tira o link da atividade */
+  cancelarReuniao(cod: string, atividade: Atividade, mensagem: string): Promise<void>;
+  /** lê a reunião da atividade para edição */
+  lerReuniao(atividade: Atividade): Promise<NovaReuniao>;
+  /** false quando a lista ainda não tem as colunas da reunião */
+  reuniaoGravavel: boolean;
   removerGatesRepetidos(cod: string): Promise<number>;
+  /** rascunho → "Em aprovação" (PMO) ou → "Ativo" com G1 aprovado (patrocinador) */
+  submeterRascunho(cod: string, modo: 'aprovacao' | 'ativar'): Promise<void>;
   excluirProjeto(cod: string, opcoes: { documentos: boolean }): Promise<void>;
+  /** depois da exclusão: avisa equipe, PMO e patrocinador (recebe a foto do projeto tirada antes de excluir) */
+  avisarExclusaoProjeto(p: Projeto, removidos: [string, number][], documentos: boolean): Promise<string>;
   criarProjeto(novo: NovoProjeto): Promise<void>;
   /** teste: avisa por e-mail; devolve o destinatário */
   enviarEmailCriacao(novo: NovoProjeto): Promise<string>;
@@ -49,6 +67,12 @@ interface PortalValor {
 }
 
 const PortalContext = createContext<PortalValor | null>(null);
+
+/** Modo de teste dos convites: reuniaoSomentePara (prioridade) ou emailSomentePara. */
+export function testeReuniao(): string[] | null {
+  const alvo = (config.reuniaoSomentePara || config.emailSomentePara || '').trim();
+  return alvo ? alvo.split(/[,;]/).map(x => x.trim()).filter(Boolean) : null;
+}
 
 /** E-mail do gerente do projeto (PMO): membro da equipe com função de gerente, ou com o mesmo nome. */
 const emailPatrocinador = () => config.emailPatrocinador || config.emailPmo;
@@ -95,7 +119,7 @@ function garantirGates(fonte: FonteDados, d: Dados): Promise<Dados> {
   return tarefa;
 }
 
-const assinar = (d: Dados) => JSON.stringify([d.projetos, d.atividades, d.riscos, d.pendencias, d.decisoes]);
+const assinar = (d: Dados) => JSON.stringify([d.projetos, d.atividades, d.riscos, d.pendencias, d.decisoes, d.tecnicos]);
 type ChaveItens = 'atividades' | 'riscos' | 'pendencias';
 
 /** Copia os dados trocando os campos de um item (sem mutar o estado anterior). */
@@ -118,6 +142,17 @@ export function PortalProvider({ children }: { children: ReactNode }) {
   const emSync = useRef(false);
 
   /** Aplica um novo estado: guarda (piloto) e marca como "já visto" para a releitura. */
+  /** Atualiza a partir do estado mais recente (para ações encadeadas, como criar atividade + reunião). */
+  const aplicarCom = useCallback((fn: (d: Dados) => Dados) => {
+    setDados(prev => {
+      if (!prev) return prev;
+      const novo = fn(prev);
+      assinatura.current = assinar(novo);
+      fonte?.persistir?.(novo);
+      return novo;
+    });
+  }, [fonte]);
+
   const bloquear = useCallback((id: string, ativo: boolean) => {
     if (ativo) bloqueios.current.add(id); else bloqueios.current.delete(id);
   }, []);
@@ -264,6 +299,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
         const completa: Atividade = { ...atv, duracao: atv.duracao || Math.max(1, diasUteis(atv.inicio, atv.termino)) };
         const criada = await fonte.criarAtividade(p, completa);
         aplicar({ ...dados, atividades: { ...dados.atividades, [cod]: [...(dados.atividades[cod] || []), criada] } });
+        return criada;
       },
       async excluirProjeto(cod, opcoes) {
         const p = projeto(cod);
@@ -276,6 +312,38 @@ export function PortalProvider({ children }: { children: ReactNode }) {
           decisoes: sem(dados.decisoes), documentos: sem(dados.documentos)
         });
       },
+      async avisarExclusaoProjeto(p, removidos, documentos) {
+        if (!fonte.enviarEmail) throw new Error('no modo piloto o e-mail não é enviado');
+        const equipe = p.equipe.map(m => m.email).filter(Boolean).join(', ');
+        const para = destinatarios(equipe, emailDoGp(p), emailPatrocinador());
+        if (!para) throw new Error('ninguém da equipe tem e-mail e emailPatrocinador está vazio');
+        const { assunto, html } = emailProjetoExcluido(p, usuario, fonte.hoje(), removidos, documentos);
+        return fonte.enviarEmail(assunto, html, para);
+      },
+      async submeterRascunho(cod, modo) {
+        const p = projeto(cod), g1 = p.fases.find(g => g.gate === 'G1');
+        const novoProj = { projeto: p, atividades: dados.atividades[cod] || [], riscos: dados.riscos[cod] || [] };
+        if (modo === 'aprovacao') {
+          await fonte.salvarProjeto(p, { situacaoCadastro: 'Em aprovação' });
+          if (g1) await fonte.salvarGate(p, g1, { situacao: 'Aguardando aprovação' });
+          aplicar({ ...dados, projetos: dados.projetos.map(x => x.codigo !== cod ? x : {
+            ...x, situacaoCadastro: 'Em aprovação', fases: x.fases.map(g => (g.gate === 'G1' ? { ...g, situacao: 'Aguardando aprovação' } : g)) }) });
+          if (config.emailAoSolicitarAprovacao && fonte.enviarEmail && emailPatrocinador()) {
+            const { assunto, html } = emailSolicitacaoProjeto({ ...novoProj, projeto: { ...p, situacaoCadastro: 'Em aprovação' } }, usuario);
+            fonte.enviarEmail(assunto, html, destinatarios(emailPatrocinador())).catch(() => undefined);
+          }
+          return;
+        }
+        const aprov = { situacao: 'Aprovado' as const, aprovadoPor: usuario, dataAprovacao: fonte.hoje(), parecer: 'Ativado pelo patrocinador a partir do rascunho' };
+        await fonte.salvarProjeto(p, { situacaoCadastro: 'Ativo', fase: 'Planejamento' });
+        if (g1) await fonte.salvarGate(p, g1, aprov);
+        aplicar({ ...dados, projetos: dados.projetos.map(x => x.codigo !== cod ? x : {
+          ...x, situacaoCadastro: 'Ativo', fase: 'Planejamento', fases: x.fases.map(g => (g.gate === 'G1' ? { ...g, ...aprov } : g)) }) });
+        if (config.emailAoCriarProjeto && fonte.enviarEmail) {
+          const { assunto, html } = emailProjetoCriadoPeloPmo({ ...novoProj, projeto: { ...p, situacaoCadastro: 'Ativo', fase: 'Planejamento' } }, usuario);
+          fonte.enviarEmail(assunto, html, destinatarios(emailDoGp(p), emailPatrocinador()) || undefined).catch(() => undefined);
+        }
+      },
       async removerGatesRepetidos(cod) {
         const p = projeto(cod), ids = p.gatesRepetidos || [];
         if (!ids.length || !fonte.excluirGates) return 0;
@@ -283,9 +351,84 @@ export function PortalProvider({ children }: { children: ReactNode }) {
         aplicar({ ...dados, projetos: dados.projetos.map(x => (x.codigo === cod ? { ...x, gatesRepetidos: [] } : x)) });
         return ids.length;
       },
-      async excluirAtividade(cod, codigo) {
+      async criarRisco(cod, r) {
+        if ((dados.riscos[cod] || []).some(x => x.codigo === r.codigo)) throw new Error(`Já existe um risco com o código ${r.codigo}.`);
+        const criado = await fonte.criarRisco(projeto(cod), r);
+        aplicar({ ...dados, riscos: { ...dados.riscos, [cod]: [...(dados.riscos[cod] || []), criado] } });
+      },
+      async excluirRisco(cod, codigo) {
+        const r = (dados.riscos[cod] || []).find(x => x.codigo === codigo)!;
+        await fonte.excluirRisco(cod, r);
+        aplicar({ ...dados, riscos: { ...dados.riscos, [cod]: (dados.riscos[cod] || []).filter(x => x.codigo !== codigo) } });
+      },
+      async criarPendencia(cod, x) {
+        if ((dados.pendencias[cod] || []).some(y => y.codigo === x.codigo)) throw new Error(`Já existe uma pendência com o código ${x.codigo}.`);
+        const criada = await fonte.criarPendencia(projeto(cod), x);
+        aplicar({ ...dados, pendencias: { ...dados.pendencias, [cod]: [...(dados.pendencias[cod] || []), criada] } });
+      },
+      async excluirPendencia(cod, codigo) {
+        const x = (dados.pendencias[cod] || []).find(y => y.codigo === codigo)!;
+        await fonte.excluirPendencia(cod, x);
+        aplicar({ ...dados, pendencias: { ...dados.pendencias, [cod]: (dados.pendencias[cod] || []).filter(y => y.codigo !== codigo) } });
+      },
+      async agendarReuniao(cod, a, r) {
+        if (!fonte.criarReuniaoTeams) throw new Error('reuniões do Teams só são criadas no modo conectado');
+        // sem as colunas, a reunião seria criada mas o link não ficaria na atividade
+        if (fonte.reuniaoGravavel && !fonte.reuniaoGravavel()) throw new Error('a lista Portal Atividades ainda não tem as colunas da reunião. Rode o script provisionar-portal.ps1 (sem -Piloto) e recarregue o portal');
+        const p = projeto(cod);
+        const codigo = a.codigo;
+        // modo de teste (emailSomentePara): o convite vai só para esse endereço
+        const eu = fonte.email().toLowerCase();
+        const lista = testeReuniao() || r.participantes;
+        // o organizador (quem está logado) não recebe convite do Outlook: a reunião vai direto para a agenda dele
+        const convidados = lista.filter(x => x.toLowerCase() !== eu);
+        const criada = await fonte.criarReuniaoTeams({ ...r, participantes: convidados }, corpoReuniao(p, a, r.pauta, r.tipo));
+        const campos = { reuniaoUrl: criada.joinUrl, reuniaoInicio: r.inicio, reuniaoId: criada.id, reuniaoTipo: r.tipo || '' };
+        await fonte.salvarAtividade(cod, a, campos);
+        aplicarCom(d => comItem<Atividade>(d, 'atividades', cod, codigo, campos));
+        return convidados;
+      },
+      async atualizarReuniao(cod, a, r, anterior) {
+        if (!fonte.atualizarReuniaoTeams || !a.reuniaoId) throw new Error('esta atividade não tem reunião gravada');
+        const p = projeto(cod), eu = fonte.email().toLowerCase();
+        const convidados = (testeReuniao() || r.participantes).filter(x => x.toLowerCase() !== eu);
+        const nova = { ...r, participantes: convidados };
+        await fonte.atualizarReuniaoTeams(a.reuniaoId, nova, corpoReuniao(p, a, r.pauta, r.tipo));
+        const campos = { reuniaoInicio: r.inicio, reuniaoTipo: r.tipo || '' };
+        await fonte.salvarAtividade(cod, a, campos);
+        aplicarCom(d => comItem<Atividade>(d, 'atividades', cod, a.codigo, campos));
+        // resumo da alteração para os convidados (além da atualização que o Outlook já envia)
+        let email = '';
+        if (config.emailAoAlterarReuniao && fonte.enviarEmail && convidados.length) {
+          try {
+            const antes = anterior || { ...nova, titulo: nova.titulo, inicio: a.reuniaoInicio || nova.inicio };
+            const { assunto, html } = emailReuniaoAlterada(p, a, { ...antes, tipo: antes.tipo || a.reuniaoTipo }, nova, a.reuniaoUrl || '');
+            email = await fonte.enviarEmail(assunto, html, convidados.join(', '));
+          } catch (e) { email = 'falhou: ' + (e as Error).message; }
+        }
+        return { convidados, email };
+      },
+      async cancelarReuniao(cod, a, mensagem) {
+        if (!fonte.cancelarReuniaoTeams || !a.reuniaoId) throw new Error('esta atividade não tem reunião gravada');
+        await fonte.cancelarReuniaoTeams(a.reuniaoId, mensagem);
+        const campos = { reuniaoUrl: '', reuniaoInicio: '', reuniaoId: '', reuniaoTipo: '' };
+        await fonte.salvarAtividade(cod, a, campos);
+        aplicarCom(d => comItem<Atividade>(d, 'atividades', cod, a.codigo, { reuniaoUrl: undefined, reuniaoInicio: undefined, reuniaoId: undefined, reuniaoTipo: undefined }));
+      },
+      async lerReuniao(a) {
+        if (!fonte.obterReuniaoTeams || !a.reuniaoId) throw new Error('esta atividade não tem reunião gravada');
+        return fonte.obterReuniaoTeams(a.reuniaoId);
+      },
+      reuniaoGravavel: !fonte.reuniaoGravavel || fonte.reuniaoGravavel(),
+      async excluirAtividade(cod, codigo, opcoes) {
         const lista = dados.atividades[cod] || [];
         const alvo = lista.filter(a => a.codigo === codigo || a.pai === codigo);
+        if (opcoes?.cancelarReunioes && fonte.cancelarReuniaoTeams) {
+          for (const a of alvo.filter(x => x.reuniaoId)) {
+            try { await fonte.cancelarReuniaoTeams(a.reuniaoId!, `A atividade ${a.codigo} · ${a.nome} foi excluída do projeto ${cod}.`); }
+            catch { /* reunião já cancelada ou de outro organizador: segue com a exclusão */ }
+          }
+        }
         for (const a of alvo) await fonte.excluirAtividade(cod, a);
         aplicar({ ...dados, atividades: { ...dados.atividades, [cod]: lista.filter(a => !alvo.includes(a)) } });
       },
@@ -340,7 +483,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
       }
     };
     return v;
-  }, [dados, fonte, usuario, sincronizando, atualizadoEm, atualizar, aplicar, bloquear]);
+  }, [dados, fonte, usuario, sincronizando, atualizadoEm, atualizar, aplicar, aplicarCom, bloquear]);
 
   if (erro) {
     return (

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { EstadoFase, Fase, Gate, Projeto } from '../../types/models';
 import { usePortal } from '../../state/PortalContext';
 import { usePapel } from '../../state/PapelContext';
@@ -41,7 +42,9 @@ export function CicloVida({ projeto: p, faseSel, aoSelecionar, aoDecidir }: Prop
   const { dados, solicitarGate, avisarPmoGate } = usePortal();
   const { pode } = usePapel();
   const toast = useToast();
-  const gate = faseSel ? gateDaFase(p, faseSel) : undefined;
+  // o gate só abre quando a pessoa clica no losango (clicar na fase apenas filtra o cronograma)
+  const [gateAberto, setGateAberto] = useState<string | null>(null);
+  const gate = gateAberto ? p.fases.find(g => g.gate === gateAberto) : undefined;
   const bloqueio = gate ? gateBloqueante(p, gate) : undefined;
 
   const solicitar = async (g: Gate) => {
@@ -71,7 +74,8 @@ export function CicloVida({ projeto: p, faseSel, aoSelecionar, aoDecidir }: Prop
     if (!g) return null;
     return (
       <div className="gcol">
-        <button type="button" className="gbtn" title={`${g.nome} · ${g.situacao}`} aria-label={`${g.nome}: ${g.situacao}`} onClick={() => aoSelecionar(f)}>
+        <button type="button" className="gbtn" title={`${g.nome} · ${g.situacao}`} aria-label={`${g.nome}: ${g.situacao}`} aria-pressed={gateAberto === g.gate}
+          onClick={() => setGateAberto(atual => (atual === g.gate ? null : g.gate))}>
           <Losango texto={g.gate} situacao={g.situacao} />
         </button>
       </div>
@@ -82,7 +86,7 @@ export function CicloVida({ projeto: p, faseSel, aoSelecionar, aoDecidir }: Prop
     <section className="card ciclo">
       <div className="linha" style={{ alignItems: 'baseline' }}>
         <h2 className="h3" style={{ fontSize: 18 }}>Ciclo de vida do projeto</h2>
-        <span className="sub">Clique numa fase ou num losango para ver o gate</span>
+        <span className="sub">Clique numa fase para filtrar o cronograma, ou no losango para ver o gate</span>
       </div>
       <div className="trilhaF">
         <div className="fcol">{botaoFase('Iniciação')}{losango('Iniciação')}</div>
@@ -99,6 +103,7 @@ export function CicloVida({ projeto: p, faseSel, aoSelecionar, aoDecidir }: Prop
       {gate && (
         <div className="gateBox" style={{ background: GATE_CAIXA[gate.situacao] || '#F3F3F4' }}>
           <Losango texto={gate.gate} situacao={gate.situacao} grande />
+          <button type="button" className="fechar" aria-label="Fechar gate" style={{ order: 9 }} onClick={() => setGateAberto(null)}>×</button>
           <div style={{ flex: 1, minWidth: 220 }}>
             <div style={{ fontWeight: 600 }}>{gate.nome} · {gate.situacao}{gate.data ? ` · previsto para ${dma(gate.data)}` : ''}</div>
             {gate.info && <div className="sub" style={{ fontSize: 13, marginTop: 2 }}>{gate.info}</div>}

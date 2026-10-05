@@ -10,6 +10,8 @@ import { CardProjeto } from '../components/portfolio/CardProjeto';
 import { ProximosMarcos } from '../components/portfolio/ProximosMarcos';
 import { EmAndamento } from '../components/portfolio/EmAndamento';
 import { ProjetosEncerrados } from '../components/portfolio/ProjetosEncerrados';
+import { Rascunhos } from '../components/portfolio/Rascunhos';
+import { PastasSemProjeto } from '../components/portfolio/PastasSemProjeto';
 import { Chips } from '../components/ui/Chips';
 import { Vazio } from '../components/ui/Vazio';
 
@@ -18,8 +20,8 @@ type Filtro = typeof FILTROS[number];
 
 export function PortfolioPage() {
   const { dados, fonte } = usePortal();
-  const { projetos, encerrados, identidade } = useProjetosVisiveis();
-  const { papel } = usePapel();
+  const { projetos, encerrados, rascunhos, identidade } = useProjetosVisiveis();
+  const { papel, pode } = usePapel();
   const [filtro, setFiltro] = useState<Filtro>('Todas');
   const [busca, setBusca] = useState('');
   const termo = busca.trim().toLowerCase();
@@ -30,6 +32,7 @@ export function PortfolioPage() {
   return (
     <>
       <main className="main">
+        {pode('excluirProjeto') && <PastasSemProjeto />}
         <IndicadoresPortfolio />
         <div className="cols">
           <section className="colMain">
@@ -54,6 +57,7 @@ export function PortfolioPage() {
             <EmAndamento />
           </aside>
         </div>
+        <Rascunhos projetos={rascunhos} />
         <ProjetosEncerrados projetos={encerrados} />
       </main>
     </>

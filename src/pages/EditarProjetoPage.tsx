@@ -51,7 +51,7 @@ export function EditarProjetoPage() {
         inicio: form.inicio, terminoPrevisto: form.termino, objetivo: form.objetivo.trim(), farol,
         escopoIncluido: linhas(form.escopoIncluido), escopoExcluido: linhas(form.escopoExcluido),
         premissas: linhas(form.premissas), dependencias: linhas(form.dependencias), restricoes: linhas(form.restricoes),
-        equipe: montarEquipe(form)
+        equipe: montarEquipe(form, dados.tecnicos)
       });
       toast('Projeto atualizado.');
       navegar(voltar);
@@ -69,7 +69,7 @@ export function EditarProjetoPage() {
       </div>
       <section className="card" style={{ padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: 18 }}>
         <h2 className="h3">Dados gerais</h2>
-        <PassoDadosGerais form={form} mudar={mudar} edicao />
+        <PassoDadosGerais form={form} mudar={mudar} aoEscolherArquiteto={(nome, email) => setForm(f => (f ? { ...f, arquiteto: nome, arquitetoEmail: email } : f))} edicao />
         <label className="campo" style={{ maxWidth: 320 }}>Farol
           <select className="ctl" value={farol} onChange={e => setFarol(e.target.value as Projeto['farol'])}>
             <option>Verde</option><option>Amarelo</option><option>Vermelho</option>

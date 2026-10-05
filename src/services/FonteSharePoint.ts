@@ -1,6 +1,6 @@
 import type { PortalConfig } from '../config/config';
 import type {
-  Atividade, Dados, Fase, Gate, MembroEquipe, NovoProjeto, PastaDocumentos, Pendencia, Projeto, Risco
+  Atividade, Dados, Fase, Gate, MembroEquipe, NovaReuniao, NovoProjeto, PastaDocumentos, Pendencia, Projeto, Risco, Tecnico
 } from '../types/models';
 import { GATE_DA_FASE, PASTAS, normalizarTipo } from '../lib/constantes';
 import { hojeIso, isoDeDataHora, iso, linhas } from '../lib/datas';
@@ -54,7 +54,8 @@ const COLUNAS_PROJETO: Record<string, string> = {
 const COLUNAS_ATIVIDADE: Record<string, string> = {
   nome: 'Title', codigo: 'Codigo', fase: 'Fase', equipe: 'Equipe', duracao: 'Duracao', descricao: 'Descricao', marco: 'Marco',
   inicio: 'DataInicio', termino: 'DataTermino', baselineInicio: 'DataBaselineInicio', baselineTermino: 'DataBaselineTermino',
-  status: 'Status', percentual: 'Percentual', pai: 'AtividadePai', observacao: 'Observacao'
+  status: 'Status', percentual: 'Percentual', pai: 'AtividadePai', observacao: 'Observacao',
+  reuniaoUrl: 'ReuniaoTeams', reuniaoInicio: 'ReuniaoInicio', reuniaoId: 'ReuniaoId', reuniaoTipo: 'ReuniaoTipo'
 };
 const COLUNAS_GATE: Record<string, string> = {
   nome: 'Title', gate: 'Gate', situacao: 'Situacao', data: 'DataPrevista', info: 'Info',
@@ -95,6 +96,10 @@ export class FonteSharePoint implements FonteDados {
       if (!l) throw new Error(`A lista "${nome}" não existe no site. Rode o script provisionar-portal.ps1.`);
       this.ids[k] = l.id;
     }
+    // lista opcional: sem ela o portal funciona, só não oferece os técnicos
+    this.idTecnicos = listas.find(x => x.displayName === 'Portal Tecnicos')?.id || '';
+    const colunas = await this.graph.todos<{ name: string }>(`/sites/${this.siteId}/lists/${this.ids.atividades}/columns?$select=name`);
+    this.colunasAtividades = new Set(colunas.map(c => c.name));
     const drives = await this.graph.todos<{ id: string; name: string; webUrl: string }>(`/sites/${this.siteId}/drives?$select=id,name,webUrl`);
     const bib = drives.find(x => x.name === this.cfg.biblioteca);
     if (!bib) throw new Error(`A biblioteca "${this.cfg.biblioteca}" não existe no site.`);
@@ -104,6 +109,10 @@ export class FonteSharePoint implements FonteDados {
 
   /** Quantos itens duplicados de gate foram ignorados na última leitura (o script limpa). */
   gatesDuplicados = 0;
+
+  private colunasAtividades = new Set<string>();
+  private idTecnicos = '';
+  reuniaoGravavel() { return ['ReuniaoTeams', 'ReuniaoInicio', 'ReuniaoId'].every(c => this.colunasAtividades.has(c)); }
 
   /** Colunas que o site ainda não tem (rodar provisionar-portal.ps1 cria). */
   colunasAusentes = new Set<string>();
@@ -146,7 +155,13 @@ export class FonteSharePoint implements FonteDados {
     const [P, A, R, Pe, G, D] = await Promise.all(
       (['projetos', 'atividades', 'riscos', 'pendencias', 'gates', 'decisoes'] as ChaveLista[]).map(k => this.itens(k))
     );
-    const d: Dados = { referencia: this.hoje(), projetos: [], atividades: {}, riscos: {}, pendencias: {}, decisoes: {}, documentos: {} };
+    const tecnicosItens = this.idTecnicos
+      ? await this.graph.todos<ItemLista>(`/sites/${this.siteId}/lists/${this.idTecnicos}/items?$expand=fields&$top=500`) : [];
+    const tecnicos: Tecnico[] = tecnicosItens.map(it => ({
+      _id: it.id, nome: txt(it.fields.Title), email: txt(it.fields.Email).trim(), funcao: txt(it.fields.Funcao) || 'Técnico',
+      ativo: it.fields.Ativo === undefined ? true : !!it.fields.Ativo
+    })).filter(t => t.nome);
+    const d: Dados = { referencia: this.hoje(), projetos: [], atividades: {}, riscos: {}, pendencias: {}, decisoes: {}, documentos: {}, tecnicos };
     const codigoPorId: Record<string, string> = {};
 
     for (const it of P) {
@@ -180,7 +195,8 @@ export class FonteSharePoint implements FonteDados {
         inicio: isoDeDataHora(f.DataInicio as string), termino: isoDeDataHora(f.DataTermino as string),
         baselineInicio: isoDeDataHora(f.DataBaselineInicio as string), baselineTermino: isoDeDataHora(f.DataBaselineTermino as string),
         status: (txt(f.Status) || 'Planejado') as Atividade['status'], percentual: num(f.Percentual),
-        pai: txt(f.AtividadePai), observacao: txt(f.Observacao)
+        pai: txt(f.AtividadePai), observacao: txt(f.Observacao),
+        reuniaoUrl: txt(f.ReuniaoTeams) || undefined, reuniaoInicio: txt(f.ReuniaoInicio) || undefined, reuniaoId: txt(f.ReuniaoId) || undefined, reuniaoTipo: txt(f.ReuniaoTipo) || undefined
       });
     }
     for (const it of R) {
@@ -247,6 +263,32 @@ export class FonteSharePoint implements FonteDados {
   }
   async excluirAtividade(_cod: string, a: Atividade) {
     await this.graph.excluir(this.url('atividades', a._id));
+  }
+  async criarRisco(p: Projeto, r: Risco): Promise<Risco> {
+    const item = await this.postItem('riscos', {
+      Title: r.descricao, ProjetoLookupId: Number(p._id), Codigo: r.codigo, ImpactoProjeto: r.impactoProjeto, Probabilidade: r.probabilidade,
+      Impacto: r.impacto, Mitigacao: r.mitigacao, Contingencia: r.contingencia, Responsavel: r.responsavel, Situacao: r.situacao
+    });
+    return { ...r, _id: item.id };
+  }
+  async excluirRisco(_cod: string, r: Risco) { await this.graph.excluir(this.url('riscos', r._id)); }
+  async criarPendencia(p: Projeto, x: Pendencia): Promise<Pendencia> {
+    const item = await this.postItem('pendencias', {
+      Title: x.pergunta, ProjetoLookupId: Number(p._id), Codigo: x.codigo, Detalhe: x.detalhe, Impacto: x.impacto, Situacao: x.situacao, Resposta: x.resposta || ''
+    });
+    return { ...x, _id: item.id };
+  }
+  async excluirPendencia(_cod: string, x: Pendencia) { await this.graph.excluir(this.url('pendencias', x._id)); }
+
+  async pastasSemProjeto(codigos: string[]) {
+    await this.preparar();
+    const itens = await this.graph.todos<ItemDrive>(`/drives/${this.driveId}/root/children?$select=name,webUrl,folder`);
+    const existentes = new Set(codigos.map(c => c.toLowerCase()));
+    return itens.filter(x => x.folder && x.name !== 'Forms' && !existentes.has(x.name.toLowerCase())).map(x => ({ nome: x.name, url: x.webUrl }));
+  }
+  async excluirPasta(nome: string) {
+    await this.preparar();
+    await this.graph.excluir(`/drives/${this.driveId}/root:/${encodeURIComponent(nome)}`);
   }
   async salvarRisco(_cod: string, r: Risco, campos: Partial<Risco>) {
     await this.graph.patch(this.url('riscos', r._id) + '/fields',
@@ -389,6 +431,73 @@ export class FonteSharePoint implements FonteDados {
       throw new Error(`envio recusado (${r.status}): ${msg}`);
     }
     return remetente ? `${destino} (enviado por ${remetente})` : destino;
+  }
+
+  /**
+   * Reunião do Teams: POST /me/events com isOnlineMeeting (permissão delegada Calendars.ReadWrite).
+   * O organizador é quem está logado; o Outlook envia os convites aos participantes.
+   */
+  private static FUSO = 'E. South America Standard Time';
+
+  private corpoEvento(r: NovaReuniao, corpoHtml: string) {
+    const fim = new Date(new Date(r.inicio + ':00').getTime() + r.duracaoMin * 60000);
+    const d2 = (n: number) => String(n).padStart(2, '0');
+    const fimLocal = `${fim.getFullYear()}-${d2(fim.getMonth() + 1)}-${d2(fim.getDate())}T${d2(fim.getHours())}:${d2(fim.getMinutes())}:00`;
+    return {
+      subject: r.titulo,
+      body: { contentType: 'HTML', content: corpoHtml },
+      start: { dateTime: r.inicio + ':00', timeZone: FonteSharePoint.FUSO },
+      end: { dateTime: fimLocal, timeZone: FonteSharePoint.FUSO },
+      attendees: r.participantes.map(address => ({ emailAddress: { address }, type: 'required' }))
+    };
+  }
+
+  /** Chamada ao calendário de quem está logado (permissão delegada Calendars.ReadWrite). */
+  private async calendario<T>(caminho: string, metodo: string, corpo?: unknown): Promise<T | null> {
+    const token = await this.auth.tokenPara(['Calendars.ReadWrite']);
+    const resp = await fetch('https://graph.microsoft.com/v1.0' + caminho, {
+      method: metodo,
+      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json', Prefer: `outlook.timezone="${FonteSharePoint.FUSO}"` },
+      body: corpo === undefined ? undefined : JSON.stringify(corpo)
+    });
+    if (!resp.ok) {
+      let msg = resp.statusText;
+      try { const j = await resp.json(); msg = j?.error?.message || msg; } catch { /* sem corpo */ }
+      if (resp.status === 403) throw new Error('o app Portal PMO ainda não tem a permissão Calendars.ReadWrite (Entra ID → Permissões de API)');
+      if (resp.status === 404) throw new Error('a reunião não está no seu calendário. Só quem criou a reunião (o organizador) pode alterá-la ou cancelá-la; ela também pode ter sido cancelada no Outlook');
+      throw new Error(`o Outlook recusou a operação (${resp.status}): ${msg}`);
+    }
+    return resp.status === 202 || resp.status === 204 ? null : await resp.json() as T;
+  }
+
+  /**
+   * Reunião do Teams: POST /me/events com isOnlineMeeting. O organizador é quem está logado;
+   * o Outlook envia os convites aos participantes.
+   */
+  async criarReuniaoTeams(r: NovaReuniao, corpoHtml: string): Promise<{ id: string; joinUrl: string }> {
+    const ev = await this.calendario<{ id: string; webLink?: string; onlineMeeting?: { joinUrl?: string } }>('/me/events', 'POST', {
+      ...this.corpoEvento(r, corpoHtml), isOnlineMeeting: true, onlineMeetingProvider: 'teamsForBusiness', allowNewTimeProposals: true
+    });
+    return { id: ev!.id, joinUrl: ev!.onlineMeeting?.joinUrl || ev!.webLink || '' };
+  }
+
+  async obterReuniaoTeams(id: string): Promise<NovaReuniao> {
+    const ev = await this.calendario<{ subject: string; start: { dateTime: string }; end: { dateTime: string }; attendees: { emailAddress: { address: string } }[] }>(
+      `/me/events/${encodeURIComponent(id)}?$select=subject,start,end,attendees`, 'GET');
+    const ini = ev!.start.dateTime.slice(0, 16), fim = ev!.end.dateTime.slice(0, 16);
+    return {
+      titulo: ev!.subject, inicio: ini,
+      duracaoMin: Math.max(15, Math.round((new Date(fim + ':00').getTime() - new Date(ini + ':00').getTime()) / 60000)),
+      pauta: '', participantes: ev!.attendees.map(a => a.emailAddress.address.toLowerCase())
+    };
+  }
+
+  async atualizarReuniaoTeams(id: string, r: NovaReuniao, corpoHtml: string): Promise<void> {
+    await this.calendario(`/me/events/${encodeURIComponent(id)}`, 'PATCH', this.corpoEvento(r, corpoHtml));
+  }
+
+  async cancelarReuniaoTeams(id: string, mensagem: string): Promise<void> {
+    await this.calendario(`/me/events/${encodeURIComponent(id)}/cancel`, 'POST', { comment: mensagem || 'Reunião cancelada pelo Portal PMO.' });
   }
 
   linkBiblioteca(cod?: string) {

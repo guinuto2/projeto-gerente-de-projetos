@@ -15,7 +15,10 @@ window.PORTAL_CONFIG = {
 
   emailAoSolicitarAprovacao: true,   // PMO pede aprovação de projeto ou gate        → patrocinador
   emailAoAprovar: true,              // patrocinador aprova gate ou projeto          → gerente do projeto + patrocinador
+  emailAoAlterarReuniao: true,       // reunião do Teams alterada                    → convidados (resumo antes → agora)
+  emailAoExcluirProjeto: true,       // projeto excluído                             → equipe + gerente + patrocinador
   emailAoCriarProjeto: true,         // patrocinador cria projeto (já aprovado)      → gerente do projeto + patrocinador
 
-  emailSomentePara: 'guilherme.santos@systechtecnologia.com.br'   // TESTE: todos os e-mails vão só para este endereço (vazio = destinatários reais)
+  emailSomentePara: 'guilherme.santos@systechtecnologia.com.br',  // TESTE: e-mails do portal vão só para este endereço (vazio = destinatários reais)
+  reuniaoSomentePara: 'felipe.cunha@systechtecnologia.com.br'     // TESTE: convites de reunião do Teams vão só para este endereço (vazio = participantes marcados)
 };

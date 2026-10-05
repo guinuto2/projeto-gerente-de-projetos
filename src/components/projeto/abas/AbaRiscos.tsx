@@ -8,18 +8,24 @@ import { Selo } from '../../ui/Selo';
 import { Vazio } from '../../ui/Vazio';
 import { MatrizRiscos } from './MatrizRiscos';
 import { EditarRisco } from '../editores/EditarRisco';
+import { ExportarCsv } from './ExportarCsv';
 
 export function AbaRiscos({ projeto }: { projeto: Projeto }) {
   const { dados } = usePortal();
   const [editando, setEditando] = useState<string | null>(null);
   const { pode } = usePapel();
   const abrir = (c: string) => { if (pode('editarRisco')) setEditando(c); };
+  const editor = editando && <EditarRisco projeto={projeto} codigo={editando === 'novo' ? undefined : editando} aoFechar={() => setEditando(null)} />;
+  const botaoNovo = pode('editarRisco') && <button type="button" className="btn pri pq" onClick={() => setEditando('novo')}>+ Novo risco</button>;
   const R = dados.riscos[projeto.codigo] || [];
-  if (!R.length) return <Vazio>Nenhum risco registrado.</Vazio>;
+  if (!R.length) return <><Vazio>Nenhum risco registrado.{botaoNovo && <><br /><br />{botaoNovo}</>}</Vazio>{editor}</>;
   return (
     <>
       <div className="linha" style={{ alignItems: 'flex-start', marginBottom: 18, gap: 28 }}>
-        <MatrizRiscos abertos={riscosAbertos(dados, projeto.codigo)} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>{botaoNovo}<ExportarCsv projeto={projeto} tipo="riscos" /></div>
+          <MatrizRiscos abertos={riscosAbertos(dados, projeto.codigo)} />
+        </div>
         <div style={{ flex: 1, minWidth: 260 }}>
           <div className="nums">{SITUACOES_RISCO.map(s => <div key={s}><b>{R.filter(r => r.situacao === s).length}</b><span>{s}</span></div>)}</div>
           <p className="sub" style={{ marginTop: 12 }}>Riscos gerais e específicos de migração aplicáveis ao cenário adotado. Clique numa linha para atualizar a situação.</p>
@@ -42,7 +48,7 @@ export function AbaRiscos({ projeto }: { projeto: Projeto }) {
           </tbody>
         </table>
       </div>
-      {editando && <EditarRisco projeto={projeto} codigo={editando} aoFechar={() => setEditando(null)} />}
+      {editor}
     </>
   );
 }

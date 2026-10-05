@@ -23,6 +23,9 @@ export interface Gate {
 
 export interface MembroEquipe { nome: string; funcao: string; empresa: string; email: string }
 
+/** Técnico da Systech (lista Portal Tecnicos). */
+export interface Tecnico { _id?: string; nome: string; email: string; funcao: string; ativo: boolean }
+
 export interface Numeros {
   localidades: number; hosts: number; clusters: number; hostsMover: number;
   vmsImpactadas: number; janelas: string; diasSystech: number; diasTRF1: number;
@@ -75,6 +78,24 @@ export interface Atividade {
   /** código da atividade macro, quando é subatividade */
   pai: string;
   observacao: string;
+  /** reunião do Teams ligada à atividade (link para entrar, início local 'aaaa-mm-ddThh:mm', id do evento) */
+  reuniaoUrl?: string;
+  reuniaoInicio?: string;
+  reuniaoId?: string;
+  /** Implementação, Alinhamento, Interna ou Execução */
+  reuniaoTipo?: string;
+}
+
+/** Dados para criar uma reunião do Teams a partir de uma atividade. */
+export interface NovaReuniao {
+  /** tipo de reunião (Implementação, Alinhamento, Interna, Execução) */
+  tipo?: string;
+  titulo: string;
+  /** início local, 'aaaa-mm-ddThh:mm' (horário de Brasília) */
+  inicio: string;
+  duracaoMin: number;
+  pauta: string;
+  participantes: string[];
 }
 
 export interface Risco {
@@ -115,6 +136,8 @@ export interface Dados {
   pendencias: Record<string, Pendencia[]>;
   decisoes: Record<string, Decisao[]>;
   documentos: Record<string, Arquivo[]>;
+  /** técnicos da Systech (lista Portal Tecnicos) */
+  tecnicos: Tecnico[];
 }
 
 export interface NovoProjeto { projeto: Projeto; atividades: Atividade[]; riscos: Risco[] }

@@ -6,17 +6,23 @@ import { SELO_PENDENCIA, porCodigo } from '../../../lib/constantes';
 import { Selo } from '../../ui/Selo';
 import { Vazio } from '../../ui/Vazio';
 import { EditarPendencia } from '../editores/EditarPendencia';
+import { ExportarCsv } from './ExportarCsv';
 
 export function AbaPendencias({ projeto }: { projeto: Projeto }) {
   const { dados } = usePortal();
   const [editando, setEditando] = useState<string | null>(null);
   const { pode } = usePapel();
   const abrir = (c: string) => { if (pode('responderPendencia')) setEditando(c); };
+  const editor = editando && <EditarPendencia projeto={projeto} codigo={editando === 'novo' ? undefined : editando} aoFechar={() => setEditando(null)} />;
+  const botaoNovo = pode('responderPendencia') && <button type="button" className="btn pri pq" onClick={() => setEditando('novo')}>+ Nova pendência</button>;
   const L = [...(dados.pendencias[projeto.codigo] || [])].sort(porCodigo);
-  if (!L.length) return <Vazio>Nenhuma pendência registrada.</Vazio>;
+  if (!L.length) return <><Vazio>Nenhuma pendência registrada.{botaoNovo && <><br /><br />{botaoNovo}</>}</Vazio>{editor}</>;
   return (
     <>
-      <p className="sub" style={{ marginBottom: 12 }}>Questionamentos ao cliente que condicionam arquitetura, cronograma ou proposta. Clique para registrar a resposta.</p>
+      <div className="linha" style={{ marginBottom: 12 }}>
+        <p className="sub">Questionamentos ao cliente que condicionam arquitetura, cronograma ou proposta. Clique para registrar a resposta.</p>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>{botaoNovo}<ExportarCsv projeto={projeto} tipo="pendencias" /></div>
+      </div>
       <div className="twrap">
         <table className="tbl">
           <thead><tr><th>ID</th><th>Pendência</th><th>Impacto</th><th>Situação</th></tr></thead>
@@ -35,7 +41,7 @@ export function AbaPendencias({ projeto }: { projeto: Projeto }) {
           </tbody>
         </table>
       </div>
-      {editando && <EditarPendencia projeto={projeto} codigo={editando} aoFechar={() => setEditando(null)} />}
+      {editor}
     </>
   );
 }

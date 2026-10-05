@@ -1,7 +1,8 @@
-import type { Atividade, Dados, Gate, PastaDocumentos } from '../types/models';
+import type { Atividade, Dados, Gate, PastaDocumentos, Pendencia, Risco } from '../types/models';
 import type { FonteDados } from './FonteDados';
 import pilotoTrf1 from '../data/piloto-trf1.json';
 import { PASTAS, normalizarTipo } from '../lib/constantes';
+import { TECNICOS_PADRAO } from '../lib/pessoas';
 
 const CHAVE = 'portal-pmo-piloto-v3';
 const original = pilotoTrf1 as unknown as Dados;
@@ -24,6 +25,7 @@ export class FontePiloto implements FonteDados {
       this.d = structuredClone(original);
     }
     this.d.projetos = this.d.projetos.map(p => ({ ...p, tipo: normalizarTipo(p.tipo) }));
+    if (!this.d.tecnicos || !this.d.tecnicos.length) this.d.tecnicos = TECNICOS_PADRAO.map(t => ({ ...t }));
     return this.d;
   }
 
@@ -46,6 +48,10 @@ export class FontePiloto implements FonteDados {
   async excluirProjeto() { /* em memória */ }
   async criarAtividade(_p: unknown, atv: Atividade) { return atv; }
   async excluirAtividade() { /* em memória */ }
+  async criarRisco(_p: unknown, r: Risco) { return r; }
+  async excluirRisco() { /* em memória */ }
+  async criarPendencia(_p: unknown, x: Pendencia) { return x; }
+  async excluirPendencia() { /* em memória */ }
   async criarGate(_p: unknown, g: Gate) { return g; }
 
   async documentos(cod: string): Promise<PastaDocumentos[]> {

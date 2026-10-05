@@ -29,7 +29,8 @@ export function NovoProjetoPage() {
   useBloqueioSincronizacao('novo-projeto', true);
 
   const mudar = (c: keyof FormProjeto, v: string) => setForm(f => ({ ...f, [c]: v }));
-  const pendencias = validar(form, dados);
+  const hoje = fonte.hoje();
+  const pendencias = validar(form, dados, hoje);
 
   const usarCronogramaModelo = () => {
     const l = cronogramaModelo(form.inicio);
@@ -40,13 +41,17 @@ export function NovoProjetoPage() {
 
   const ehPatrocinador = pode('aprovarGate');
   const enviar = async (situacao: SituacaoCadastro) => {
-    if (pendencias.length) { setErro('Faltam dados: ' + pendencias.join('; ') + '.'); setConfirmar(false); return; }
+    // rascunho: basta código (sem repetir) e nome; o resto pode ser completado depois
+    const faltas = situacao === 'Rascunho'
+      ? pendencias.filter(p => /código|nome/.test(p))
+      : pendencias;
+    if (faltas.length) { setErro('Faltam dados: ' + faltas.join('; ') + '.'); setConfirmar(false); return; }
     setEnviando(true); setErro('');
     try {
       // PMO cria já ativo: G1 aprovado por ele e projeto em Planejamento
-      const novo = montarProjeto(form, situacao, situacao === 'Ativo' ? { por: fonte.modo === 'piloto' ? 'Patrocinador (piloto)' : usuario, em: fonte.hoje() } : undefined);
+      const novo = montarProjeto(form, situacao, situacao === 'Ativo' ? { por: fonte.modo === 'piloto' ? 'Patrocinador (piloto)' : usuario, em: fonte.hoje() } : undefined, dados.tecnicos);
       await criarProjeto(novo);
-      toast(situacao === 'Rascunho' ? 'Rascunho salvo.' : situacao === 'Ativo' ? 'Projeto criado e ativo no portfólio.' : 'Projeto enviado para aprovação do patrocinador.');
+      toast(situacao === 'Rascunho' ? 'Rascunho salvo. Ele fica em “Rascunhos”, no portfólio.' : situacao === 'Ativo' ? 'Projeto criado e ativo no portfólio.' : 'Projeto enviado para aprovação do patrocinador.');
       navegar(`/projeto/${encodeURIComponent(novo.projeto.codigo)}`);
       // o projeto já está salvo; falha no e-mail só gera aviso
       if (situacao === 'Em aprovação' && config.emailAoSolicitarAprovacao) {
@@ -83,12 +88,12 @@ export function NovoProjetoPage() {
       </div>
       <section className="card" style={{ padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: 18 }}>
         {passo === 0 && <>
-          <PassoDadosGerais form={form} mudar={mudar} />
+          <PassoDadosGerais form={form} mudar={mudar} dataMinima={hoje} aoEscolherArquiteto={(nome, email) => setForm(f => (f ? { ...f, arquiteto: nome, arquitetoEmail: email } : f))} />
           <h3 className="h3" style={{ fontSize: 15 }}>Equipe do projeto</h3>
           <EditorEquipe equipe={form.equipe} aoMudar={e => setForm(f => ({ ...f, equipe: e }))} />
         </>}
         {passo === 1 && <PassoEscopo form={form} mudar={mudar} />}
-        {passo === 2 && <PassoCronograma linhas={form.atividades} aoMudar={l => setForm(f => ({ ...f, atividades: l }))} aoUsarModelo={usarCronogramaModelo} />}
+        {passo === 2 && <PassoCronograma dataMinima={hoje} linhas={form.atividades} aoMudar={l => setForm(f => ({ ...f, atividades: l }))} aoUsarModelo={usarCronogramaModelo} />}
         {passo === 3 && <PassoRiscos linhas={form.riscos} aoMudar={l => setForm(f => ({ ...f, riscos: l }))} aoUsarModelo={() => setForm(f => ({ ...f, riscos: riscosModelo() }))} />}
         {erro && <Mensagem tipo="erro">{erro}</Mensagem>}
         <div className="linha" style={{ borderTop: '1px solid var(--borda2)', paddingTop: 16 }}>
@@ -112,7 +117,7 @@ export function NovoProjetoPage() {
           <ul className="ul" style={{ marginTop: 0 }}>
             <li><b>{form.nome}</b> · {form.cliente} · {form.tipo}</li>
             <li>GP: {form.gerente || '—'}{form.arquiteto ? ` · Arquiteto: ${form.arquiteto}` : ''}</li>
-            <li>{form.atividades.filter(a => a.nome.trim()).length} atividades · {form.riscos.filter(r => r.descricao.trim()).length} riscos · {montarEquipe(form).length} pessoas na equipe</li>
+            <li>{form.atividades.filter(a => a.nome.trim()).length} atividades · {form.riscos.filter(r => r.descricao.trim()).length} riscos · {montarEquipe(form, dados.tecnicos).length} pessoas na equipe</li>
           </ul>
           <div className="msg info">O projeto entra <b>ativo</b>, com o <b>G1 aprovado por você</b> e na fase de <b>Planejamento</b>. Os gates G2, G3 e G4 ficam pendentes.</div>
         </Confirmacao>

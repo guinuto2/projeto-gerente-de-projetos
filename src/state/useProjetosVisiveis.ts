@@ -36,7 +36,9 @@ export function useProjetosVisiveis() {
 
   const todos = useMemo(() => dados.projetos.filter(podeVer), [dados.projetos, podeVer]);
   /** projetos em andamento (o que o portfólio, os indicadores e os marcos consideram) */
-  const projetos = useMemo(() => todos.filter(p => p.situacaoCadastro !== 'Encerrado'), [todos]);
+  const projetos = useMemo(() => todos.filter(p => p.situacaoCadastro !== 'Encerrado' && p.situacaoCadastro !== 'Rascunho'), [todos]);
   const encerrados = useMemo(() => todos.filter(p => p.situacaoCadastro === 'Encerrado'), [todos]);
-  return { projetos, encerrados, todos, podeVer, identidade, membros };
+  /** rascunhos: só para quem cadastra projetos (o técnico não vê) */
+  const rascunhos = useMemo(() => (papel === 'Técnico' ? [] : todos.filter(p => p.situacaoCadastro === 'Rascunho')), [todos, papel]);
+  return { projetos, encerrados, rascunhos, todos, podeVer, identidade, membros };
 }

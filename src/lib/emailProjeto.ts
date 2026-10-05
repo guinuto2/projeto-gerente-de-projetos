@@ -2,7 +2,7 @@
  * E-mails do portal no "jeito Outlook": texto e tabelas simples, sem largura fixa (lê bem no celular),
  * mais um botão para abrir o portal. Estilos inline porque o Outlook ignora CSS externo.
  */
-import type { Gate, NovoProjeto, Projeto } from '../types/models';
+import type { Atividade, Gate, NovaReuniao, NovoProjeto, Projeto } from '../types/models';
 import { config } from '../config/config';
 import { dma } from './datas';
 
@@ -159,6 +159,73 @@ export function emailProjetoCriadoPeloPmo({ projeto: p }: NovoProjeto, autor: st
       dados: dadosProjeto(p), equipe: p.equipe, observacao: p.objetivo,
       botao: { texto: 'Abrir o projeto no portal', url: linkProjeto(p.codigo) },
       rodape: 'Mensagem automática do Portal PMO.'
+    })
+  };
+}
+
+/** Texto do convite da reunião do Teams (o Outlook acrescenta o link "Ingressar" automaticamente). */
+export function corpoReuniao(p: Projeto, a: Atividade, pauta: string, tipo?: string): string {
+  const linha = (k: string, v: string) => `<tr><td style="${BORDA};padding:5px 10px;background:#F3F3F3"><b>${esc(k)}</b></td><td style="${BORDA};padding:5px 10px">${esc(v) || '—'}</td></tr>`;
+  return `<div style="${FONTE}">
+<p style="margin:0 0 10px">Reunião da atividade <b>${esc(a.codigo)} · ${esc(a.nome)}</b> do projeto <b>${esc(p.codigo)} · ${esc(p.nome)}</b>.</p>
+${pauta ? `<p style="margin:0 0 10px"><b>Pauta</b><br>${esc(pauta).replace(/\n/g, '<br>')}</p>` : ''}
+<table cellpadding="0" cellspacing="0" style="border-collapse:collapse;max-width:600px;${FONTE}">
+${tipo ? linha('Tipo de reunião', tipo) : ''}${linha('Projeto', `${p.codigo} · ${p.nome}`)}${linha('Cliente', p.cliente)}${linha('Atividade', `${a.codigo} · ${a.nome}`)}${linha('Fase', a.fase)}${linha('Gerente do projeto', p.gerente)}
+</table>
+<p style="margin:12px 0 0;font-size:12px">Projeto no portal: <a href="${linkProjeto(p.codigo)}" style="color:#0563C1">${esc(linkProjeto(p.codigo))}</a></p>
+</div>`;
+}
+
+const quandoReuniao = (r: NovaReuniao) => {
+  const d = r.inicio.slice(0, 10), h = r.inicio.slice(11, 16);
+  const dur = r.duracaoMin < 60 ? `${r.duracaoMin} min` : `${Math.floor(r.duracaoMin / 60)} h${r.duracaoMin % 60 ? ` ${r.duracaoMin % 60}` : ''}`;
+  return `${dma(d)} às ${h} (${dur})`;
+};
+
+/** Resumo da alteração da reunião: o que era e o que ficou. */
+export function emailReuniaoAlterada(p: Projeto, a: Atividade, antes: NovaReuniao, depois: NovaReuniao, joinUrl: string) {
+  const mudou = (x: string, y: string) => (x === y ? y : `${y}  (antes: ${x})`);
+  const entraram = depois.participantes.filter(e => !antes.participantes.includes(e));
+  const sairam = antes.participantes.filter(e => !depois.participantes.includes(e));
+  const dados: [string, string][] = [
+    ['Reunião', mudou(antes.titulo, depois.titulo)],
+    ['Tipo', mudou(antes.tipo || '—', depois.tipo || '—')],
+    ['Data e horário', mudou(quandoReuniao(antes), quandoReuniao(depois))],
+    ['Projeto', `${p.codigo} · ${p.nome}`],
+    ['Atividade', `${a.codigo} · ${a.nome}`],
+    ['Participantes', depois.participantes.join(', ') || '—']
+  ];
+  if (entraram.length) dados.push(['Entraram', entraram.join(', ')]);
+  if (sairam.length) dados.push(['Saíram', sairam.join(', ')]);
+  return {
+    assunto: `[Portal PMO] Reunião alterada · ${depois.titulo} · ${quandoReuniao(depois)}`,
+    html: montar({
+      titulo: 'Reunião do Teams alterada',
+      intro: `A reunião <b>${esc(depois.titulo)}</b> do projeto <b>${esc(p.codigo)}</b> foi alterada. Confira as novas informações; o convite no seu calendário também foi atualizado.`,
+      dados,
+      observacao: depois.pauta ? `Pauta: ${depois.pauta}` : undefined,
+      botao: { texto: 'Entrar na reunião do Teams', url: joinUrl || linkProjeto(p.codigo) },
+      rodape: `Projeto no portal: ${linkProjeto(p.codigo)} · Mensagem automática do Portal PMO.`
+    })
+  };
+}
+
+/** Projeto excluído: avisa a equipe, o PMO e o patrocinador. */
+export function emailProjetoExcluido(p: Projeto, autor: string, quando: string, removidos: [string, number][], documentos: boolean) {
+  return {
+    assunto: `[Portal PMO] Projeto excluído · ${p.codigo} · ${p.cliente}`,
+    html: montar({
+      titulo: 'Projeto excluído',
+      intro: `${esc(autor)} excluiu o projeto <b>${esc(p.codigo)} · ${esc(p.nome)}</b> do Portal PMO em ${esc(dma(quando))}. Ele não aparece mais no portfólio.`,
+      dados: [
+        ['Projeto', `${p.codigo} · ${p.nome}`], ['Cliente', p.cliente], ['Gerente de projeto', p.gerente],
+        ['Fase em que estava', p.situacaoCadastro === 'Encerrado' ? 'Encerrado' : p.fase],
+        ['Itens removidos', removidos.filter(([, n]) => n > 0).map(([t, n]) => `${n} ${t}`).join(', ') || '—'],
+        ['Pasta de documentos', documentos ? 'Enviada para a lixeira do SharePoint (pode ser restaurada por até 93 dias)' : 'Mantida no SharePoint']
+      ],
+      equipe: p.equipe,
+      botao: { texto: 'Abrir o portal', url: urlDoPortal() },
+      rodape: 'Você recebeu esta mensagem por fazer parte da equipe do projeto. Mensagem automática do Portal PMO.'
     })
   };
 }

@@ -1,4 +1,4 @@
-import type { Atividade, Dados, Gate, NovoProjeto, PastaDocumentos, Pendencia, Projeto, Risco } from '../types/models';
+import type { Atividade, Dados, Gate, NovaReuniao, NovoProjeto, PastaDocumentos, Pendencia, Projeto, Risco } from '../types/models';
 
 /**
  * Contrato entre a interface e quem guarda os dados.
@@ -25,6 +25,14 @@ export interface FonteDados {
   /** devolve a atividade com o _id gerado pela lista */
   criarAtividade(p: Projeto, atv: Atividade): Promise<Atividade>;
   excluirAtividade(cod: string, atv: Atividade): Promise<void>;
+  criarRisco(p: Projeto, r: Risco): Promise<Risco>;
+  excluirRisco(cod: string, r: Risco): Promise<void>;
+  criarPendencia(p: Projeto, x: Pendencia): Promise<Pendencia>;
+  excluirPendencia(cod: string, x: Pendencia): Promise<void>;
+  /** pastas na raiz da biblioteca que não correspondem a nenhum projeto (sobras de exclusões) */
+  pastasSemProjeto?(codigos: string[]): Promise<{ nome: string; url: string }[]>;
+  /** manda a pasta para a lixeira do site */
+  excluirPasta?(nome: string): Promise<void>;
   /** cria o item do gate na lista e devolve com _id */
   criarGate(p: Projeto, g: Gate): Promise<Gate>;
   /** remove itens de Portal Gates pelo ID (limpeza de repetidos) */
@@ -32,6 +40,16 @@ export interface FonteDados {
   documentos(cod: string): Promise<PastaDocumentos[]>;
   enviarArquivo(cod: string, pasta: string, arquivo: File): Promise<void>;
   linkBiblioteca(cod?: string): string;
+  /** cria um evento com reunião do Teams no calendário de quem está logado e envia os convites */
+  criarReuniaoTeams?(r: NovaReuniao, corpoHtml: string): Promise<{ id: string; joinUrl: string }>;
+  /** lê a reunião (para editar) */
+  obterReuniaoTeams?(id: string): Promise<NovaReuniao>;
+  /** altera a reunião; o Outlook manda a atualização aos convidados */
+  atualizarReuniaoTeams?(id: string, r: NovaReuniao, corpoHtml: string): Promise<void>;
+  /** cancela a reunião; o Outlook manda o cancelamento aos convidados */
+  cancelarReuniaoTeams?(id: string, mensagem: string): Promise<void>;
+  /** false quando a lista Portal Atividades ainda não tem as colunas da reunião (rodar o script) */
+  reuniaoGravavel?(): boolean;
   /** envia e-mail pela conta logada; devolve o destinatário (só no modo SharePoint) */
   enviarEmail?(assunto: string, html: string, para?: string): Promise<string>;
   /** só no piloto: grava o estado atual no navegador */

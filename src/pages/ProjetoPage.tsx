@@ -19,6 +19,7 @@ import { AbaEscopo } from '../components/projeto/abas/AbaEscopo';
 import { AbaDocumentos } from '../components/projeto/abas/AbaDocumentos';
 import { AbaDecisoes } from '../components/projeto/abas/AbaDecisoes';
 import { DecidirGate } from '../components/projeto/editores/DecidirGate';
+import { AvisoRascunho } from '../components/projeto/AvisoRascunho';
 
 export function ProjetoPage() {
   const { codigo = '', aba = 'cronograma' } = useParams();
@@ -67,15 +68,23 @@ export function ProjetoPage() {
           }}>{limpando ? 'Removendo…' : 'Remover repetidos'}</button>
         </Mensagem>
       )}
+      {p.situacaoCadastro === 'Rascunho' && pode('criarProjeto') && <AvisoRascunho projeto={p} />}
       {p.situacaoCadastro === 'Encerrado' && (
         <Mensagem tipo="ok">Projeto encerrado{p.fases.find(g => g.gate === 'G4')?.dataAprovacao ? ` em ${p.fases.find(g => g.gate === 'G4')!.dataAprovacao!.split('-').reverse().join('/')}` : ''}. Ele aparece em “Projetos encerrados” no portfólio.</Mensagem>
       )}
       {p.situacaoCadastro === 'Em aprovação' && (
         <Mensagem tipo="info" className="linha">
           <span>Cadastro enviado pelo PMO e aguardando aprovação do patrocinador. A aprovação registra o gate G1 e coloca o projeto no portfólio.</span>
-          {g1 && pode('aprovarGate') && <button type="button" className="btn ok pq" onClick={() => { setFaseSel('Iniciação'); decidir(g1); }}>Analisar cadastro (G1)</button>}
+          {g1 && pode('aprovarGate') && <button type="button" className="btn ok pq" onClick={() => decidir(g1)}>Analisar cadastro (G1)</button>}
         </Mensagem>
       )}
+      {/* pedidos do PMO aguardando o patrocinador (o G1 de cadastro já tem o aviso acima) */}
+      {p.fases.filter(g => g.situacao === 'Aguardando aprovação' && !(g.gate === 'G1' && p.situacaoCadastro === 'Em aprovação')).map(g => (
+        <Mensagem key={g.gate} tipo="info" className="linha">
+          <span>O PMO pediu a aprovação do <b>{g.nome}</b>{pode('aprovarGate') ? '.' : '. Aguardando a decisão do patrocinador.'}</span>
+          {pode('aprovarGate') && <button type="button" className="btn ok pq" onClick={() => decidir(g)}>Analisar pedido</button>}
+        </Mensagem>
+      ))}
       <CabecalhoProjeto projeto={p} />
       {papel !== 'Patrocinador' && <IndicadoresProjeto projeto={p} />}
       <CicloVida projeto={p} faseSel={faseSel} aoSelecionar={selecionarFase} aoDecidir={decidir} />

@@ -309,3 +309,37 @@ textarea.ctl { height: auto; min-height: 96px; padding: 10px; resize: vertical; 
 /* v3.16: seção recolhível de projetos encerrados */
 .secaoToggle { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 18px 20px; background: none; border: 0; cursor: pointer; text-align: left; color: var(--texto); font: inherit; }
 .secaoToggle .cnt { font-family: var(--mono); font-size: 12px; background: var(--borda2); border-radius: 99px; padding: 1px 8px; margin-left: 6px; font-weight: 600; }
+
+/* v3.19: reunião do Teams na atividade */
+.reuniao { border: 1px solid var(--borda); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 12px; background: #FBFBFC; }
+.participantes { list-style: none; margin: 0; padding: 0; border: 1px solid var(--borda2); border-radius: 8px; background: #fff; max-height: 220px; overflow-y: auto; }
+.participantes li { padding: 8px 10px; border-top: 1px solid var(--borda2); }
+.participantes li:first-child { border-top: 0; }
+.reuniaoAgendada { display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; padding: 10px 12px; border-radius: 8px; background: #EEF0FB; color: #2B2F6B; font-size: 13px; }
+.teams { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 6px; background: #EEF0FB; color: #464EB8; text-decoration: none; white-space: nowrap; }
+.teams:hover { background: #DDE0F7; color: #464EB8; }
+
+/* v3.26: realce ao passar o mouse em todos os botões e itens clicáveis */
+.btn, .chip, .fbtn, .passo, .aba, .gbtn, .btnCx, .rm, .secaoToggle, .mItem, .lista a, .arq, .pcard, .gclick, .tbl tr.cl td, .nav a, .fechar, .teams {
+  transition: background-color .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease, filter .15s ease;
+}
+.btn:hover:not(:disabled) { background: #F4EBEC; border-color: var(--vinhoBorda); }
+.btn.pri:hover:not(:disabled), .btn.ok:hover:not(:disabled) { background: var(--vinhoEsc); border-color: var(--vinhoEsc); color: #fff; }
+.btn.excluir:hover:not(:disabled) { background: #7A230D; border-color: #7A230D; color: #fff; }
+.btn.perigo:hover:not(:disabled) { background: #FBE3DC; border-color: #E8B4A6; }
+.chip:hover:not(.on) { background: #F4EBEC; border-color: var(--vinhoBorda); color: var(--vinho); }
+.chip.on:hover { filter: brightness(1.25); }
+.fbtn:hover { filter: brightness(0.96); box-shadow: 0 2px 8px rgba(0, 0, 0, .08); }
+.passo:hover:not(.on) { border-color: var(--vinhoBorda); background: #FBF6F6; }
+.aba:hover:not(.on) { color: var(--vinho); background: #FBF6F6; }
+.gbtn:hover { background: #F4EBEC; }
+.btnCx:hover:not(:disabled) { background: #33373D; border-color: #55595F; }
+.rm:hover { background: #FBE3DC; border-radius: 4px; }
+.secaoToggle:hover { background: #FBF6F6; }
+.fechar:hover { color: var(--vinho); }
+.mItem, .lista a { border-radius: 6px; margin: 0 -8px; padding-left: 8px !important; padding-right: 8px !important; }
+.mItem:hover, .lista a:hover { background: #F4EBEC; }
+.mItem:hover .mTit, .lista a:hover .mTit { color: var(--vinho); }
+.pcard:hover { box-shadow: 0 4px 14px rgba(0, 0, 0, .07); }
+.btn:focus-visible, .chip:focus-visible, .mItem:focus-visible, .lista a:focus-visible { outline: 2px solid var(--vinho); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .btn, .chip, .fbtn, .passo, .aba, .mItem, .pcard { transition: none; } }

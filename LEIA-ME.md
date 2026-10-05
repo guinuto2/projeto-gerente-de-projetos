@@ -1,4 +1,75 @@
-# Portal do Escritório de Projetos — v3.18 (React)
+# Portal do Escritório de Projetos — v3.27 (React)
+
+**v3.27**
+- **"+ Novo risco"** e **"+ Nova pendência"** nas abas do projeto (PMO e patrocinador), com código sugerido na sequência
+  (R-14, DA-A17…). Os painéis de risco e pendência também ganharam **Excluir**.
+- **Exportar CSV** nas abas Cronograma (planejamento completo: datas previstas e de baseline, desvio, status, %, marcos,
+  reuniões), Riscos e Pendências. Formato do Excel em português (";" e acentos corretos).
+- **Pastas sem projeto:** o patrocinador vê no portfólio as pastas da biblioteca de projetos que já foram excluídos e pode
+  mandá-las para a lixeira. Ao excluir um projeto, "excluir também a pasta" agora vem marcado.
+
+
+**v3.26**
+- **Rascunhos:** "Salvar rascunho" pede só código e nome. Rascunhos ficam na seção "Rascunhos" do portfólio (fora da lista
+  e dos indicadores). No rascunho: Editar dados, Enviar para aprovação (PMO) ou Ativar projeto (patrocinador) e Excluir
+  rascunho, com a lista do que ainda falta preencher.
+- Cronograma e marcos: atividade nova, ou data alterada, não pode ser antes de hoje (datas antigas que não mudam
+  continuam valendo, para atualizar status de atividades passadas). Reunião do Teams também não pode ser no passado.
+- Equipe do projeto: um só botão "+ Adicionar pessoa" (a linha começa como Técnico; troque a função se for outra pessoa).
+- Realce ao passar o mouse em todos os botões e itens clicáveis.
+- "Hoje" é a data do computador no modo conectado (muda sozinha todo dia); no piloto é fixa em 30/09/2026.
+
+
+**v3.25**
+- Função da equipe só com opções fixas: Técnico, Gerente de projeto, Arquiteto, Responsável do cliente,
+  Responsável do fornecedor e Patrocinador.
+- Projetos novos não aceitam início nem atividades antes de hoje (campos de data com mínimo e aviso).
+- Gates: clicar na fase só filtra o cronograma; a aprovação aparece ao clicar no losango ou quando o PMO pede
+  (aviso no topo do projeto com "Analisar pedido").
+- E-mail de projeto excluído para a equipe (técnicos, gerente, arquiteto, cliente) e o patrocinador
+  (`emailAoExcluirProjeto` no config.js).
+
+
+**v3.24 — tabela de técnicos da Systech**
+- Nova lista **Portal Tecnicos** (Nome, E-mail, Função, Ativo), criada e populada pelo script com Guilherme Santos,
+  Felipe Cunha, Mario Junior e Leonardo Costa. Para incluir, alterar ou desativar técnicos, edite a lista no SharePoint.
+- Na equipe do projeto, quem tem a função **Técnico** é escolhido nessa tabela (nome, e-mail e empresa preenchidos
+  sozinhos; o mesmo técnico não aparece duas vezes). Botões "+ Adicionar técnico Systech" e "+ Adicionar outra pessoa".
+- O campo **Arquiteto** e o **Gerente de projeto** também usam a tabela para trazer o e-mail.
+
+
+**v3.23 — tipos de reunião e aviso de alteração**
+- Tipos: **Implementação** (2 h), **Alinhamento** (1 h), **Interna** (30 min, só a equipe Systech marcada) e **Execução** (1 h).
+  O tipo entra no título, fica gravado na atividade (coluna ReuniaoTipo) e aparece no selo do cronograma.
+- Ao alterar a reunião, os convidados recebem um e-mail do portal com o resumo "antes → agora" (tipo, data, horário,
+  duração, quem entrou e quem saiu) e o botão para entrar no Teams. Desliga com `emailAoAlterarReuniao: false`.
+- Rode `provisionar-portal.ps1` (sem `-Piloto`) para criar a coluna ReuniaoTipo.
+
+
+**v3.22 — gerenciar a reunião pelo portal**
+- No painel da atividade com reunião: **Entrar no Teams**, **Editar reunião** (título, data, horário, duração, pauta e
+  participantes; o Outlook manda a atualização) e **Cancelar reunião** (com mensagem opcional aos convidados).
+- Ao excluir uma atividade com reunião, a confirmação oferece cancelar a reunião junto.
+- O portal confere se a lista Portal Atividades tem as colunas da reunião; sem elas, o agendamento fica bloqueado com
+  a instrução de rodar o script (antes, a reunião era criada mas o link não ficava gravado).
+- Só o organizador (quem criou) consegue editar ou cancelar pelo portal.
+
+
+**v3.21:** `reuniaoSomentePara` no config.js: em teste, os convites de reunião do Teams vão só para esse endereço (os e-mails do portal seguem `emailSomentePara`).
+
+**v3.20:** o organizador da reunião nunca entra como convidado (o Outlook não manda convite para ele). O painel e o aviso final dizem claramente quem recebeu convite; em modo de teste com o próprio e-mail, avisa que nenhum convite será enviado e que a reunião vai direto para a agenda.
+
+**v3.19 — reunião do Teams nas atividades**
+- Ao incluir ou editar uma atividade (PMO e Patrocinador), opção "Agendar reunião no Teams": título, data, início,
+  duração, pauta, participantes da equipe já marcados (desmarque quem não quer chamar) e outros convidados.
+- O evento é criado no calendário de quem está logado (organizador) com link do Teams, e o Outlook envia os convites.
+- O link fica gravado na atividade e aparece no cronograma ("Teams 06/10 14:30"), abrindo direto a reunião.
+- Modo de teste: com `emailSomentePara` preenchido, o convite vai só para esse endereço.
+
+Configuração (uma vez): Entra ID → Portal PMO → Permissões de API → Microsoft Graph → Delegadas →
+**Calendars.ReadWrite** → Conceder consentimento do administrador. Depois rode `provisionar-portal.ps1`
+(sem `-Piloto`) para criar as colunas ReuniaoTeams, ReuniaoInicio e ReuniaoId em Portal Atividades.
+
 
 **v3.18 — perfis:** o perfil GP foi unido ao PMO, e o antigo PMO (aprovador) passou a se chamar Patrocinador.
 - **Patrocinador** (sigla PAT): aprova ou devolve gates e projetos, cria projetos já aprovados, exclui projetos.

@@ -80,6 +80,10 @@ export function Gantt({ projeto, atividades, filtro, aoAbrir }: Props) {
                           : <span className="tog" />}
                         <span className="gcod">{a.codigo}</span>
                         <span className="gnome" title={a.nome}>{a.nome}</span>
+                        {a.reuniaoUrl && (
+                          <a className="teams" href={a.reuniaoUrl} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
+                            title={`Entrar na reunião do Teams${a.reuniaoTipo ? ` (${a.reuniaoTipo})` : ''}`}>{a.reuniaoTipo || 'Teams'}{a.reuniaoInicio ? ` ${a.reuniaoInicio.slice(8, 10)}/${a.reuniaoInicio.slice(5, 7)} ${a.reuniaoInicio.slice(11, 16)}` : ''}</a>
+                        )}
                         {a.status !== 'Planejado' && <Selo valor={a.status} cores={SELO_STATUS} />}
                         <span className={`geq ${classeEquipe(a.equipe)}`}>{a.equipe}</span>
                       </div>
