@@ -1,7 +1,7 @@
 name: Documentação MkDocs no GitHub Pages
 on:
   push:
-    branches: [main]
+    branches: [documentacao]
     paths:
       - 'docs/**'
       - 'mkdocs.yml'
@@ -36,7 +36,7 @@ jobs:
         with:
           path: site
   deploy:
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/documentacao'
     needs: build
     runs-on: ubuntu-latest
     permissions:
