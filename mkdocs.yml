@@ -1,0 +1,48 @@
+site_name: Portal PMO — Documentação de src
+site_description: Arquitetura, código, funções e dados do Portal PMO
+site_author: Equipe do projeto
+use_directory_urls: true
+# O workflow preenche automaticamente a URL real do GitHub Pages.
+# Para outros hosts, defina MKDOCS_SITE_URL com a URL e barra final.
+site_url: !ENV [MKDOCS_SITE_URL, '']
+theme:
+  name: material
+  language: pt
+  palette:
+    primary: red
+    accent: red
+  features:
+    - navigation.sections
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+plugins:
+  - search:
+      lang: pt
+markdown_extensions:
+  - admonition
+  - tables
+  - attr_list
+  - toc:
+      permalink: true
+  - pymdownx.highlight
+  - pymdownx.superfences
+nav:
+  - Início: index.md
+  - Executar o portal: execucao.md
+  - Dependências: dependencias.md
+  - Arquitetura: arquitetura.md
+  - Páginas e componentes: interface.md
+  - Estado e funções do portal: estado.md
+  - Serviços e integrações: servicos.md
+  - Regras e utilitários: regras.md
+  - Configuração: configuracao.md
+  - Dados e tabelas:
+      - Modelo e relacionamentos: dados.md
+      - Dicionário SharePoint: tabelas.md
+      - Tipos TypeScript: tipos.md
+  - Referência do código: referencia.md
+  - Limitações e manutenção: manutencao.md
+  - Publicar a documentação: github-pages.md
+  - Escopo e validação: validacao.md
