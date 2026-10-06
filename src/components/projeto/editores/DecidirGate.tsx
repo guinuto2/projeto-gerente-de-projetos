@@ -13,8 +13,8 @@ import { Selo } from '../../ui/Selo';
 export function DecidirGate({ projeto: p, gate, aoFechar }: { projeto: Projeto; gate: Gate; aoFechar: () => void }) {
   const { dados, decidirGate, aprovarCadastro, avisarAprovacao } = usePortal();
   const toast = useToast();
-  // o G3 fecha Execução e Monitoramento juntas
-  const fases = gate.fase === 'Execução' ? (['Execução', 'Monitoramento'] as const) : [gate.fase];
+  // o G4 fecha Monitoramento e Encerramento juntas
+  const fases = gate.fase === 'Encerramento' ? (['Monitoramento', 'Encerramento'] as const) : [gate.fase];
   const partes = fases.map(f => progressoFase(dados, p.codigo, f));
   const prog = { feitas: partes.reduce((s, x) => s + x.feitas, 0), total: partes.reduce((s, x) => s + x.total, 0), abertas: partes.flatMap(x => x.abertas) };
   const [parecer, setParecer] = useState('');
@@ -29,7 +29,8 @@ export function DecidirGate({ projeto: p, gate, aoFechar }: { projeto: Projeto; 
     try {
       if (aprovar && gate.gate === 'G1' && p.situacaoCadastro !== 'Ativo') await aprovarCadastro(p.codigo, parecer.trim());
       else await decidirGate(p.codigo, gate.gate, { aprovar, parecer: parecer.trim(), congelarBaseline: aprovar && gate.gate === 'G2' && congelar });
-      toast(aprovar ? `${gate.gate} aprovado. ${gate.gate === 'G4' ? 'Projeto encerrado.' : `Projeto em ${PROXIMA_FASE[gate.fase]}.`}` : `${gate.gate} devolvido ao PMO.`);
+      toast(aprovar ? `${gate.gate} aprovado. ${gate.gate === 'G4' ? 'Projeto encerrado.' : `Projeto em ${PROXIMA_FASE[gate.fase]}.`}`
+        : gate.gate === 'G1' && p.situacaoCadastro === 'Em aprovação' ? 'Cadastro devolvido ao PMO: o projeto voltou para Rascunhos.' : `${gate.gate} devolvido ao PMO.`);
       aoFechar();
       if (aprovar && config.emailAoAprovar) {
         avisarAprovacao(p.codigo, gate.gate, parecer.trim())
@@ -40,7 +41,7 @@ export function DecidirGate({ projeto: p, gate, aoFechar }: { projeto: Projeto; 
   };
 
   return (
-    <Drawer aberto titulo={gate.nome} subtitulo={`${p.codigo} · ${gate.fase === 'Execução' ? 'Gate de Execução e Monitoramento' : `Gate da fase ${gate.fase}`}`} salvando={salvando} erro={erro}
+    <Drawer aberto titulo={gate.nome} subtitulo={`${p.codigo} · ${gate.fase === 'Encerramento' ? 'Gate de Monitoramento e Encerramento' : `Gate da fase ${gate.fase}`}`} salvando={salvando} erro={erro}
       aoFechar={aoFechar} aoSalvar={() => decidir(true)} rotuloSalvar={`Aprovar ${gate.gate}`}
       acoes={gate.situacao === 'Aguardando aprovação' && <button type="button" className="btn perigo" disabled={salvando} onClick={() => decidir(false)}>Devolver ao PMO</button>}>
       <p style={{ fontSize: 14, color: 'var(--medio)', lineHeight: 1.5 }}>
@@ -49,7 +50,7 @@ export function DecidirGate({ projeto: p, gate, aoFechar }: { projeto: Projeto; 
       </p>
       {gate.info && <div><div className="sub">Critério</div><div style={{ fontSize: 14, marginTop: 2 }}>{gate.info}</div></div>}
       <div>
-        <div className="sub">Atividades {gate.fase === 'Execução' ? 'de Execução e Monitoramento' : `da fase ${gate.fase}`}</div>
+        <div className="sub">Atividades {gate.fase === 'Encerramento' ? 'de Monitoramento e Encerramento' : `da fase ${gate.fase}`}</div>
         <div style={{ fontSize: 14, marginTop: 2, fontWeight: 600 }}>{prog.feitas} de {prog.total} concluídas</div>
         {prog.abertas.length > 0 && (
           <>

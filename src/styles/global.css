@@ -343,3 +343,61 @@ textarea.ctl { height: auto; min-height: 96px; padding: 10px; resize: vertical; 
 .pcard:hover { box-shadow: 0 4px 14px rgba(0, 0, 0, .07); }
 .btn:focus-visible, .chip:focus-visible, .mItem:focus-visible, .lista a:focus-visible { outline: 2px solid var(--vinho); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { .btn, .chip, .fbtn, .passo, .aba, .mItem, .pcard { transition: none; } }
+
+/* v3.28: ação à direita na linha das abas */
+.abas { align-items: center; }
+.abasDireita { margin-left: auto; padding-left: 12px; display: flex; gap: 8px; flex-shrink: 0; }
+
+/* v3.30: janela com as datas ao passar o mouse na atividade */
+.dicaAtv { position: fixed; z-index: 50; background: #fff; border: 1px solid var(--borda); border-left: 3px solid var(--vinho); border-radius: 8px; box-shadow: 0 8px 24px rgba(0, 0, 0, .14); padding: 10px 12px; font-size: 12.5px; pointer-events: none; display: flex; flex-direction: column; gap: 5px; }
+.dicaTit { font-weight: 700; font-size: 13px; color: var(--texto); line-height: 1.35; margin-bottom: 2px; }
+.dicaLinha { display: flex; justify-content: space-between; gap: 10px; align-items: center; }
+.dicaLinha > span:first-child { color: var(--suave); }
+
+/* v3.31: a janela de datas abre sobre a barra; destaque leve na barra sob o mouse */
+.gbar, .gmarco { cursor: help; }
+.gbar:hover { box-shadow: 0 0 0 2px rgba(126, 24, 28, .35); }
+
+/* v3.31: fases do ciclo de vida alinhadas — o rótulo "em paralelo" não empurra Execução/Monitoramento para baixo */
+.trilhaF { padding-top: 18px; }
+.fcol.bloco { position: relative; }
+.rotBloco { position: absolute; top: -18px; left: 2px; white-space: nowrap; }
+.blocoIn { gap: 0; }
+.trilhaF .fbtn { height: 84px; min-height: 0; justify-content: center; }
+@media (max-width: 860px) {
+  .trilhaF { padding-top: 0; }
+  .rotBloco { position: static; }
+  .trilhaF .fbtn { height: auto; min-height: 76px; }
+}
+
+/* v3.33: atualização semanal (mesmo desenho do protótipo, na identidade Systech) */
+.atvLista { width: 380px; flex-shrink: 0; }
+.atvCard { text-align: left; width: 100%; padding: 12px; border-radius: 8px; background: var(--cinza); border: 2px solid transparent; cursor: pointer; color: var(--texto); font: inherit; }
+.atvCard:hover { border-color: var(--vinhoBorda); background: #FBF6F6; }
+.atvCard.on { background: var(--vinhoClaro); border-color: var(--vinho); }
+.atvSt { font-size: 12px; font-weight: 600; }
+.atvNome { font-size: 14px; font-weight: 600; margin-top: 2px; }
+.atvNota { font-size: 12px; color: var(--suave); margin-top: 2px; }
+.formAtual { flex: 1 1 auto; min-width: 0; padding: 24px 28px; display: flex; flex-direction: column; gap: 20px; }
+.ctl.alertaData { border-color: #D69E2E; background: #FFFBF0; }
+@media (max-width: 1180px) { .atvLista { width: auto; } }
+
+/* v3.35: página com os cronogramas de todos os projetos */
+.cronFiltros { display: flex; gap: 20px; align-items: flex-end; flex-wrap: wrap; }
+.cronBloco { padding: 16px 18px 18px; display: flex; flex-direction: column; gap: 12px; }
+.cronCab { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
+.cronNome { display: block; font-size: 17px; font-weight: 600; color: var(--vinho); text-decoration: none; margin-top: 2px; }
+.cronNome:hover { text-decoration: underline; }
+.cronInfo { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; font-size: 13px; }
+
+/* v3.35: cabeçalho compacto, numa linha só mesmo com todos os itens de menu */
+.headerIn { gap: 18px; padding: 0 28px; flex-wrap: nowrap; }
+.logoTxt { font-size: 15px; }
+.nav { flex-wrap: nowrap; gap: 2px; min-width: 0; }
+.nav a { padding: 8px 10px; font-size: 13.5px; white-space: nowrap; }
+.conexao { gap: 6px; white-space: nowrap; }
+.papel { white-space: nowrap; }
+.sync { display: none; }
+@media (min-width: 1500px) { .sync { display: inline; } }
+@media (max-width: 1280px) { .logoTxt { display: none; } }
+@media (max-width: 1100px) { .headerIn { flex-wrap: wrap; } .nav { flex-wrap: wrap; } }

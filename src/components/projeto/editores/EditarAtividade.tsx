@@ -17,6 +17,14 @@ interface Props {
   /** fase sugerida para a nova atividade (a selecionada no ciclo de vida) */
   faseInicial?: Fase | null;
   aoFechar: () => void;
+  /** chamado ao incluir uma subatividade, com o código da atividade principal */
+  aoCriarSubatividade?: (pai: string) => void;
+}
+
+/** Próximo código de subatividade: 3.2 → 3.2.1, 3.2.2… */
+function proximoCodigoFilho(lista: Atividade[], pai: string): string {
+  const nums = lista.filter(a => a.pai === pai).map(a => Number(a.codigo.split('.').pop())).filter(n => !isNaN(n));
+  return `${pai}.${(nums.length ? Math.max(...nums) : 0) + 1}`;
 }
 
 function proximoCodigo(lista: Atividade[]): string {
@@ -27,7 +35,7 @@ function proximoCodigo(lista: Atividade[]): string {
 }
 
 /** Cria, edita ou exclui uma atividade do cronograma. */
-export function EditarAtividade({ projeto, codigo, faseInicial, aoFechar }: Props) {
+export function EditarAtividade({ projeto, codigo, faseInicial, aoFechar, aoCriarSubatividade }: Props) {
   const { hoje, dados, salvarAtividade, criarAtividade, excluirAtividade, agendarReuniao, atualizarReuniao, cancelarReuniao, lerReuniao, reuniaoGravavel, fonte, email: meuEmail } = usePortal();
   const toast = useToast();
   const { pode, papel } = usePapel();
@@ -50,7 +58,8 @@ export function EditarAtividade({ projeto, codigo, faseInicial, aoFechar }: Prop
     marco: existente?.marco || false,
     pai: existente?.pai || '',
     descricao: existente?.descricao || '',
-    observacao: existente?.observacao || ''
+    observacao: existente?.observacao || '',
+    responsavel: existente?.responsavel || ''
   });
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState('');
@@ -107,7 +116,8 @@ export function EditarAtividade({ projeto, codigo, faseInicial, aoFechar }: Prop
     const pct = f.status === 'Concluído' ? 100 : Math.max(0, Math.min(100, Number(f.percentual) || 0));
     const campos = {
       nome: f.nome.trim(), fase: f.fase, equipe: f.equipe.trim() || 'Systech', status: f.status, percentual: pct,
-      inicio: f.inicio, termino: f.termino, marco: f.marco, descricao: f.descricao.trim(), observacao: f.observacao.trim()
+      inicio: f.inicio, termino: f.termino, marco: f.marco, descricao: f.descricao.trim(), observacao: f.observacao.trim(),
+      responsavel: f.responsavel
     };
     // validação da reunião antes de gravar qualquer coisa
     const vaiReunir = reuniao.ativa && (editandoReuniao || podeAgendar);
@@ -124,6 +134,7 @@ export function EditarAtividade({ projeto, codigo, faseInicial, aoFechar }: Prop
           // nova atividade entra com a baseline igual ao previsto
           baselineInicio: f.inicio, baselineTermino: f.termino
         });
+        if (f.pai) aoCriarSubatividade?.(f.pai);
       } else {
         await salvarAtividade(projeto.codigo, existente.codigo, campos);
         atv = { ...existente, ...campos };
@@ -146,7 +157,7 @@ export function EditarAtividade({ projeto, codigo, faseInicial, aoFechar }: Prop
           toast(`${nova ? 'Atividade incluída' : 'Alteração salva'}, mas a reunião não foi ${editandoReuniao ? 'atualizada' : 'criada'}: ${(e as Error).message}.`);
         }
       } else {
-        toast(nova ? 'Atividade incluída no cronograma.' : 'Alteração salva.');
+        toast(nova ? (f.pai ? `Subatividade incluída dentro de ${f.pai}.` : 'Atividade incluída no cronograma.') : 'Alteração salva.');
       }
       aoFechar();
     } catch (e) { setErro((e as Error).message); setSalvando(false); }
@@ -181,9 +192,19 @@ export function EditarAtividade({ projeto, codigo, faseInicial, aoFechar }: Prop
       <label className="campo">Atividade *<input className="ctl" value={f.nome} onChange={muda('nome')} disabled={!estrutura} placeholder="O que será feito" /></label>
       <div className="fg2">
         <label className="campo">Equipe<input className="ctl" value={f.equipe} onChange={muda('equipe')} disabled={!estrutura} placeholder="Systech, cliente ou ambos" /></label>
+        <label className="campo">Responsável
+          <select className="ctl" value={f.responsavel} onChange={muda('responsavel')} disabled={!estrutura}>
+            <option value="">— sem responsável —</option>
+            {projeto.equipe.filter(m => m.email).map(m => <option key={m.email} value={m.email.toLowerCase()}>{m.nome} · {m.funcao}</option>)}
+          </select>
+        </label>
         {nova
           ? <label className="campo">Subatividade de
-              <select className="ctl" value={f.pai} onChange={muda('pai')}>
+              <select className="ctl" value={f.pai} onChange={e => {
+                const pai = e.target.value, principal = macros.find(m => m.codigo === pai);
+                setF(s => ({ ...s, pai, codigo: pai ? proximoCodigoFilho(lista, pai) : proximoCodigo(lista), fase: principal ? principal.fase : s.fase,
+                  inicio: s.inicio || principal?.inicio || '', termino: s.termino || principal?.termino || '' }));
+              }}>
                 <option value="">— atividade principal —</option>
                 {macros.map(a => <option key={a.codigo} value={a.codigo}>{a.codigo} · {a.nome}</option>)}
               </select>

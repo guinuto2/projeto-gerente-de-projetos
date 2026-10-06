@@ -8,7 +8,6 @@ import { Selo } from '../../ui/Selo';
 import { Vazio } from '../../ui/Vazio';
 import { MatrizRiscos } from './MatrizRiscos';
 import { EditarRisco } from '../editores/EditarRisco';
-import { ExportarCsv } from './ExportarCsv';
 
 export function AbaRiscos({ projeto }: { projeto: Projeto }) {
   const { dados } = usePortal();
@@ -23,7 +22,7 @@ export function AbaRiscos({ projeto }: { projeto: Projeto }) {
     <>
       <div className="linha" style={{ alignItems: 'flex-start', marginBottom: 18, gap: 28 }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>{botaoNovo}<ExportarCsv projeto={projeto} tipo="riscos" /></div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>{botaoNovo}</div>
           <MatrizRiscos abertos={riscosAbertos(dados, projeto.codigo)} />
         </div>
         <div style={{ flex: 1, minWidth: 260 }}>

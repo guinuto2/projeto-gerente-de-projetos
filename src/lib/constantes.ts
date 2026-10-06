@@ -17,7 +17,7 @@ export const SELO_FAROL: Record<string, Cores> = { Verde: ['#D7F0E3', '#145C3C']
 export const COR_FAROL: Record<string, string> = { Verde: '#1F8A5B', Amarelo: '#D69E2E', Vermelho: '#C0392B' };
 export const SELO_STATUS: Record<string, Cores> = {
   'Concluído': ['#D7F0E3', '#145C3C'], 'Em andamento': ['#FFF1D1', '#7A5200'], 'Planejado': ['#EEF0F3', '#3C4757'],
-  'Bloqueado': ['#FBE3DC', '#9A2E12'], 'Cancelado': ['#EEF0F3', '#8A94A3']
+  'Bloqueado': ['#FBE3DC', '#9A2E12'], 'Cancelado': ['#EEF0F3', '#8A94A3'], 'A confirmar': ['#E8EEF7', '#2B4C7E']
 };
 export const SELO_RISCO: Record<string, Cores> = {
   'Aberto': ['#FBE3DC', '#9A2E12'], 'Em tratamento': ['#FFF1D1', '#7A5200'], 'Mitigado': ['#D7F0E3', '#145C3C'], 'Fechado': ['#EEF0F3', '#3C4757']
@@ -36,11 +36,11 @@ export function classeEquipe(equipe: string): 's' | 'c' | 'a' {
   return /systech|pmo/i.test(equipe) ? 's' : 'c';
 }
 
-/** Gate que fecha cada fase (Monitoramento corre em paralelo e não tem gate). */
+/** Gate que fecha cada fase (Monitoramento corre junto com o Encerramento e fecha no G4). */
 export const GATE_DA_FASE: Partial<Record<Fase, { gate: string; nome: string }>> = {
   'Iniciação': { gate: 'G1', nome: 'G1 · Termo de abertura aprovado' },
   'Planejamento': { gate: 'G2', nome: 'G2 · Linha de base aprovada' },
-  'Execução': { gate: 'G3', nome: 'G3 · Implementação aceita (libera o encerramento)' },
+  'Execução': { gate: 'G3', nome: 'G3 · Execução aceita (libera monitoramento e encerramento)' },
   'Encerramento': { gate: 'G4', nome: 'G4 · Termo de aceite final' }
 };
 
@@ -50,10 +50,10 @@ export const PROXIMA_FASE: Partial<Record<Fase, Fase>> = {
 };
 
 /**
- * Onde cada gate aparece no ciclo de vida. Execução e Monitoramento formam um bloco em paralelo;
- * o gate da Execução (G3) fica depois do bloco, antes do Encerramento.
+ * Onde cada gate aparece no ciclo de vida. Monitoramento e Encerramento formam um bloco em paralelo;
+ * o G3 fica depois da Execução e o G4 depois do bloco.
  */
-export const GATE_APOS_FASE: Record<string, Fase> = { 'Iniciação': 'Iniciação', 'Planejamento': 'Planejamento', 'Execução': 'Monitoramento', 'Monitoramento': 'Monitoramento', 'Encerramento': 'Encerramento' };
+export const GATE_APOS_FASE: Record<string, Fase> = { 'Iniciação': 'Iniciação', 'Planejamento': 'Planejamento', 'Execução': 'Execução', 'Monitoramento': 'Encerramento', 'Encerramento': 'Encerramento' };
 
 /** Tipos de reunião do Teams: duração sugerida e se convida só a equipe Systech. */
 export interface TipoReuniao { nome: string; duracaoMin: number; somenteSystech: boolean; descricao: string }
@@ -78,3 +78,8 @@ export function proximoCodigoSeq(codigos: string[], prefixoPadrao: string): stri
   const maior = Math.max(...partes.filter(m => m[1] === prefixo).map(m => Number(m[2])));
   return prefixo + (maior + 1);
 }
+
+/** Causas de atraso da atualização semanal. */
+export const CAUSAS_ATRASO = ['Cliente / acesso', 'Fabricante / entrega', 'Janela / RDM', 'Recurso interno', 'Técnica'];
+/** Status disponíveis na atualização semanal (igual ao protótipo). */
+export const STATUS_ATUALIZACAO = ['Em andamento', 'Planejado', 'Bloqueado', 'Concluído', 'A confirmar', 'Cancelado'] as const;

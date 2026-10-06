@@ -1,4 +1,63 @@
-# Portal do Escritório de Projetos — v3.27 (React)
+# Portal do Escritório de Projetos — v3.35 (React)
+
+**v3.35 — página "Cronogramas"**
+- Novo item de menu **Cronogramas** (ao lado de Novo projeto): o cronograma de todos os projetos em andamento, um bloco por
+  projeto no mesmo molde do cronograma do projeto (fases, barras, baseline, marcos, hoje, janela de datas na barra).
+- Todos os blocos usam a mesma escala de datas (semanas alinhadas). Filtros: projeto (todos ou um) e fase, com a contagem
+  de atividades de cada fase no projeto filtrado. Clicar numa atividade abre o projeto.
+- Cabeçalho compactado: fica numa linha só de 1280 px para cima.
+
+
+**v3.34**
+- Ciclo de vida: Iniciação ─G1─ Planejamento ─G2─ Execução ─G3─ [ Monitoramento ∥ Encerramento ] ─G4.
+  O G3 fecha só a Execução; o G4 fecha Monitoramento e Encerramento. No modelo Systech, o monitoramento acompanha o encerramento.
+- **Patrocinador** só aprova (gates e cadastros) e visualiza: não cria, não edita, não exclui, não atualiza atividades.
+  A exclusão de projetos passou para o **PMO**.
+- **Rascunhos** visíveis só para o PMO.
+- **Reunião remarcada no Outlook** (o organizador aceitou outro horário): o portal lê o horário atual ao abrir e a cada
+  releitura e grava a nova data no cronograma; atividade de um dia só, no dia da reunião, acompanha a nova data.
+
+
+**v3.33 — atualização semanal (como no protótipo)**
+- Menu **Atualizar status** (todos os perfis): à esquerda, as atividades abertas da semana e as atrasadas dos projetos em
+  que a pessoa está, com o filtro "Só as minhas" / "Toda a equipe"; à direita, o formulário: status, % concluído, nova data
+  prevista, data real, depende de RDM e nº, impedimento, causa do atraso, horas realizadas e próximo passo.
+- Atividade ganhou **Responsável** (escolhido na equipe do projeto) — é ele que define "minhas atividades".
+- Nova data prevista depois da baseline exige a causa do atraso e avisa o gerente do projeto por e-mail
+  (`emailAoReprogramar`). A baseline não é editável na atualização.
+- Rode `provisionar-portal.ps1` (sem `-Piloto`) para criar as colunas novas em Portal Atividades.
+
+
+**v3.32**
+- Subatividades: ao incluir, a atividade principal abre sozinha no cronograma (antes ficava fechada e parecia que não
+  tinha entrado); o código é sugerido na sequência (3.2 → 3.2.1) e a fase vem da principal.
+- Técnico: vê **todos os projetos encerrados** (consulta), além dos projetos em andamento em que está na equipe;
+  não vê os quadros de indicadores nem as abas Escopo e premissas, Riscos e Pendências.
+- Indicadores do projeto aparecem só para o PMO.
+- Modal de exclusão sem a frase sobre o e-mail (o aviso continua sendo enviado).
+
+
+**v3.31:** a janela com as datas abre só ao passar o mouse sobre a barra de duração (ou o losango do marco) no cronograma;
+as cinco fases do ciclo de vida ficam alinhadas e com a mesma altura.
+
+
+**v3.30**
+- Cronograma: ao passar o mouse sobre uma atividade, uma janela mostra início e término (com o dia da semana),
+  duração em dias úteis, baseline (se mudou) e situação.
+- Ciclo de vida sem a frase de instrução.
+- Patrocinador devolve o cadastro (G1) → o projeto sai de "Em aprovação", o aviso "Analisar cadastro" some e ele volta
+  para **Rascunhos** do PMO, mostrando o motivo da devolução.
+
+
+**v3.29:** a planilha do cronograma não cita mais o Portal PMO (linha 2: cliente · gerente · data).
+
+**v3.28 — exportação do cronograma**
+- Botão **"⤓ Exportar cronograma"** à direita da linha das abas do projeto (sai das abas de riscos e pendências).
+- Exporta **planilha do Excel (.xlsx) formatada**: só código, atividade, início previsto e término previsto; título com
+  projeto, cliente e gerente; cabeçalho vinho com filtro e fixo ao rolar; atividades agrupadas por fase e em ordem de
+  data; linhas zebradas; datas reais (dd/mm/aaaa). Gerada pelo próprio portal, sem biblioteca extra.
+  (CSV não guarda formatação, por isso o formato passou a ser .xlsx.)
+
 
 **v3.27**
 - **"+ Novo risco"** e **"+ Nova pendência"** nas abas do projeto (PMO e patrocinador), com código sugerido na sequência

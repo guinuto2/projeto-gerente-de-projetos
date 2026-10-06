@@ -11,6 +11,8 @@ export interface Autenticador {
   tokenPara(escopos: string[]): Promise<string>;
   /** e-mail (UPN) de quem entrou */
   email(): string;
+  /** token sem nenhuma interação; null se precisar de consentimento (usado nas leituras automáticas) */
+  tokenSilencioso(escopos: string[]): Promise<string | null>;
   sair(): Promise<void>;
 }
 
@@ -74,6 +76,12 @@ export class AutenticadorMsal implements Autenticador {
 
   email() { return this.conta?.username || ''; }
 
+  async tokenSilencioso(escopos: string[]): Promise<string | null> {
+    if (!this.conta) return null;
+    try { return (await this.pca.acquireTokenSilent({ scopes: escopos, account: this.conta })).accessToken; }
+    catch { return null; }
+  }
+
   async tokenPara(escopos: string[]): Promise<string> {
     if (!this.conta) throw new Error('Sessão não iniciada.');
     try {
@@ -99,6 +107,7 @@ export class AutenticadorTeste implements Autenticador {
   async token() { return 'token-de-teste'; }
   async tokenPara() { return 'token-de-teste'; }
   email() { return 'teste@gruposystech.onmicrosoft.com'; }
+  async tokenSilencioso() { return 'token-de-teste'; }
   async sair() { /* nada */ }
 }
 

@@ -6,7 +6,7 @@ const ORDEM: Fase[] = ['Iniciação', 'Planejamento', 'Execução', 'Encerrament
 /** Situação inicial coerente com a fase atual do projeto. */
 function situacaoInicial(p: Projeto, fase: Fase): Gate['situacao'] {
   if (p.situacaoCadastro === 'Encerrado') return 'Aprovado';
-  const atual = FASES.indexOf(p.fase === 'Monitoramento' ? 'Execução' : p.fase);
+  const atual = FASES.indexOf(p.fase === 'Monitoramento' ? 'Encerramento' : p.fase);
   const daFase = FASES.indexOf(fase);
   if (daFase < atual) return 'Aprovado';
   if (fase === 'Iniciação' && p.situacaoCadastro === 'Em aprovação') return 'Aguardando aprovação';

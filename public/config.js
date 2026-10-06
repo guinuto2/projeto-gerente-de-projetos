@@ -17,6 +17,7 @@ window.PORTAL_CONFIG = {
   emailAoAprovar: true,              // patrocinador aprova gate ou projeto          → gerente do projeto + patrocinador
   emailAoAlterarReuniao: true,       // reunião do Teams alterada                    → convidados (resumo antes → agora)
   emailAoExcluirProjeto: true,       // projeto excluído                             → equipe + gerente + patrocinador
+  emailAoReprogramar: true,          // atualização semanal passa da baseline        → gerente do projeto
   emailAoCriarProjeto: true,         // patrocinador cria projeto (já aprovado)      → gerente do projeto + patrocinador
 
   emailSomentePara: 'guilherme.santos@systechtecnologia.com.br',  // TESTE: e-mails do portal vão só para este endereço (vazio = destinatários reais)

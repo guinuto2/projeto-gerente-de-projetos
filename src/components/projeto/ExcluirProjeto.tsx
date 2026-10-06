@@ -54,7 +54,6 @@ export function ExcluirProjeto({ projeto: p, aoFechar }: { projeto: Projeto; aoF
         <h2 id="excluir-titulo" className="h3">Excluir o projeto {c}?</h2>
         <p className="sub" style={{ fontSize: 14, lineHeight: 1.5 }}>{p.nome}</p>
         <div className="msg erro">Esta ação não pode ser desfeita pelo portal. Serão apagados o projeto e tudo o que está vinculado a ele:</div>
-        {config.emailAoExcluirProjeto && fonte.modo === 'sharepoint' && <p className="sub" style={{ margin: 0 }}>A equipe do projeto, o PMO e o patrocinador recebem um e-mail avisando da exclusão.</p>}
         <ul className="ul" style={{ marginTop: 0 }}>
           {itens.map(([t, n]) => <li key={t}><b>{n}</b> {t}</li>)}
         </ul>

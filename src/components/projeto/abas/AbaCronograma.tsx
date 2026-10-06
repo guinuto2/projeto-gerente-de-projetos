@@ -8,7 +8,6 @@ import { Chips } from '../../ui/Chips';
 import { Vazio } from '../../ui/Vazio';
 import { Gantt } from './Gantt';
 import { TEMA } from '../../../lib/tema';
-import { ExportarCsv } from './ExportarCsv';
 import { EditarAtividade } from '../editores/EditarAtividade';
 
 interface Props { projeto: Projeto; faseSel: Fase | null; limparFase: () => void }
@@ -17,11 +16,13 @@ export function AbaCronograma({ projeto, faseSel, limparFase }: Props) {
   const { dados, hoje, fonte } = usePortal();
   const { pode } = usePapel();
   const [equipe, setEquipe] = useState('Todas');
+  const [abertos, setAbertos] = useState<Record<string, boolean>>({});
   /** código da atividade em edição, ou 'nova' */
   const [editando, setEditando] = useState<string | null>(null);
   const atividades = dados.atividades[projeto.codigo] || [];
   const editor = editando && (
-    <EditarAtividade projeto={projeto} codigo={editando === 'nova' ? undefined : editando} faseInicial={faseSel} aoFechar={() => setEditando(null)} />
+    <EditarAtividade projeto={projeto} codigo={editando === 'nova' ? undefined : editando} faseInicial={faseSel} aoFechar={() => setEditando(null)}
+      aoCriarSubatividade={pai => setAbertos(s => ({ ...s, [pai]: true }))} />
   );
   if (!atividades.length) return (
     <>
@@ -44,7 +45,6 @@ export function AbaCronograma({ projeto, faseSel, limparFase }: Props) {
       <div className="linha" style={{ marginBottom: 14 }}>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
           {pode('gerenciarAtividades') && <button type="button" className="btn pri pq" onClick={() => setEditando('nova')}>+ Nova atividade</button>}
-          <ExportarCsv projeto={projeto} tipo="cronograma" />
           <Chips rotulo="Filtrar por equipe" opcoes={equipes} valor={equipe} aoMudar={setEquipe} formatar={e => (e === 'Todas' ? 'Todas as equipes' : e)} />
         </div>
         <div className="legenda">
@@ -58,7 +58,7 @@ export function AbaCronograma({ projeto, faseSel, limparFase }: Props) {
           <button type="button" className="btn pq" onClick={limparFase}>Mostrar todas</button>
         </div>
       )}
-      <Gantt projeto={projeto} atividades={atividades} aoAbrir={c => { if (pode('atualizarAtividade')) setEditando(c); }}
+      <Gantt projeto={projeto} atividades={atividades} abertos={abertos} aoAlternar={setAbertos} aoAbrir={c => { if (pode('atualizarAtividade')) setEditando(c); }}
         filtro={a => (equipe === 'Todas' || a.equipe === equipe) && (!faseSel || a.fase === faseSel)} />
       <p className="sub" style={{ marginTop: 10 }}>
         {pode('gerenciarAtividades') ? 'Clique numa atividade para editar nome, fase, datas, status ou excluir.' : 'Clique numa atividade para atualizar status, % e observação.'} As alterações {fonte.modo === 'piloto' ? 'ficam neste navegador (modo piloto)' : 'são gravadas na lista Portal Atividades'}.

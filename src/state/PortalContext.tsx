@@ -6,7 +6,7 @@ import type { FonteDados } from '../services/FonteDados';
 import { criarFonte } from '../services/criarFonte';
 import { config } from '../config/config';
 import { horaAgora } from '../lib/datas';
-import { corpoReuniao, emailProjetoExcluido, emailReuniaoAlterada, emailGateAprovado, emailProjetoCriadoPeloPmo, emailSolicitacaoGate, emailSolicitacaoProjeto } from '../lib/emailProjeto';
+import { corpoReuniao, emailReprogramacao, emailProjetoExcluido, emailReuniaoAlterada, emailGateAprovado, emailProjetoCriadoPeloPmo, emailSolicitacaoGate, emailSolicitacaoProjeto } from '../lib/emailProjeto';
 import { progressoFase } from '../lib/calculos';
 import { gatesFaltantes } from '../lib/gates';
 import { useToast } from './ToastContext';
@@ -33,6 +33,8 @@ interface PortalValor {
   editarProjeto(cod: string, campos: Partial<Projeto>): Promise<void>;
   criarAtividade(cod: string, atv: Atividade): Promise<Atividade>;
   excluirAtividade(cod: string, codigo: string, opcoes?: { cancelarReunioes?: boolean }): Promise<void>;
+  /** atualização semanal da atividade; avisa o gerente se a data prevista passar da baseline. Devolve o aviso enviado (ou vazio). */
+  atualizarSemanal(cod: string, codigo: string, campos: Partial<Atividade>): Promise<string>;
   criarRisco(cod: string, r: Risco): Promise<void>;
   excluirRisco(cod: string, codigo: string): Promise<void>;
   criarPendencia(cod: string, x: Pendencia): Promise<void>;
@@ -85,6 +87,31 @@ function destinatarios(...grupos: string[]): string {
   if (config.emailSomentePara.trim()) return config.emailSomentePara.trim();
   const lista = grupos.flatMap(g => g.split(/[,;]/)).map(x => x.trim().toLowerCase()).filter(Boolean);
   return Array.from(new Set(lista)).join(', ');
+}
+
+/**
+ * Reuniões remarcadas no Outlook (o organizador aceitou outra data): grava o novo horário na atividade.
+ * Atividade de um dia só, no dia da reunião, acompanha a nova data. Devolve o que mudou.
+ */
+async function reunioesRemarcadas(fonte: FonteDados, d: Dados): Promise<{ cod: string; codigo: string; campos: Partial<Atividade>; texto: string }[]> {
+  if (!fonte.lerReunioes) return [];
+  const comReuniao = Object.entries(d.atividades).flatMap(([cod, l]) => l.filter(a => a.reuniaoId).map(a => ({ cod, a })));
+  if (!comReuniao.length) return [];
+  let atuais: Record<string, string>;
+  try { atuais = await fonte.lerReunioes(comReuniao.map(x => x.a.reuniaoId!)); } catch { return []; }
+  const mudancas = [];
+  for (const { cod, a } of comReuniao) {
+    const novo = atuais[a.reuniaoId!];
+    if (!novo || novo === a.reuniaoInicio) continue;
+    const diaAntigo = (a.reuniaoInicio || '').slice(0, 10), diaNovo = novo.slice(0, 10);
+    const campos: Partial<Atividade> = { reuniaoInicio: novo };
+    if (diaAntigo && a.inicio === diaAntigo && a.termino === diaAntigo && diaNovo !== diaAntigo) { campos.inicio = diaNovo; campos.termino = diaNovo; }
+    try {
+      await fonte.salvarAtividade(cod, a, campos);
+      mudancas.push({ cod, codigo: a.codigo, campos, texto: `${a.codigo} ${a.nome} → ${diaNovo.split('-').reverse().join('/')} ${novo.slice(11, 16)}` });
+    } catch { /* sem permissão de escrita: tenta de novo na próxima leitura */ }
+  }
+  return mudancas;
 }
 
 /** Gates já criados nesta sessão (chave "PROJETO|G1"), para nunca criar o mesmo duas vezes. */
@@ -178,12 +205,27 @@ export function PortalProvider({ children }: { children: ReactNode }) {
         assinatura.current = assinar(d);
         ultimaSync.current = Date.now();
         setAtualizadoEm(horaAgora());
+        aplicarRemarcadas(f, d);
       } catch (e) {
         if (vivo) setErro((e as Error).message);
       }
     })();
     return () => { vivo = false; };
   }, []);
+
+  /** grava no estado as reuniões que mudaram de horário no Outlook e avisa quem está usando */
+  const aplicarRemarcadas = useCallback(async (f: FonteDados, d: Dados) => {
+    const mud = await reunioesRemarcadas(f, d);
+    if (!mud.length) return;
+    setDados(prev => {
+      if (!prev) return prev;
+      let novo = prev;
+      for (const m of mud) novo = comItem<Atividade>(novo, 'atividades', m.cod, m.codigo, m.campos);
+      assinatura.current = assinar(novo);
+      return novo;
+    });
+    toast(`Reunião remarcada no Outlook; cronograma atualizado: ${mud.map(m => m.texto).join('; ')}.`);
+  }, [toast]);
 
   const editando = () => {
     const el = document.activeElement as HTMLElement | null;
@@ -202,6 +244,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
       ultimaSync.current = Date.now();
       setAtualizadoEm(horaAgora());
       if (mudou) { setDados(novo); assinatura.current = nova; }
+      aplicarRemarcadas(fonte, novo);
       if (manual) toast(mudou ? 'Dados atualizados do SharePoint.' : 'Nada mudou desde a última leitura.');
       else if (mudou) toast('Há alterações novas no SharePoint. A tela foi atualizada.');
     } catch (e) {
@@ -210,7 +253,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
       emSync.current = false;
       setSincronizando(false);
     }
-  }, [fonte, toast]);
+  }, [fonte, toast, aplicarRemarcadas]);
 
   // releitura automática: intervalo + ao voltar para a aba
   useEffect(() => {
@@ -269,6 +312,11 @@ export function PortalProvider({ children }: { children: ReactNode }) {
           : { situacao: 'Pendente' as const, aprovadoPor: '', dataAprovacao: '', parecer };
         await fonte.salvarGate(p, g, camposGate);
         let novo: Dados = { ...dados, projetos: dados.projetos.map(x => x.codigo !== cod ? x : { ...x, fases: x.fases.map(y => (y.gate === gate ? { ...y, ...camposGate } : y)) }) };
+        if (!aprovar && gate === 'G1' && p.situacaoCadastro === 'Em aprovação') {
+          // cadastro recusado: volta para o PMO como rascunho (sai do aviso "Analisar cadastro")
+          await fonte.salvarProjeto(p, { situacaoCadastro: 'Rascunho' });
+          novo = { ...novo, projetos: novo.projetos.map(x => (x.codigo === cod ? { ...x, situacaoCadastro: 'Rascunho' } : x)) };
+        }
         if (aprovar) {
           // avança a fase oficial; o G4 encerra o projeto
           const camposProjeto: Partial<Projeto> = gate === 'G4'
@@ -350,6 +398,20 @@ export function PortalProvider({ children }: { children: ReactNode }) {
         await fonte.excluirGates(ids);
         aplicar({ ...dados, projetos: dados.projetos.map(x => (x.codigo === cod ? { ...x, gatesRepetidos: [] } : x)) });
         return ids.length;
+      },
+      async atualizarSemanal(cod, codigo, campos) {
+        const a = (dados.atividades[cod] || []).find(x => x.codigo === codigo)!;
+        const registro = { ...campos, dataUltimaAtualizacao: fonte.hoje(), atualizadoPor: usuario };
+        await fonte.salvarAtividade(cod, a, registro);
+        aplicarCom(d => comItem<Atividade>(d, 'atividades', cod, codigo, registro));
+        // reprogramação: nova data prevista depois da baseline (e diferente da que já estava)
+        const nova = campos.termino;
+        if (!nova || !a.baselineTermino || nova <= a.baselineTermino || nova === a.termino) return '';
+        if (!config.emailAoReprogramar || !fonte.enviarEmail) return '';
+        const p = projeto(cod), para = destinatarios(emailDoGp(p));
+        if (!para) return '';
+        const { assunto, html } = emailReprogramacao(p, a, nova, { causa: campos.causaAtraso || '', observacao: campos.observacao || '', impedimento: !!campos.impedimento, autor: usuario });
+        try { return await fonte.enviarEmail(assunto, html, para); } catch { return ''; }
       },
       async criarRisco(cod, r) {
         if ((dados.riscos[cod] || []).some(x => x.codigo === r.codigo)) throw new Error(`Já existe um risco com o código ${r.codigo}.`);
@@ -456,7 +518,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
         if (!fonte.enviarEmail) throw new Error('no modo piloto o e-mail não é enviado');
         if (!emailPatrocinador()) throw new Error('defina emailPatrocinador no config.js');
         const p = projeto(cod), g = p.fases.find(x => x.gate === gate)!;
-        const fases = g.fase === 'Execução' ? ['Execução', 'Monitoramento'] as const : [g.fase];
+        const fases = g.fase === 'Encerramento' ? ['Monitoramento', 'Encerramento'] as const : [g.fase];
         const prog = fases.map(f => progressoFase(dados, cod, f)).reduce((s, x) => ({ feitas: s.feitas + x.feitas, total: s.total + x.total }), { feitas: 0, total: 0 });
         const { assunto, html } = emailSolicitacaoGate(p, g, prog, usuario);
         return fonte.enviarEmail(assunto, html, destinatarios(emailPatrocinador()));

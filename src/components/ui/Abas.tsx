@@ -1,6 +1,8 @@
+import type { ReactNode } from 'react';
+
 export interface Aba { id: string; rotulo: string; contagem?: number }
 
-export function Abas({ abas, ativa, aoMudar }: { abas: Aba[]; ativa: string; aoMudar: (id: string) => void }) {
+export function Abas({ abas, ativa, aoMudar, direita }: { abas: Aba[]; ativa: string; aoMudar: (id: string) => void; direita?: ReactNode }) {
   return (
     <div className="abas" role="tablist">
       {abas.map(a => (
@@ -8,6 +10,7 @@ export function Abas({ abas, ativa, aoMudar }: { abas: Aba[]; ativa: string; aoM
           {a.rotulo}{a.contagem !== undefined && <span className="cnt">{a.contagem}</span>}
         </button>
       ))}
+      {direita && <div className="abasDireita">{direita}</div>}
     </div>
   );
 }

@@ -19,6 +19,8 @@ export interface PortalConfig {
   emailAoAlterarReuniao: boolean;
   /** avisa equipe, PMO e patrocinador quando um projeto é excluído */
   emailAoExcluirProjeto: boolean;
+  /** avisa o gerente do projeto quando a atualização semanal passa a data prevista para depois da baseline */
+  emailAoReprogramar: boolean;
   /** endereço do portal usado nos links dos e-mails; vazio = o endereço aberto no navegador */
   urlPortal: string;
   /** caixa compartilhada que envia os e-mails (ex.: pmo@empresa.com.br); vazio = a conta logada */
@@ -48,6 +50,7 @@ export const config: PortalConfig = {
   emailAoAprovar: true,
   emailAoAlterarReuniao: true,
   emailAoExcluirProjeto: true,
+  emailAoReprogramar: true,
   urlPortal: '',
   emailRemetente: '',
   emailPatrocinador: '',

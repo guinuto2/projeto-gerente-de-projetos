@@ -8,8 +8,9 @@ export function TrilhaFases({ atual }: { atual: Fase }) {
   return (
     <div className="trilha" aria-label={`Fase atual: ${atual}`}>
       {FASES.map((f, k) => {
-        const emCurso = k === i || (i === 2 && k === 3);
-        const cor = k < i ? TEMA.cinzaMarca : emCurso ? TEMA.vinho : TEMA.futuro;
+        // Monitoramento (3) acompanha o Encerramento (4)
+        const emCurso = k === i || (i === 4 && k === 3);
+        const cor = emCurso ? TEMA.vinho : k < i ? TEMA.cinzaMarca : TEMA.futuro;
         return (
           <div key={f}>
             <i style={{ background: cor }} />

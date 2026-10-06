@@ -28,7 +28,9 @@ export function useProjetosVisiveis() {
   ), [fonte.modo, membros, usuario, email]);
 
   const podeVer = useCallback((p: Projeto) => {
+    if (p.situacaoCadastro === 'Rascunho') return papel === 'PMO';   // rascunho é só do PMO
     if (papel !== 'Técnico') return true;
+    if (p.situacaoCadastro === 'Encerrado') return true;   // encerrados ficam abertos para consulta de todos os técnicos
     return p.equipe.some(m =>
       (!!identidade.nome && norm(m.nome) === norm(identidade.nome)) ||
       (!!identidade.email && !!m.email && norm(m.email) === norm(identidade.email)));
@@ -39,6 +41,6 @@ export function useProjetosVisiveis() {
   const projetos = useMemo(() => todos.filter(p => p.situacaoCadastro !== 'Encerrado' && p.situacaoCadastro !== 'Rascunho'), [todos]);
   const encerrados = useMemo(() => todos.filter(p => p.situacaoCadastro === 'Encerrado'), [todos]);
   /** rascunhos: só para quem cadastra projetos (o técnico não vê) */
-  const rascunhos = useMemo(() => (papel === 'Técnico' ? [] : todos.filter(p => p.situacaoCadastro === 'Rascunho')), [todos, papel]);
+  const rascunhos = useMemo(() => (papel === 'PMO' ? todos.filter(p => p.situacaoCadastro === 'Rascunho') : []), [todos, papel]);
   return { projetos, encerrados, rascunhos, todos, podeVer, identidade, membros };
 }

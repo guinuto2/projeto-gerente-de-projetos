@@ -113,7 +113,7 @@ export function emailSolicitacaoGate(p: Projeto, g: Gate, progresso: { feitas: n
       intro: `${esc(autor)} pediu a aprovação do gate <b>${esc(g.nome)}</b> no projeto <b>${esc(p.codigo)} · ${esc(p.nome)}</b>.`,
       dados: [
         ['Projeto', `${p.codigo} · ${p.nome}`], ['Cliente', p.cliente], ['Gerente de projeto', p.gerente],
-        ['Gate', g.nome], ['Fase', g.fase === 'Execução' ? 'Execução e Monitoramento' : g.fase],
+        ['Gate', g.nome], ['Fase', g.fase === 'Encerramento' ? 'Monitoramento e Encerramento' : g.fase],
         ['Atividades da fase', `${progresso.feitas} de ${progresso.total} concluídas`],
         ['Data prevista do gate', dma(g.data)]
       ],
@@ -226,6 +226,25 @@ export function emailProjetoExcluido(p: Projeto, autor: string, quando: string, 
       equipe: p.equipe,
       botao: { texto: 'Abrir o portal', url: urlDoPortal() },
       rodape: 'Você recebeu esta mensagem por fazer parte da equipe do projeto. Mensagem automática do Portal PMO.'
+    })
+  };
+}
+
+/** Atualização semanal empurrou a data prevista para depois da baseline: avisa o gerente do projeto. */
+export function emailReprogramacao(p: Projeto, a: Atividade, novaData: string, info: { causa: string; observacao: string; impedimento: boolean; autor: string }) {
+  return {
+    assunto: `[Portal PMO] Reprogramação · ${p.codigo} · ${a.codigo} ${a.nome}`,
+    html: montar({
+      titulo: 'Atividade reprogramada além da baseline',
+      intro: `${esc(info.autor)} atualizou a atividade <b>${esc(a.codigo)} · ${esc(a.nome)}</b> do projeto <b>${esc(p.codigo)}</b> com uma data prevista posterior à linha de base. Avalie se é preciso uma solicitação de mudança.`,
+      dados: [
+        ['Projeto', `${p.codigo} · ${p.nome}`], ['Cliente', p.cliente], ['Atividade', `${a.codigo} · ${a.nome}`], ['Fase', a.fase],
+        ['Término na baseline', dma(a.baselineTermino)], ['Nova data prevista', dma(novaData)],
+        ['Causa do atraso', info.causa || 'não informada'], ['Impedimento', info.impedimento ? 'Sim' : 'Não'],
+        ['Próximo passo / observação', info.observacao || '—']
+      ],
+      botao: { texto: 'Abrir o cronograma no portal', url: linkProjeto(p.codigo) },
+      rodape: 'Mensagem automática do Portal PMO.'
     })
   };
 }

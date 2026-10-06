@@ -8,6 +8,7 @@
   v3.19: colunas da reunião do Teams em Portal Atividades.
   v3.23: coluna ReuniaoTipo (Implementação, Alinhamento, Interna, Execução).
   v3.24: lista Portal Tecnicos (Nome, E-mail, Função, Ativo) com os técnicos da Systech.
+  v3.33: colunas da atualização semanal e do responsável em Portal Atividades.
 
 .EXEMPLOS
   # só a estrutura (listas vazias)
@@ -133,6 +134,18 @@ Campo $L 'ReuniaoTeams' 'Reunião do Teams (link)' 'Note'
 Campo $L 'ReuniaoInicio' 'Reunião · início' 'Text'
 Campo $L 'ReuniaoId' 'Reunião · ID do evento' 'Text'
 Campo $L 'ReuniaoTipo' 'Reunião · tipo' 'Text'
+# v3.33: responsável e atualização semanal
+Campo $L 'ResponsavelEmail' 'Responsável (e-mail)' 'Text'
+CampoData $L 'DataReal' 'Data real'
+Campo $L 'DependeRDM' 'Depende de RDM' 'Boolean'
+Campo $L 'NumeroRDM' 'Nº da RDM' 'Text'
+Campo $L 'Impedimento' 'Impedimento' 'Boolean'
+Campo $L 'CausaAtraso' 'Causa do atraso' 'Choice' @('Cliente / acesso', 'Fabricante / entrega', 'Janela / RDM', 'Recurso interno', 'Técnica')
+Campo $L 'HorasRealizadas' 'Horas realizadas' 'Number'
+CampoData $L 'DataUltimaAtualizacao' 'Última atualização'
+Campo $L 'AtualizadoPor' 'Atualizado por' 'Text'
+# status "A confirmar" na lista de opções
+try { Atualizar-Opcoes $L 'Status' @('Planejado', 'Em andamento', 'Bloqueado', 'A confirmar', 'Concluído', 'Cancelado') } catch { Write-Warning "Opções de Status não atualizadas: $($_.Exception.Message)" }
 
 # ------------------------------------------------------------ Portal Riscos
 $L = 'Portal Riscos'; Lista $L 'Lists/PortalRiscos'; Titulo $L 'Risco'
@@ -171,7 +184,7 @@ Campo $L 'Parecer' 'Parecer do PMO' 'Note'
 
 # Reparo: gates gravados sem o código G1..G4 recebem o código pela fase
 $GATES = @{ 'Iniciação' = @('G1', 'G1 · Termo de abertura aprovado'); 'Planejamento' = @('G2', 'G2 · Linha de base aprovada');
-            'Execução' = @('G3', 'G3 · Implementação aceita (libera o encerramento)'); 'Encerramento' = @('G4', 'G4 · Termo de aceite final') }
+            'Execução' = @('G3', 'G3 · Execução aceita (libera monitoramento e encerramento)'); 'Encerramento' = @('G4', 'G4 · Termo de aceite final') }
 $reparados = 0
 foreach ($it in (Get-PnPListItem -List $L -PageSize 500)) {
   $fase = [string]$it['Fase']
@@ -209,7 +222,8 @@ $gatesExistentes = @(Get-PnPListItem -List $L -PageSize 500)
 $criados = 0
 foreach ($proj in (Get-PnPListItem -List 'Portal Projetos' -PageSize 500)) {
   $idProj = $proj.Id
-  $faseAtual = [string]$proj['Fase']; if ($faseAtual -eq 'Monitoramento') { $faseAtual = 'Execução' }
+  # Monitoramento corre junto com o Encerramento
+  $faseAtual = [string]$proj['Fase']; if ($faseAtual -eq 'Monitoramento') { $faseAtual = 'Encerramento' }
   $idxAtual = [array]::IndexOf($ORDEMF, $faseAtual)
   $situacaoProj = [string]$proj['Situacao']
   foreach ($f in @('Iniciação', 'Planejamento', 'Execução', 'Encerramento')) {

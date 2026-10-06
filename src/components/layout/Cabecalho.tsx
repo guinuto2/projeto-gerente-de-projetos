@@ -29,10 +29,12 @@ export function Cabecalho() {
         <NavLink className="logo" to="/"><div className="marca" title={`Perfil: ${papel}`}>{sigla}</div><div className="logoTxt">Systech · Escritório de Projetos</div></NavLink>
         <nav className="nav" aria-label="Portal">
           <NavLink to="/" end className={classe}>Portfólio</NavLink>
+          {pode('atualizarAtividade') && <NavLink to="/atualizar" className={classe}>Atualizar status</NavLink>}
           {pode('criarProjeto') && <NavLink to="/novo" className={classe}>Novo projeto</NavLink>}
-          {biblioteca && <a href={biblioteca} target="_blank" rel="noopener noreferrer">Documentos no SharePoint ↗</a>}
+          <NavLink to="/cronogramas" className={classe}>Cronogramas</NavLink>
+          {biblioteca && <a href={biblioteca} target="_blank" rel="noopener noreferrer" title="Biblioteca de documentos no SharePoint">Documentos ↗</a>}
         </nav>
-        <label className="papel" title={DESCRICAO_PAPEL[papel]}>Perfil (teste)
+        <label className="papel" title={`Perfil de teste: ${DESCRICAO_PAPEL[papel]}`}>Perfil
           <select value={papel} onChange={e => { const p = e.target.value as Papel; trocar(p); toast(`Perfil ${p}: ${DESCRICAO_PAPEL[p].toLowerCase()}.`); }}>
             {PAPEIS.map(p => <option key={p}>{p}</option>)}
           </select>

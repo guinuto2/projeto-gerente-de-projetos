@@ -84,19 +84,19 @@ export function montarProjeto(f: FormProjeto, situacao: SituacaoCadastro, aprova
   };
 }
 
-/** Cronograma padrão Systech a partir do início informado (dias úteis, fases em sequência; Monitoramento acompanha a Execução). */
+/** Cronograma padrão Systech a partir do início informado (dias úteis, fases em sequência; Monitoramento acompanha o Encerramento). */
 export function cronogramaModelo(inicio: string): LinhaAtividade[] {
   let cursor = inicio || hojeIso();
   if (!diaUtilIso(cursor)) cursor = somarDiasUteis(cursor, 1);
   const linhas: LinhaAtividade[] = [];
-  let iniExec = '', fimExec = '';
+  let iniEnc = '', fimEnc = '';
   for (const a of CRONOGRAMA_SYSTECH.filter(x => !x.paralela)) {
     const ini = cursor, fim = somarDiasUteis(ini, a.dias - 1);
-    if (a.fase === 'Execução') { iniExec = iniExec || ini; fimExec = fim; }
+    if (a.fase === 'Encerramento') { iniEnc = iniEnc || ini; fimEnc = fim; }
     linhas.push({ codigo: a.codigo, nome: a.nome, fase: a.fase, equipe: a.equipe, inicio: ini, termino: fim, marco: !!a.marco });
     cursor = somarDiasUteis(fim, 1);
   }
-  const paralelas = CRONOGRAMA_SYSTECH.filter(x => x.paralela).map(a => ({ codigo: a.codigo, nome: a.nome, fase: a.fase, equipe: a.equipe, inicio: iniExec, termino: fimExec, marco: false }));
+  const paralelas = CRONOGRAMA_SYSTECH.filter(x => x.paralela).map(a => ({ codigo: a.codigo, nome: a.nome, fase: a.fase, equipe: a.equipe, inicio: iniEnc, termino: fimEnc, marco: false }));
   const posExec = linhas.findIndex(l => l.fase === 'Encerramento');
   linhas.splice(posExec < 0 ? linhas.length : posExec, 0, ...paralelas);
   return linhas;

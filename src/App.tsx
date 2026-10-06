@@ -7,6 +7,8 @@ import { PortfolioPage } from './pages/PortfolioPage';
 import { ProjetoPage } from './pages/ProjetoPage';
 import { NovoProjetoPage } from './pages/NovoProjetoPage';
 import { EditarProjetoPage } from './pages/EditarProjetoPage';
+import { AtualizacaoPage } from './pages/AtualizacaoPage';
+import { CronogramasPage } from './pages/CronogramasPage';
 
 /**
  * HashRouter (#/projeto/...) para funcionar em qualquer hospedagem estática
@@ -25,6 +27,8 @@ export default function App() {
             <Route path="/projeto/:codigo/:aba" element={<ProjetoPage />} />
             <Route path="/novo" element={<NovoProjetoPage />} />
             <Route path="/editar/:codigo" element={<EditarProjetoPage />} />
+            <Route path="/atualizar" element={<AtualizacaoPage />} />
+            <Route path="/cronogramas" element={<CronogramasPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </HashRouter>

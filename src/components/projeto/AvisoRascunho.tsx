@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import type { Projeto } from '../../types/models';
 import { usePortal } from '../../state/PortalContext';
-import { usePapel } from '../../state/PapelContext';
 import { useToast } from '../../state/ToastContext';
 import { pendenciasRascunho } from '../../lib/rascunho';
 import { Confirmacao } from '../ui/Confirmacao';
@@ -10,14 +9,15 @@ import { Confirmacao } from '../ui/Confirmacao';
 /** Faixa no topo de um projeto em rascunho: completar, enviar/ativar ou excluir. */
 export function AvisoRascunho({ projeto: p }: { projeto: Projeto }) {
   const { dados, hoje, submeterRascunho, excluirProjeto } = usePortal();
-  const { pode } = usePapel();
   const toast = useToast();
   const navegar = useNavigate();
   const [acao, setAcao] = useState<null | 'enviar' | 'ativar' | 'excluir'>(null);
   const [ocupado, setOcupado] = useState(false);
   const [erro, setErro] = useState('');
   const faltam = pendenciasRascunho(dados, p, hoje);
-  const ehPatrocinador = pode('aprovarGate');
+  const ehPatrocinador = false;   // rascunho é só do PMO: ele envia para aprovação
+  const g1 = p.fases.find(g => g.gate === 'G1');
+  const devolvido = !!g1?.parecer && g1.situacao === 'Pendente';
 
   const confirmar = async () => {
     setOcupado(true); setErro('');
@@ -43,6 +43,7 @@ export function AvisoRascunho({ projeto: p }: { projeto: Projeto }) {
           <button type="button" className="btn pq perigo" onClick={() => setAcao('excluir')}>Excluir rascunho</button>
         </span>
       </div>
+      {devolvido && <div style={{ fontSize: 13 }}><b>Devolvido pelo patrocinador:</b> {g1!.parecer}. Ajuste e envie de novo.</div>}
       {faltam.length > 0 && <div style={{ fontSize: 13 }}>Falta: {faltam.join(' · ')}. O cronograma é completado na aba Cronograma, abaixo.</div>}
       {acao && (
         <Confirmacao ocupado={ocupado} erro={erro} aoCancelar={() => setAcao(null)} aoConfirmar={confirmar}

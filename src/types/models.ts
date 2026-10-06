@@ -1,6 +1,6 @@
 export type Fase = 'Iniciação' | 'Planejamento' | 'Execução' | 'Monitoramento' | 'Encerramento';
 export type EstadoFase = 'Concluída' | 'Em andamento' | 'Não iniciada';
-export type StatusAtividade = 'Planejado' | 'Em andamento' | 'Bloqueado' | 'Concluído' | 'Cancelado';
+export type StatusAtividade = 'Planejado' | 'Em andamento' | 'Bloqueado' | 'Concluído' | 'Cancelado' | 'A confirmar';
 export type Nivel = 'Baixo' | 'Médio' | 'Alto';
 export type SituacaoRisco = 'Aberto' | 'Em tratamento' | 'Mitigado' | 'Fechado';
 export type SituacaoGate = 'Pendente' | 'Aguardando aprovação' | 'Aprovado' | '';
@@ -84,6 +84,17 @@ export interface Atividade {
   reuniaoId?: string;
   /** Implementação, Alinhamento, Interna ou Execução */
   reuniaoTipo?: string;
+  /** responsável pela atividade (e-mail de alguém da equipe do projeto) */
+  responsavel?: string;
+  /* ---- atualização semanal ---- */
+  dataReal?: string;
+  dependeRdm?: boolean;
+  numeroRdm?: string;
+  impedimento?: boolean;
+  causaAtraso?: string;
+  horasRealizadas?: number;
+  dataUltimaAtualizacao?: string;
+  atualizadoPor?: string;
 }
 
 /** Dados para criar uma reunião do Teams a partir de uma atividade. */

@@ -15,16 +15,16 @@ export type Acao =
   | 'editarRisco' | 'responderPendencia' | 'enviarDocumento';
 
 const MATRIZ: Record<Papel, Acao[]> = {
-  // aprova gates e projetos, cria projetos já aprovados, exclui projetos
-  Patrocinador: ['criarProjeto', 'editarProjeto', 'excluirProjeto', 'aprovarGate', 'gerenciarAtividades', 'atualizarAtividade', 'editarRisco', 'responderPendencia', 'enviarDocumento'],
-  // cadastra e conduz os projetos; envia projetos e gates para aprovação do patrocinador
-  PMO: ['criarProjeto', 'editarProjeto', 'solicitarGate', 'gerenciarAtividades', 'atualizarAtividade', 'editarRisco', 'responderPendencia', 'enviarDocumento'],
+  // só aprova (gates e cadastros) e visualiza; não cria, não edita, não exclui
+  Patrocinador: ['aprovarGate'],
+  // cadastra, edita e conduz os projetos; envia para aprovação do patrocinador; exclui projetos
+  PMO: ['criarProjeto', 'editarProjeto', 'excluirProjeto', 'solicitarGate', 'gerenciarAtividades', 'atualizarAtividade', 'editarRisco', 'responderPendencia', 'enviarDocumento'],
   'Técnico': ['atualizarAtividade', 'enviarDocumento']
 };
 
 export const DESCRICAO_PAPEL: Record<Papel, string> = {
-  Patrocinador: 'Aprova gates e projetos, cria projetos já aprovados e exclui projetos',
-  PMO: 'Cadastra e edita projetos, cronograma e riscos; solicita aprovação ao patrocinador',
+  Patrocinador: 'Aprova gates e cadastros de projeto e visualiza os projetos',
+  PMO: 'Cadastra, edita e exclui projetos, cronograma e riscos; solicita aprovação ao patrocinador',
   'Técnico': 'Atualiza status, % e observação das atividades e envia documentos'
 };
 

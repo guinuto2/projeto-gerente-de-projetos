@@ -30,12 +30,12 @@ export function gateBloqueante(p: Projeto, g: Gate): Gate | undefined {
   return ordem.slice(0, ordem.findIndex(x => x.gate === g.gate)).find(x => x.situacao !== 'Aprovado');
 }
 
-/** Gate ligado à fase. Monitoramento usa o gate da Execução (G3): as duas fecham juntas. */
+/** Gate ligado à fase. Monitoramento usa o gate do Encerramento (G4): as duas fecham juntas. */
 export const gateDaFase = (p: Projeto, f: Fase): Gate | undefined =>
-  p.fases.find(x => x.gate && x.fase === (f === 'Monitoramento' ? 'Execução' : f));
+  p.fases.find(x => x.gate && x.fase === (f === 'Monitoramento' ? 'Encerramento' : f));
 
 /**
- * Iniciação ─G1─ Planejamento ─G2─ [ Execução ∥ Monitoramento ] ─G3─ Encerramento ─G4
+ * Iniciação ─G1─ Planejamento ─G2─ Execução ─G3─ [ Monitoramento ∥ Encerramento ] ─G4
  * A fase avança quando o gate é aprovado.
  */
 export function CicloVida({ projeto: p, faseSel, aoSelecionar, aoDecidir }: Props) {
@@ -86,19 +86,18 @@ export function CicloVida({ projeto: p, faseSel, aoSelecionar, aoDecidir }: Prop
     <section className="card ciclo">
       <div className="linha" style={{ alignItems: 'baseline' }}>
         <h2 className="h3" style={{ fontSize: 18 }}>Ciclo de vida do projeto</h2>
-        <span className="sub">Clique numa fase para filtrar o cronograma, ou no losango para ver o gate</span>
       </div>
       <div className="trilhaF">
         <div className="fcol">{botaoFase('Iniciação')}{losango('Iniciação')}</div>
         <div className="fcol">{botaoFase('Planejamento')}{losango('Planejamento')}</div>
+        <div className="fcol">{botaoFase('Execução')}{losango('Execução')}</div>
         <div className="fcol bloco">
           <div className="blocoIn">
-            <div className="rotBloco">Implementação · em paralelo</div>
-            <div className="blocoFases">{botaoFase('Execução')}{botaoFase('Monitoramento')}</div>
+            <div className="rotBloco">Monitoramento e encerramento · em paralelo</div>
+            <div className="blocoFases">{botaoFase('Monitoramento')}{botaoFase('Encerramento')}</div>
           </div>
-          {losango('Execução')}
+          {losango('Encerramento')}
         </div>
-        <div className="fcol">{botaoFase('Encerramento')}{losango('Encerramento')}</div>
       </div>
       {gate && (
         <div className="gateBox" style={{ background: GATE_CAIXA[gate.situacao] || '#F3F3F4' }}>

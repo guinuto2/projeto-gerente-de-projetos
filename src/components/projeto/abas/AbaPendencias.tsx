@@ -6,7 +6,6 @@ import { SELO_PENDENCIA, porCodigo } from '../../../lib/constantes';
 import { Selo } from '../../ui/Selo';
 import { Vazio } from '../../ui/Vazio';
 import { EditarPendencia } from '../editores/EditarPendencia';
-import { ExportarCsv } from './ExportarCsv';
 
 export function AbaPendencias({ projeto }: { projeto: Projeto }) {
   const { dados } = usePortal();
@@ -21,7 +20,7 @@ export function AbaPendencias({ projeto }: { projeto: Projeto }) {
     <>
       <div className="linha" style={{ marginBottom: 12 }}>
         <p className="sub">Questionamentos ao cliente que condicionam arquitetura, cronograma ou proposta. Clique para registrar a resposta.</p>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>{botaoNovo}<ExportarCsv projeto={projeto} tipo="pendencias" /></div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>{botaoNovo}</div>
       </div>
       <div className="twrap">
         <table className="tbl">

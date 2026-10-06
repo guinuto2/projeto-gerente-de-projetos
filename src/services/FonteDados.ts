@@ -48,6 +48,8 @@ export interface FonteDados {
   atualizarReuniaoTeams?(id: string, r: NovaReuniao, corpoHtml: string): Promise<void>;
   /** cancela a reunião; o Outlook manda o cancelamento aos convidados */
   cancelarReuniaoTeams?(id: string, mensagem: string): Promise<void>;
+  /** horário atual das reuniões no calendário de quem está logado (só as que ele organiza); id → início 'aaaa-mm-ddThh:mm' */
+  lerReunioes?(ids: string[]): Promise<Record<string, string>>;
   /** false quando a lista Portal Atividades ainda não tem as colunas da reunião (rodar o script) */
   reuniaoGravavel?(): boolean;
   /** envia e-mail pela conta logada; devolve o destinatário (só no modo SharePoint) */

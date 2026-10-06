@@ -20,6 +20,7 @@ import { AbaDocumentos } from '../components/projeto/abas/AbaDocumentos';
 import { AbaDecisoes } from '../components/projeto/abas/AbaDecisoes';
 import { DecidirGate } from '../components/projeto/editores/DecidirGate';
 import { AvisoRascunho } from '../components/projeto/AvisoRascunho';
+import { ExportarCronograma } from '../components/projeto/ExportarCronograma';
 
 export function ProjetoPage() {
   const { codigo = '', aba = 'cronograma' } = useParams();
@@ -34,7 +35,7 @@ export function ProjetoPage() {
   useEffect(() => { setFaseSel(null); window.scrollTo(0, 0); }, [codigo]);
 
   const p = dados.projetos.find(x => x.codigo === codigo);
-  if (!p || !podeVer(p)) return <main className="main"><Vazio>{p ? 'Você não faz parte da equipe deste projeto.' : `Projeto "${codigo}" não encontrado.`} <Link to="/">Voltar ao portfólio</Link></Vazio></main>;
+  if (!p || !podeVer(p)) return <main className="main"><Vazio>{!p ? `Projeto "${codigo}" não encontrado.` : p.situacaoCadastro === 'Rascunho' ? 'Este projeto ainda é um rascunho do PMO.' : 'Você não faz parte da equipe deste projeto.'} <Link to="/">Voltar ao portfólio</Link></Vazio></main>;
 
   const abas: Aba[] = [
     { id: 'cronograma', rotulo: 'Cronograma', contagem: macro(dados, p.codigo).length },
@@ -44,8 +45,12 @@ export function ProjetoPage() {
     { id: 'documentos', rotulo: 'Documentos' },
     { id: 'decisoes', rotulo: 'Decisões', contagem: (dados.decisoes[p.codigo] || []).length }
   ];
+  // o técnico não vê escopo, riscos e pendências
+  const OCULTAS_TECNICO = ['riscos', 'pendencias', 'escopo'];
+  const abasVisiveis = papel === 'Técnico' ? abas.filter(a => !OCULTAS_TECNICO.includes(a.id)) : abas;
+  const abaAtiva = abasVisiveis.some(a => a.id === aba) ? aba : 'cronograma';
   const irAba = (id: string) => navegar(`/projeto/${encodeURIComponent(p.codigo)}/${id}`);
-  const selecionarFase = (f: Fase | null) => { setFaseSel(f); if (aba !== 'cronograma') irAba('cronograma'); };
+  const selecionarFase = (f: Fase | null) => { setFaseSel(f); if (abaAtiva !== 'cronograma') irAba('cronograma'); };
   const g1 = p.fases.find(g => g.gate === 'G1');
   const decidir = (g: Gate) => setGateAberto(g.gate);
   const gateEmDecisao = gateAberto ? p.fases.find(g => g.gate === gateAberto) : undefined;
@@ -86,17 +91,17 @@ export function ProjetoPage() {
         </Mensagem>
       ))}
       <CabecalhoProjeto projeto={p} />
-      {papel !== 'Patrocinador' && <IndicadoresProjeto projeto={p} />}
+      {papel === 'PMO' && <IndicadoresProjeto projeto={p} />}
       <CicloVida projeto={p} faseSel={faseSel} aoSelecionar={selecionarFase} aoDecidir={decidir} />
       <section className="card">
-        <Abas abas={abas} ativa={aba} aoMudar={irAba} />
+        <Abas abas={abasVisiveis} ativa={abaAtiva} aoMudar={irAba} direita={<ExportarCronograma projeto={p} />} />
         <div className="painelAba">
-          {aba === 'cronograma' && <AbaCronograma projeto={p} faseSel={faseSel} limparFase={() => setFaseSel(null)} />}
-          {aba === 'riscos' && <AbaRiscos projeto={p} />}
-          {aba === 'pendencias' && <AbaPendencias projeto={p} />}
-          {aba === 'escopo' && <AbaEscopo projeto={p} />}
-          {aba === 'documentos' && <AbaDocumentos projeto={p} />}
-          {aba === 'decisoes' && <AbaDecisoes projeto={p} />}
+          {abaAtiva === 'cronograma' && <AbaCronograma projeto={p} faseSel={faseSel} limparFase={() => setFaseSel(null)} />}
+          {abaAtiva === 'riscos' && <AbaRiscos projeto={p} />}
+          {abaAtiva === 'pendencias' && <AbaPendencias projeto={p} />}
+          {abaAtiva === 'escopo' && <AbaEscopo projeto={p} />}
+          {abaAtiva === 'documentos' && <AbaDocumentos projeto={p} />}
+          {abaAtiva === 'decisoes' && <AbaDecisoes projeto={p} />}
         </div>
       </section>
       {gateEmDecisao && <DecidirGate projeto={p} gate={gateEmDecisao} aoFechar={() => setGateAberto(null)} />}

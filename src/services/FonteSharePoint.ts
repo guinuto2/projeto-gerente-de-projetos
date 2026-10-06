@@ -55,7 +55,9 @@ const COLUNAS_ATIVIDADE: Record<string, string> = {
   nome: 'Title', codigo: 'Codigo', fase: 'Fase', equipe: 'Equipe', duracao: 'Duracao', descricao: 'Descricao', marco: 'Marco',
   inicio: 'DataInicio', termino: 'DataTermino', baselineInicio: 'DataBaselineInicio', baselineTermino: 'DataBaselineTermino',
   status: 'Status', percentual: 'Percentual', pai: 'AtividadePai', observacao: 'Observacao',
-  reuniaoUrl: 'ReuniaoTeams', reuniaoInicio: 'ReuniaoInicio', reuniaoId: 'ReuniaoId', reuniaoTipo: 'ReuniaoTipo'
+  reuniaoUrl: 'ReuniaoTeams', reuniaoInicio: 'ReuniaoInicio', reuniaoId: 'ReuniaoId', reuniaoTipo: 'ReuniaoTipo',
+  responsavel: 'ResponsavelEmail', dataReal: 'DataReal', dependeRdm: 'DependeRDM', numeroRdm: 'NumeroRDM', impedimento: 'Impedimento',
+  causaAtraso: 'CausaAtraso', horasRealizadas: 'HorasRealizadas', dataUltimaAtualizacao: 'DataUltimaAtualizacao', atualizadoPor: 'AtualizadoPor'
 };
 const COLUNAS_GATE: Record<string, string> = {
   nome: 'Title', gate: 'Gate', situacao: 'Situacao', data: 'DataPrevista', info: 'Info',
@@ -196,7 +198,11 @@ export class FonteSharePoint implements FonteDados {
         baselineInicio: isoDeDataHora(f.DataBaselineInicio as string), baselineTermino: isoDeDataHora(f.DataBaselineTermino as string),
         status: (txt(f.Status) || 'Planejado') as Atividade['status'], percentual: num(f.Percentual),
         pai: txt(f.AtividadePai), observacao: txt(f.Observacao),
-        reuniaoUrl: txt(f.ReuniaoTeams) || undefined, reuniaoInicio: txt(f.ReuniaoInicio) || undefined, reuniaoId: txt(f.ReuniaoId) || undefined, reuniaoTipo: txt(f.ReuniaoTipo) || undefined
+        reuniaoUrl: txt(f.ReuniaoTeams) || undefined, reuniaoInicio: txt(f.ReuniaoInicio) || undefined, reuniaoId: txt(f.ReuniaoId) || undefined, reuniaoTipo: txt(f.ReuniaoTipo) || undefined,
+        responsavel: txt(f.ResponsavelEmail) || undefined, dataReal: isoDeDataHora(f.DataReal as string) || undefined,
+        dependeRdm: !!f.DependeRDM, numeroRdm: txt(f.NumeroRDM) || undefined, impedimento: !!f.Impedimento,
+        causaAtraso: txt(f.CausaAtraso) || undefined, horasRealizadas: f.HorasRealizadas == null ? undefined : num(f.HorasRealizadas),
+        dataUltimaAtualizacao: isoDeDataHora(f.DataUltimaAtualizacao as string) || undefined, atualizadoPor: txt(f.AtualizadoPor) || undefined
       });
     }
     for (const it of R) {
@@ -479,6 +485,31 @@ export class FonteSharePoint implements FonteDados {
       ...this.corpoEvento(r, corpoHtml), isOnlineMeeting: true, onlineMeetingProvider: 'teamsForBusiness', allowNewTimeProposals: true
     });
     return { id: ev!.id, joinUrl: ev!.onlineMeeting?.joinUrl || ev!.webLink || '' };
+  }
+
+  /** Lê o início atual das reuniões em lote. Reuniões de outro organizador (404) são ignoradas. */
+  async lerReunioes(ids: string[]): Promise<Record<string, string>> {
+    const token = await this.auth.tokenSilencioso(['Calendars.ReadWrite']);
+    const resultado: Record<string, string> = {};
+    if (!token || !ids.length) return resultado;
+    for (let i = 0; i < ids.length; i += 20) {
+      const lote = ids.slice(i, i + 20);
+      const resp = await fetch('https://graph.microsoft.com/v1.0/$batch', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requests: lote.map((id, k) => ({
+          id: String(k), method: 'GET', url: `/me/events/${encodeURIComponent(id)}?$select=start,isCancelled`,
+          headers: { Prefer: `outlook.timezone="${FonteSharePoint.FUSO}"` }
+        })) })
+      });
+      if (!resp.ok) continue;
+      const j = await resp.json() as { responses: { id: string; status: number; body?: { start?: { dateTime: string }; isCancelled?: boolean } }[] };
+      for (const r of j.responses || []) {
+        const ini = r.body?.start?.dateTime;
+        if (r.status === 200 && ini && !r.body?.isCancelled) resultado[lote[Number(r.id)]] = ini.slice(0, 16);
+      }
+    }
+    return resultado;
   }
 
   async obterReuniaoTeams(id: string): Promise<NovaReuniao> {

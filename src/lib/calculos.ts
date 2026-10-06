@@ -1,6 +1,5 @@
 /** Indicadores calculados a partir das atividades — ninguém digita % do projeto. */
 import type { Atividade, Dados, EstadoFase, Fase, Pendencia, Projeto, Risco } from '../types/models';
-import { FASES } from './constantes';
 import { diasUteis } from './datas';
 
 export const macro = (d: Dados, cod: string): Atividade[] => (d.atividades[cod] || []).filter(a => !a.pai);
@@ -50,20 +49,21 @@ export function proximoMarco(d: Dados, cod: string, hoje: string): Atividade | u
     .sort((a, b) => a.termino.localeCompare(b.termino))[0];
 }
 
+/** Posição no ciclo oficial: Monitoramento e Encerramento correm juntos (mesma posição). */
+const POSICAO: Record<Fase, number> = { 'Iniciação': 0, 'Planejamento': 1, 'Execução': 2, 'Monitoramento': 3, 'Encerramento': 3 };
+
 /**
  * Estado oficial da fase: quem avança a fase é a aprovação do gate (campo Fase do projeto).
- * Monitoramento acompanha a Execução em paralelo.
+ * Monitoramento acompanha o Encerramento em paralelo (os dois fecham no G4).
  */
 export function estadoFase(_d: Dados, p: Projeto, fase: Fase): EstadoFase {
   if (p.situacaoCadastro === 'Encerrado') return 'Concluída';
-  const atual = FASES.indexOf(p.fase === 'Monitoramento' ? 'Execução' : p.fase), j = FASES.indexOf(fase);
-  if (fase === 'Monitoramento') return atual < 2 ? 'Não iniciada' : atual === 2 ? 'Em andamento' : 'Concluída';
-  const k = j > 3 ? j - 1 : j, a = atual > 3 ? atual - 1 : atual;
+  const k = POSICAO[fase], a = POSICAO[p.fase] ?? 0;
   return k < a ? 'Concluída' : k === a ? 'Em andamento' : 'Não iniciada';
 }
 
 export function faseAtual(_d: Dados, p: Projeto): Fase {
-  return p.fase === 'Monitoramento' ? 'Execução' : p.fase;
+  return p.fase === 'Monitoramento' ? 'Encerramento' : p.fase;
 }
 
 /** Quantas atividades macro da fase já foram concluídas (ou canceladas). */
