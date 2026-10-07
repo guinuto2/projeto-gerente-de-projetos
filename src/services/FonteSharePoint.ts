@@ -1,12 +1,12 @@
 import type { PortalConfig } from '../config/config';
 import type {
-  Atividade, Dados, Fase, Gate, MembroEquipe, NovaReuniao, NovoProjeto, PastaDocumentos, Pendencia, Projeto, Risco, Tecnico
+  Arquivo, Atividade, Dados, Fase, Gate, MembroEquipe, NovaReuniao, NovoProjeto, PastaDocumentos, Pendencia, Projeto, RegistroHistorico, Risco, Tecnico
 } from '../types/models';
 import { GATE_DA_FASE, PASTAS, normalizarTipo } from '../lib/constantes';
 import { hojeIso, isoDeDataHora, iso, linhas } from '../lib/datas';
 import type { Autenticador } from './auth';
 import type { FonteDados } from './FonteDados';
-import { GraphClient } from './graph';
+import { GraphClient, fetchGraph } from './graph';
 
 /** Nomes das listas criadas por provisionar-portal.ps1. */
 export const LISTAS = {
@@ -22,7 +22,7 @@ type ChaveLista = keyof typeof LISTAS;
 type Campos = Record<string, unknown>;
 interface ItemLista { id: string; fields: Campos }
 interface ItemDrive {
-  name: string; webUrl: string; lastModifiedDateTime: string;
+  id?: string; name: string; webUrl: string; lastModifiedDateTime: string;
   lastModifiedBy?: { user?: { displayName?: string } }; file?: unknown; folder?: unknown;
 }
 
@@ -79,7 +79,7 @@ export class FonteSharePoint implements FonteDados {
   entrar() { return this.auth.entrar(); }
   sair() { return this.auth.sair(); }
   email() { return this.auth.email(); }
-  hoje() { return hojeIso(); }
+  hoje() { return /^\d{4}-\d{2}-\d{2}$/.test(this.cfg.dataSimulada || '') ? this.cfg.dataSimulada : hojeIso(); }
 
   private preparando?: Promise<void>;
 
@@ -100,6 +100,7 @@ export class FonteSharePoint implements FonteDados {
     }
     // lista opcional: sem ela o portal funciona, só não oferece os técnicos
     this.idTecnicos = listas.find(x => x.displayName === 'Portal Tecnicos')?.id || '';
+    this.idHistorico = listas.find(x => x.displayName === 'Portal Historico')?.id || '';
     const colunas = await this.graph.todos<{ name: string }>(`/sites/${this.siteId}/lists/${this.ids.atividades}/columns?$select=name`);
     this.colunasAtividades = new Set(colunas.map(c => c.name));
     const drives = await this.graph.todos<{ id: string; name: string; webUrl: string }>(`/sites/${this.siteId}/drives?$select=id,name,webUrl`);
@@ -114,6 +115,7 @@ export class FonteSharePoint implements FonteDados {
 
   private colunasAtividades = new Set<string>();
   private idTecnicos = '';
+  private idHistorico = '';
   reuniaoGravavel() { return ['ReuniaoTeams', 'ReuniaoInicio', 'ReuniaoId'].every(c => this.colunasAtividades.has(c)); }
 
   /** Colunas que o site ainda não tem (rodar provisionar-portal.ps1 cria). */
@@ -277,6 +279,49 @@ export class FonteSharePoint implements FonteDados {
     });
     return { ...r, _id: item.id };
   }
+  /** Procura de novo a lista do histórico (o script pode ter rodado com o portal já aberto). */
+  private procuraHistorico = 0;
+  private async listaHistorico(): Promise<string> {
+    await this.preparar();
+    if (!this.idHistorico && Date.now() - this.procuraHistorico > 30000) {
+      this.procuraHistorico = Date.now();
+      const listas = await this.graph.todos<{ id: string; displayName: string }>(`/sites/${this.siteId}/lists?$select=id,displayName`);
+      this.idHistorico = listas.find(x => x.displayName === 'Portal Historico')?.id || '';
+    }
+    if (!this.idHistorico) throw new Error('A lista "Portal Historico" não existe no site. Rode o script provisionar-portal.ps1 (sem -Piloto)');
+    return this.idHistorico;
+  }
+
+  /** Histórico: lista "Portal Historico" (o script cria). Erros sobem para o portal avisar e guardar o registro. */
+  async registrar(r: RegistroHistorico) {
+    const id = await this.listaHistorico();
+    try {
+      await this.graph.post(`/sites/${this.siteId}/lists/${id}/items`, { fields: {
+        Title: r.descricao.slice(0, 250), Detalhe: r.descricao, ProjetoCodigo: r.projeto, TipoMudanca: r.tipo, Acao: r.acao, Usuario: r.usuario,
+        Quando: r.quando.replace(/\.\d{3}Z$/, 'Z')
+      } });
+    } catch (e) {
+      const msg = (e as Error).message;
+      // coluna faltando: diz qual é
+      const campo = /Field '([^']+)' is not recognized/i.exec(msg)?.[1];
+      throw new Error(campo ? `a lista Portal Historico não tem a coluna "${campo}". Rode o script provisionar-portal.ps1 (sem -Piloto)` : msg);
+    }
+  }
+  async historico(cod: string): Promise<RegistroHistorico[]> {
+    await this.listaHistorico();
+    const filtro = encodeURIComponent(`fields/ProjetoCodigo eq '${cod.replace(/'/g, "''")}'`);
+    const itens = await this.graph.todos<ItemLista>(`/sites/${this.siteId}/lists/${this.idHistorico}/items?$expand=fields&$top=500&$filter=${filtro}`,
+      { Prefer: 'HonorNonIndexedQueriesWarningMayFailRandomly' });
+    return itens.map(it => ({
+      quando: txt(it.fields.Quando), usuario: txt(it.fields.Usuario), projeto: txt(it.fields.ProjetoCodigo),
+      tipo: txt(it.fields.TipoMudanca) || txt(it.fields.Tipo), acao: txt(it.fields.Acao), descricao: txt(it.fields.Detalhe) || txt(it.fields.Title)
+    })).sort((a, b) => b.quando.localeCompare(a.quando));
+  }
+  async excluirArquivo(_cod: string, _pasta: string, arquivo: Arquivo) {
+    await this.preparar();
+    if (!arquivo.id) throw new Error('Arquivo sem identificador; recarregue a aba Documentos.');
+    await this.graph.excluir(`/drives/${this.driveId}/items/${arquivo.id}`);
+  }
   async excluirRisco(_cod: string, r: Risco) { await this.graph.excluir(this.url('riscos', r._id)); }
   async criarPendencia(p: Projeto, x: Pendencia): Promise<Pendencia> {
     const item = await this.postItem('pendencias', {
@@ -380,24 +425,32 @@ export class FonteSharePoint implements FonteDados {
     }
   }
 
+  /**
+   * Pastas do projeto: 1 chamada para ver as subpastas (com a quantidade de arquivos de cada uma)
+   * e só depois lê as pastas que têm arquivos — em vez de 2 chamadas por pasta.
+   */
   async documentos(cod: string): Promise<PastaDocumentos[]> {
     await this.preparar();
     const base = `/drives/${this.driveId}/root:/${encodeURIComponent(cod)}`;
+    let subpastas: (ItemDrive & { id: string; folder?: { childCount?: number } })[] = [];
+    try { subpastas = await this.graph.todos(`${base}:/children?$select=id,name,webUrl,folder`); } catch { /* pasta do projeto ainda não existe */ }
     const pastas: PastaDocumentos[] = [];
     for (const p of PASTAS) {
-      let arquivos: PastaDocumentos['arquivos'] = [], url = '';
-      try {
-        const caminho = `${base}/${encodeURIComponent(p)}`;
-        url = (await this.graph.get<{ webUrl: string }>(caminho)).webUrl;
-        const filhos = await this.graph.todos<ItemDrive>(`${caminho}:/children?$select=name,webUrl,lastModifiedDateTime,lastModifiedBy,file,folder`);
-        arquivos = filhos.filter(x => x.file).map(x => ({
-          nome: x.name, url: x.webUrl, modificado: iso(new Date(x.lastModifiedDateTime)), autor: x.lastModifiedBy?.user?.displayName || ''
-        }));
-      } catch { /* pasta ainda não existe */ }
-      pastas.push({ pasta: p, url, arquivos });
+      const sp = subpastas.find(x => x.folder && x.name === p);
+      let arquivos: PastaDocumentos['arquivos'] = [];
+      if (sp && (sp.folder?.childCount ?? 1) > 0) {
+        try {
+          const filhos = await this.graph.todos<ItemDrive>(`/drives/${this.driveId}/items/${sp.id}/children?$select=id,name,webUrl,lastModifiedDateTime,lastModifiedBy,file`);
+          arquivos = filhos.filter(x => x.file).map(x => ({
+            id: x.id, nome: x.name, url: x.webUrl, modificado: iso(new Date(x.lastModifiedDateTime)), autor: x.lastModifiedBy?.user?.displayName || ''
+          }));
+        } catch { /* sem acesso à pasta */ }
+      }
+      pastas.push({ pasta: p, url: sp?.webUrl || '', arquivos });
     }
     return pastas;
   }
+
 
   async enviarArquivo(cod: string, pasta: string, arquivo: File) {
     await this.preparar();
@@ -421,7 +474,7 @@ export class FonteSharePoint implements FonteDados {
     const remetente = this.cfg.emailRemetente.trim();
     const token = await this.auth.tokenPara([remetente ? 'Mail.Send.Shared' : 'Mail.Send']);
     const endpoint = remetente ? `/users/${encodeURIComponent(remetente)}/sendMail` : '/me/sendMail';
-    const r = await fetch('https://graph.microsoft.com/v1.0' + endpoint, {
+    const r = await fetchGraph('https://graph.microsoft.com/v1.0' + endpoint, {
       method: 'POST',
       headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
       body: JSON.stringify({ message: { subject: assunto, body: { contentType: 'HTML', content: html },
@@ -461,7 +514,7 @@ export class FonteSharePoint implements FonteDados {
   /** Chamada ao calendário de quem está logado (permissão delegada Calendars.ReadWrite). */
   private async calendario<T>(caminho: string, metodo: string, corpo?: unknown): Promise<T | null> {
     const token = await this.auth.tokenPara(['Calendars.ReadWrite']);
-    const resp = await fetch('https://graph.microsoft.com/v1.0' + caminho, {
+    const resp = await fetchGraph('https://graph.microsoft.com/v1.0' + caminho, {
       method: metodo,
       headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json', Prefer: `outlook.timezone="${FonteSharePoint.FUSO}"` },
       body: corpo === undefined ? undefined : JSON.stringify(corpo)
@@ -494,7 +547,7 @@ export class FonteSharePoint implements FonteDados {
     if (!token || !ids.length) return resultado;
     for (let i = 0; i < ids.length; i += 20) {
       const lote = ids.slice(i, i + 20);
-      const resp = await fetch('https://graph.microsoft.com/v1.0/$batch', {
+      const resp = await fetchGraph('https://graph.microsoft.com/v1.0/$batch', {
         method: 'POST',
         headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
         body: JSON.stringify({ requests: lote.map((id, k) => ({

@@ -7,6 +7,8 @@ export interface PortalConfig {
   biblioteca: string;
   /** intervalo da releitura automática do SharePoint */
   sincronizarSegundos: number;
+  /** TESTE: finge que hoje é esta data ('aaaa-mm-dd'); vazio = data real (ou a do piloto) */
+  dataSimulada: string;
   /** envia e-mail quando o PMO cria um projeto */
   emailAoCriarProjeto: boolean;
   /** TESTE: se preenchido, todos os e-mails vão só para este endereço (em vez de GP/PMO) */
@@ -43,7 +45,8 @@ export const config: PortalConfig = {
   sharepointHost: '',
   sitePath: '/sites/TesteProjetos',
   biblioteca: 'Documentos de Projetos',
-  sincronizarSegundos: 60,
+  sincronizarSegundos: 120,
+  dataSimulada: '',
   emailAoCriarProjeto: true,
   emailSomentePara: '',
   reuniaoSomentePara: '',

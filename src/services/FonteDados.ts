@@ -1,4 +1,4 @@
-import type { Atividade, Dados, Gate, NovaReuniao, NovoProjeto, PastaDocumentos, Pendencia, Projeto, Risco } from '../types/models';
+import type { Arquivo, Atividade, Dados, Gate, NovaReuniao, NovoProjeto, PastaDocumentos, Pendencia, Projeto, RegistroHistorico, Risco } from '../types/models';
 
 /**
  * Contrato entre a interface e quem guarda os dados.
@@ -25,6 +25,12 @@ export interface FonteDados {
   /** devolve a atividade com o _id gerado pela lista */
   criarAtividade(p: Projeto, atv: Atividade): Promise<Atividade>;
   excluirAtividade(cod: string, atv: Atividade): Promise<void>;
+  /** grava um registro no histórico (não falha a ação se não conseguir) */
+  registrar(r: RegistroHistorico): Promise<void>;
+  /** histórico do projeto, do mais recente para o mais antigo */
+  historico(cod: string): Promise<RegistroHistorico[]>;
+  /** exclui um arquivo da biblioteca (vai para a lixeira) */
+  excluirArquivo?(cod: string, pasta: string, arquivo: Arquivo): Promise<void>;
   criarRisco(p: Projeto, r: Risco): Promise<Risco>;
   excluirRisco(cod: string, r: Risco): Promise<void>;
   criarPendencia(p: Projeto, x: Pendencia): Promise<Pendencia>;

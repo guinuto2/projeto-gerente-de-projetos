@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Projeto } from '../../types/models';
 import { usePortal } from '../../state/PortalContext';
@@ -7,15 +8,16 @@ import { pendenciasRascunho } from '../../lib/rascunho';
 export function Rascunhos({ projetos }: { projetos: Projeto[] }) {
   const { dados, hoje } = usePortal();
   const navegar = useNavigate();
+  const [aberto, setAberto] = useState(false);   // começa fechada
   if (!projetos.length) return null;
   const abrir = (p: Projeto) => navegar(`/projeto/${encodeURIComponent(p.codigo)}`);
   return (
     <section className="card" id="rascunhos">
-      <div className="secaoToggle" style={{ cursor: 'default' }}>
+      <button type="button" className="secaoToggle" aria-expanded={aberto} onClick={() => setAberto(a => !a)}>
         <span className="h3">Rascunhos <span className="cnt">{projetos.length}</span></span>
-        <span className="sub">Abra um rascunho para completar, enviar para aprovação ou excluir</span>
-      </div>
-      <div className="twrap" style={{ margin: '0 20px 20px' }}>
+        <span aria-hidden="true">{aberto ? '▾' : '▸'}</span>
+      </button>
+      {aberto && <div className="twrap" style={{ margin: '0 20px 20px' }}>
         <table className="tbl">
           <thead><tr><th>Código</th><th>Projeto</th><th>Cliente</th><th>Gerente</th><th>Situação</th><th /></tr></thead>
           <tbody>
@@ -36,7 +38,7 @@ export function Rascunhos({ projetos }: { projetos: Projeto[] }) {
             })}
           </tbody>
         </table>
-      </div>
+      </div>}
     </section>
   );
 }

@@ -135,7 +135,20 @@ export interface Pendencia {
 
 export interface Decisao { _id?: string; codigo: string; decisao: string; descricao: string; justificativa: string; impacto: string }
 
-export interface Arquivo { nome: string; url: string; modificado: string; autor: string; fase?: string }
+export interface Arquivo { id?: string; nome: string; url: string; modificado: string; autor: string; fase?: string }
+
+/** Registro do histórico do projeto (lista Portal Historico). */
+export interface RegistroHistorico {
+  /** data e hora, ISO */
+  quando: string;
+  usuario: string;
+  projeto: string;
+  /** Projeto, Atividade, Subatividade, Risco, Pendência, Gate, Reunião, Documento */
+  tipo: string;
+  /** Criou, Editou, Excluiu, Aprovou… */
+  acao: string;
+  descricao: string;
+}
 export interface PastaDocumentos { pasta: string; url: string; arquivos: Arquivo[] }
 
 /** Tudo que o portal carrega de uma vez. Listas indexadas pelo código do projeto. */

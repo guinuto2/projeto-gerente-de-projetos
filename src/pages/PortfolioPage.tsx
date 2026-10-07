@@ -9,6 +9,7 @@ import { IndicadoresPortfolio } from '../components/portfolio/IndicadoresPortfol
 import { CardProjeto } from '../components/portfolio/CardProjeto';
 import { ProximosMarcos } from '../components/portfolio/ProximosMarcos';
 import { EmAndamento } from '../components/portfolio/EmAndamento';
+import { AtividadesAtrasadas } from '../components/portfolio/AtividadesAtrasadas';
 import { ProjetosEncerrados } from '../components/portfolio/ProjetosEncerrados';
 import { Rascunhos } from '../components/portfolio/Rascunhos';
 import { PastasSemProjeto } from '../components/portfolio/PastasSemProjeto';
@@ -51,14 +52,15 @@ export function PortfolioPage() {
                     {papel !== 'Técnico' && <><br /><br /><Link className="btn pri" to="/novo">Cadastrar projeto</Link></>}</>}
               </Vazio>
             )}
+            <Rascunhos projetos={rascunhos} />
+            <ProjetosEncerrados projetos={encerrados} />
           </section>
           <aside className="aside">
             <ProximosMarcos />
             <EmAndamento />
+            <AtividadesAtrasadas />
           </aside>
         </div>
-        <Rascunhos projetos={rascunhos} />
-        <ProjetosEncerrados projetos={encerrados} />
       </main>
     </>
   );

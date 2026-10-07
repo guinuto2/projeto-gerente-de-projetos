@@ -1,8 +1,9 @@
-import type { Atividade, Dados, Gate, PastaDocumentos, Pendencia, Risco } from '../types/models';
+import type { Atividade, Dados, Gate, PastaDocumentos, Pendencia, RegistroHistorico, Risco } from '../types/models';
 import type { FonteDados } from './FonteDados';
 import pilotoTrf1 from '../data/piloto-trf1.json';
 import { PASTAS, normalizarTipo } from '../lib/constantes';
 import { TECNICOS_PADRAO } from '../lib/pessoas';
+import { config } from '../config/config';
 
 const CHAVE = 'portal-pmo-piloto-v3';
 const original = pilotoTrf1 as unknown as Dados;
@@ -15,7 +16,7 @@ export class FontePiloto implements FonteDados {
   async entrar() { return 'Modo piloto'; }
   async sair() { /* sem sessão */ }
   email() { return ''; }
-  hoje() { return original.referencia; }
+  hoje() { return /^\d{4}-\d{2}-\d{2}$/.test(config.dataSimulada || '') ? config.dataSimulada : original.referencia; }
 
   async carregar(): Promise<Dados> {
     try {
@@ -35,6 +36,7 @@ export class FontePiloto implements FonteDados {
   }
 
   restaurar() {
+    try { localStorage.removeItem('portal-pmo-historico-v1'); } catch { /* */ }
     try { localStorage.removeItem(CHAVE); } catch { /* nada a fazer */ }
   }
 
@@ -48,6 +50,18 @@ export class FontePiloto implements FonteDados {
   async excluirProjeto() { /* em memória */ }
   async criarAtividade(_p: unknown, atv: Atividade) { return atv; }
   async excluirAtividade() { /* em memória */ }
+  async registrar(r: RegistroHistorico) {
+    try {
+      const lista = JSON.parse(localStorage.getItem('portal-pmo-historico-v1') || '[]') as RegistroHistorico[];
+      lista.push(r); localStorage.setItem('portal-pmo-historico-v1', JSON.stringify(lista.slice(-2000)));
+    } catch { /* sem armazenamento */ }
+  }
+  async historico(cod: string) {
+    try {
+      return (JSON.parse(localStorage.getItem('portal-pmo-historico-v1') || '[]') as RegistroHistorico[])
+        .filter(r => r.projeto === cod).sort((a, b) => b.quando.localeCompare(a.quando));
+    } catch { return []; }
+  }
   async criarRisco(_p: unknown, r: Risco) { return r; }
   async excluirRisco() { /* em memória */ }
   async criarPendencia(_p: unknown, x: Pendencia) { return x; }

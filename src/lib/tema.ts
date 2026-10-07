@@ -18,6 +18,7 @@ export const TEMA = {
   concluido: '#1F8A5B',   // verde: atividade concluída
   emCurso: '#202020',
   atrasado: '#C0392B',
+  atrasadoFundo: '#F3C9C2',
   baseline: '#B9BCC1',
   futuro: '#E3E4E6'
 } as const;

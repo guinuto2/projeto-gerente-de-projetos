@@ -50,6 +50,8 @@ export function Gantt(props: Props) {
 
   const pos = (s: string) => ((dia(s)!.getTime() - dia(escala.ini)!.getTime()) / 864e5) / escala.total * 100;
   const larg = (a: string, b: string) => Math.max(0.6, ((dia(b)!.getTime() - dia(a)!.getTime()) / 864e5 + 1) / escala.total * 100);
+  // atrasada: passou da data prevista sem concluir (a barra inteira fica avermelhada, mesmo com 0% feito)
+  const atrasada = (a: Atividade) => a.status !== 'Concluído' && a.status !== 'Cancelado' && !!a.termino && a.termino < hoje;
   const corBarra = (a: Atividade) => a.status === 'Concluído' ? TEMA.concluido : (a.status === 'Bloqueado' || a.termino < hoje) ? TEMA.atrasado : TEMA.emCurso;
 
   const grade = (
@@ -65,7 +67,7 @@ export function Gantt(props: Props) {
     return (
       <>
         {mudouBaseline && <div className="gbase" style={{ left: `${pos(a.baselineInicio)}%`, width: `${larg(a.baselineInicio, a.baselineTermino)}%` }} title={`Baseline ${dm(a.baselineInicio)}–${dm(a.baselineTermino)}`} />}
-        <div className="gbar" {...eventosDica(a)} style={{ left: `${pos(a.inicio)}%`, width: `${larg(a.inicio, a.termino)}%`, background: TEMA.barraFundo }}>
+        <div className="gbar" {...eventosDica(a)} style={{ left: `${pos(a.inicio)}%`, width: `${larg(a.inicio, a.termino)}%`, background: atrasada(a) ? TEMA.atrasadoFundo : TEMA.barraFundo }}>
           <i style={{ width: `${a.percentual}%`, background: corBarra(a) }} />
         </div>
         {a.marco && <div className="gmarco" {...eventosDica(a)} style={{ left: `calc(${pos(a.termino) + larg(a.termino, a.termino)}% - 7px)`, background: a.status === 'Concluído' ? TEMA.concluido : TEMA.vinho }} />}

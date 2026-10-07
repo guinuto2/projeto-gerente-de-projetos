@@ -20,6 +20,7 @@ import { AbaDocumentos } from '../components/projeto/abas/AbaDocumentos';
 import { AbaDecisoes } from '../components/projeto/abas/AbaDecisoes';
 import { DecidirGate } from '../components/projeto/editores/DecidirGate';
 import { AvisoRascunho } from '../components/projeto/AvisoRascunho';
+import { AbaHistorico } from '../components/projeto/abas/AbaHistorico';
 import { ExportarCronograma } from '../components/projeto/ExportarCronograma';
 
 export function ProjetoPage() {
@@ -43,10 +44,11 @@ export function ProjetoPage() {
     { id: 'pendencias', rotulo: 'Pendências', contagem: pendenciasAbertas(dados, p.codigo).length },
     { id: 'escopo', rotulo: 'Escopo e premissas' },
     { id: 'documentos', rotulo: 'Documentos' },
-    { id: 'decisoes', rotulo: 'Decisões', contagem: (dados.decisoes[p.codigo] || []).length }
+    { id: 'decisoes', rotulo: 'Decisões', contagem: (dados.decisoes[p.codigo] || []).length },
+    { id: 'historico', rotulo: 'Histórico' }
   ];
-  // o técnico não vê escopo, riscos e pendências
-  const OCULTAS_TECNICO = ['riscos', 'pendencias', 'escopo'];
+  // o técnico não vê escopo, riscos, pendências nem o histórico
+  const OCULTAS_TECNICO = ['riscos', 'pendencias', 'escopo', 'historico'];
   const abasVisiveis = papel === 'Técnico' ? abas.filter(a => !OCULTAS_TECNICO.includes(a.id)) : abas;
   const abaAtiva = abasVisiveis.some(a => a.id === aba) ? aba : 'cronograma';
   const irAba = (id: string) => navegar(`/projeto/${encodeURIComponent(p.codigo)}/${id}`);
@@ -102,6 +104,7 @@ export function ProjetoPage() {
           {abaAtiva === 'escopo' && <AbaEscopo projeto={p} />}
           {abaAtiva === 'documentos' && <AbaDocumentos projeto={p} />}
           {abaAtiva === 'decisoes' && <AbaDecisoes projeto={p} />}
+          {abaAtiva === 'historico' && <AbaHistorico projeto={p} />}
         </div>
       </section>
       {gateEmDecisao && <DecidirGate projeto={p} gate={gateEmDecisao} aoFechar={() => setGateAberto(null)} />}

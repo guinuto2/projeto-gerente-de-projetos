@@ -3,55 +3,48 @@ import type { Atividade } from '../../types/models';
 import { usePortal } from '../../state/PortalContext';
 import { useProjetosVisiveis } from '../../state/useProjetosVisiveis';
 import { SELO_STATUS } from '../../lib/constantes';
-import { dm } from '../../lib/datas';
+import { diasUteis, dm } from '../../lib/datas';
 import { Selo } from '../ui/Selo';
 
 const MAXIMO = 8;
 
-/**
- * O que está acontecendo hoje: atividades abertas cujo período inclui hoje (mesmo ainda "Planejado"),
- * mais as marcadas como em andamento ou bloqueadas e ainda no prazo. As que começam hoje aparecem primeiro.
- */
-export function EmAndamento() {
+/** Atividades abertas que já passaram da data de término prevista, das mais atrasadas para as menos. */
+export function AtividadesAtrasadas() {
   const { dados, hoje } = usePortal();
   const { projetos } = useProjetosVisiveis();
   const aberta = (a: Atividade) => a.status !== 'Concluído' && a.status !== 'Cancelado';
-  const noPeriodo = (a: Atividade) => !!a.inicio && !!a.termino && a.inicio <= hoje && a.termino >= hoje;
+  // dias úteis depois do término previsto até hoje
+  const atraso = (a: Atividade) => Math.max(1, diasUteis(a.termino, hoje) - 1);
   const itens = projetos.flatMap(p => {
     const lista = dados.atividades[p.codigo] || [];
     return lista.filter(a => {
-      if (!aberta(a)) return false;
+      if (!aberta(a) || !a.termino || a.termino >= hoje) return false;
       if (a.pai) {
-        // subatividade só entra se tiver datas próprias (senão repete a principal)
         const pai = lista.find(x => x.codigo === a.pai);
-        if (pai && pai.inicio === a.inicio && pai.termino === a.termino) return false;
+        if (pai && pai.inicio === a.inicio && pai.termino === a.termino) return false;   // repetiria a principal
       }
-      if (a.termino && a.termino < hoje) return false;   // atrasadas aparecem na seção "Atividades atrasadas"
-      return noPeriodo(a) || a.status === 'Em andamento' || a.status === 'Bloqueado';
-    }).map(a => ({ a, cod: p.codigo }));
-  }).sort((x, y) =>
-    Number(y.a.inicio === hoje) - Number(x.a.inicio === hoje) ||
-    Number(y.a.status === 'Bloqueado') - Number(x.a.status === 'Bloqueado') ||
-    (x.a.termino || '').localeCompare(y.a.termino || ''));
+      return true;
+    }).map(a => ({ a, cod: p.codigo, dias: atraso(a) }));
+  }).sort((x, y) => y.dias - x.dias || x.a.termino.localeCompare(y.a.termino));
 
   return (
-    <section className="card pad">
+    <section className="card pad atrasadas">
       <div className="linha" style={{ alignItems: 'baseline' }}>
-        <h2 className="h3">Atividades em andamento agora</h2>
+        <h2 className="h3">Atividades atrasadas</h2>
         {itens.length > 0 && <span className="cnt">{itens.length}</span>}
       </div>
       <div className="lista" style={{ marginTop: 10 }}>
-        {itens.slice(0, MAXIMO).map(({ a, cod }) => (
+        {itens.slice(0, MAXIMO).map(({ a, cod, dias }) => (
           <Link key={cod + a.codigo} to={`/projeto/${encodeURIComponent(cod)}/cronograma`} style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>
             <div className="projTopo"><span className="projTag">{cod}</span><Selo valor={a.status} cores={SELO_STATUS} /></div>
             <div className="mTit">{a.codigo} · {a.nome}</div>
             <div className="sub" style={{ marginTop: 4 }}>
-              {a.inicio === hoje && <span className="hojeTag">começa hoje</span>}
-              {a.equipe} · {a.percentual}% · {a.inicio === a.termino ? `em ${dm(a.termino)}` : `até ${dm(a.termino)}`}
+              <span className="atrasoTag">{dias} {dias > 1 ? 'dias úteis' : 'dia útil'} de atraso</span>
+              {a.equipe} · {a.percentual}% · previsto {dm(a.termino)}
             </div>
           </Link>
         ))}
-        {!itens.length && <div className="sub">Nada em andamento hoje.</div>}
+        {!itens.length && <div className="sub">Nenhuma atividade atrasada.</div>}
         {itens.length > MAXIMO && <Link to="/cronogramas" className="sub" style={{ display: 'block', paddingTop: 8 }}>Ver todas ({itens.length}) nos cronogramas →</Link>}
       </div>
     </section>

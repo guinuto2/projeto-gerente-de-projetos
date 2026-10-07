@@ -9,7 +9,7 @@ const encerradoEm = (p: Projeto) => p.fases.find(g => g.gate === 'G4')?.dataApro
 
 /** Lista compacta dos projetos com o G4 aprovado. */
 export function ProjetosEncerrados({ projetos }: { projetos: Projeto[] }) {
-  const [aberto, setAberto] = useState(true);
+  const [aberto, setAberto] = useState(false);   // começa fechada
   const navegar = useNavigate();
   const lista = [...projetos].sort((a, b) => encerradoEm(b).localeCompare(encerradoEm(a)));
   const abrir = (p: Projeto) => navegar(`/projeto/${encodeURIComponent(p.codigo)}`);

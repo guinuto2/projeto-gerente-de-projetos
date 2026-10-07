@@ -83,3 +83,16 @@ export function proximoCodigoSeq(codigos: string[], prefixoPadrao: string): stri
 export const CAUSAS_ATRASO = ['Cliente / acesso', 'Fabricante / entrega', 'Janela / RDM', 'Recurso interno', 'Técnica'];
 /** Status disponíveis na atualização semanal (igual ao protótipo). */
 export const STATUS_ATUALIZACAO = ['Em andamento', 'Planejado', 'Bloqueado', 'Concluído', 'A confirmar', 'Cancelado'] as const;
+
+/** Número de cada fase no código das atividades: Iniciação 1.x, Planejamento 2.x, Execução 3.x, Monitoramento 4.x, Encerramento 5.x. */
+export const NUMERO_FASE: Record<Fase, number> = { 'Iniciação': 1, 'Planejamento': 2, 'Execução': 3, 'Monitoramento': 4, 'Encerramento': 5 };
+
+/**
+ * Próximo código de atividade da fase: a primeira é N.0, depois N.1, N.2…
+ * (considera só códigos no formato N.M da mesma fase; ignora subatividades N.M.K).
+ */
+export function codigoDaFase(codigos: string[], fase: Fase): string {
+  const n = NUMERO_FASE[fase];
+  const usados = codigos.map(c => new RegExp(`^${n}\\.(\\d+)$`).exec(c.trim())).filter((m): m is RegExpExecArray => !!m).map(m => Number(m[1]));
+  return `${n}.${usados.length ? Math.max(...usados) + 1 : 0}`;
+}

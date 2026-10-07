@@ -17,12 +17,17 @@ export function AbaCronograma({ projeto, faseSel, limparFase }: Props) {
   const { pode } = usePapel();
   const [equipe, setEquipe] = useState('Todas');
   const [abertos, setAbertos] = useState<Record<string, boolean>>({});
+  /** nova subatividade aberta a partir do painel da atividade principal */
+  const [subDe, setSubDe] = useState<string | undefined>(undefined);
   /** código da atividade em edição, ou 'nova' */
   const [editando, setEditando] = useState<string | null>(null);
   const atividades = dados.atividades[projeto.codigo] || [];
   const editor = editando && (
-    <EditarAtividade projeto={projeto} codigo={editando === 'nova' ? undefined : editando} faseInicial={faseSel} aoFechar={() => setEditando(null)}
-      aoCriarSubatividade={pai => setAbertos(s => ({ ...s, [pai]: true }))} />
+    <EditarAtividade key={editando + (subDe || '')} projeto={projeto} codigo={editando === 'nova' ? undefined : editando} faseInicial={faseSel}
+      paiInicial={editando === 'nova' ? subDe : undefined}
+      aoFechar={() => { setEditando(null); setSubDe(undefined); }}
+      aoCriarSubatividade={pai => setAbertos(s => ({ ...s, [pai]: true }))}
+      aoNovaSubatividade={pai => { setSubDe(pai); setEditando('nova'); }} />
   );
   if (!atividades.length) return (
     <>
@@ -58,10 +63,10 @@ export function AbaCronograma({ projeto, faseSel, limparFase }: Props) {
           <button type="button" className="btn pq" onClick={limparFase}>Mostrar todas</button>
         </div>
       )}
-      <Gantt projeto={projeto} atividades={atividades} abertos={abertos} aoAlternar={setAbertos} aoAbrir={c => { if (pode('atualizarAtividade')) setEditando(c); }}
+      <Gantt projeto={projeto} atividades={atividades} abertos={abertos} aoAlternar={setAbertos} aoAbrir={c => setEditando(c)}
         filtro={a => (equipe === 'Todas' || a.equipe === equipe) && (!faseSel || a.fase === faseSel)} />
       <p className="sub" style={{ marginTop: 10 }}>
-        {pode('gerenciarAtividades') ? 'Clique numa atividade para editar nome, fase, datas, status ou excluir.' : 'Clique numa atividade para atualizar status, % e observação.'} As alterações {fonte.modo === 'piloto' ? 'ficam neste navegador (modo piloto)' : 'são gravadas na lista Portal Atividades'}.
+        Clique numa atividade para ver os detalhes{pode('atualizarAtividade') ? ' e liberar a edição' : ''}. As alterações {fonte.modo === 'piloto' ? 'ficam neste navegador (modo piloto)' : 'são gravadas na lista Portal Atividades'}.
       </p>
       {editor}
     </>

@@ -3,8 +3,10 @@ import { usePortal } from '../../state/PortalContext';
 import { useToast } from '../../state/ToastContext';
 import { Confirmacao } from '../ui/Confirmacao';
 
+let cache: { chave: string; quando: number; pastas: { nome: string; url: string }[] } | null = null;
+
 /**
- * Patrocinador: pastas da biblioteca "Documentos de Projetos" que não pertencem a nenhum projeto
+ * PMO: pastas da biblioteca "Documentos de Projetos" que não pertencem a nenhum projeto
  * (sobras de projetos excluídos sem a pasta). Podem ir para a lixeira do site.
  */
 export function PastasSemProjeto() {
@@ -18,7 +20,9 @@ export function PastasSemProjeto() {
 
   useEffect(() => {
     if (!fonte.pastasSemProjeto) return;
-    fonte.pastasSemProjeto(codigos.split('|').filter(Boolean)).then(setPastas).catch(() => setPastas([]));
+    if (cache && cache.chave === codigos && Date.now() - cache.quando < 10 * 60000) { setPastas(cache.pastas); return; }
+    fonte.pastasSemProjeto(codigos.split('|').filter(Boolean))
+      .then(p => { cache = { chave: codigos, quando: Date.now(), pastas: p }; setPastas(p); }).catch(() => setPastas([]));
   }, [fonte, codigos]);
 
   if (!pastas.length) return null;
@@ -27,7 +31,7 @@ export function PastasSemProjeto() {
     try {
       for (const p of pastas) await fonte.excluirPasta!(p.nome);
       toast(`${pastas.length} pasta(s) enviada(s) para a lixeira do SharePoint.`);
-      setPastas([]); setConfirmar(false);
+      setPastas([]); setConfirmar(false); cache = null;
     } catch (e) { setErro((e as Error).message); }
     finally { setOcupado(false); }
   };

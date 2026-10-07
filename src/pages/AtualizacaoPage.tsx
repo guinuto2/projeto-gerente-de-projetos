@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import type { Atividade, Projeto, StatusAtividade } from '../types/models';
+import type { Atividade, StatusAtividade } from '../types/models';
 import { usePortal, useBloqueioSincronizacao } from '../state/PortalContext';
 import { usePapel } from '../state/PapelContext';
 import { useToast } from '../state/ToastContext';
@@ -8,7 +8,6 @@ import { useProjetosVisiveis } from '../state/useProjetosVisiveis';
 import { atividadesDaSemana, semanaDe, vencida, type ItemSemana } from '../lib/semana';
 import { CAUSAS_ATRASO, STATUS_ATUALIZACAO } from '../lib/constantes';
 import { dm, dma } from '../lib/datas';
-import { Chips } from '../components/ui/Chips';
 import { Mensagem } from '../components/ui/Mensagem';
 
 interface Form {
@@ -27,18 +26,14 @@ const reprograma = (a: Atividade, f: Form) => !!a.baselineTermino && f.termino !
 /** Atualização semanal: lista das atividades da semana à esquerda, formulário à direita. */
 export function AtualizacaoPage() {
   const { dados, hoje, atualizarSemanal } = usePortal();
-  const { projetos, identidade } = useProjetosVisiveis();
-  const { pode } = usePapel();
+  const { projetos } = useProjetosVisiveis();
+  const { pode, papel } = usePapel();
   const toast = useToast();
   useBloqueioSincronizacao('atualizacao-semanal', true);
 
   const todos = useMemo(() => atividadesDaSemana(dados, projetos, hoje), [dados, projetos, hoje]);
-  // "minha": responsável com o meu e-mail (ou, no piloto, o e-mail da pessoa com o meu nome na equipe)
-  const meuEmail = (p: Projeto) => (identidade.email || p.equipe.find(m => m.nome.toLowerCase() === identidade.nome.toLowerCase())?.email || '').toLowerCase();
-  const ehMinha = (i: ItemSemana) => !!i.atividade.responsavel && i.atividade.responsavel.toLowerCase() === meuEmail(i.projeto);
-  const minhas = todos.filter(ehMinha);
-  const [filtro, setFiltro] = useState<'Só as minhas' | 'Toda a equipe'>(minhas.length ? 'Só as minhas' : 'Toda a equipe');
-  const lista = filtro === 'Só as minhas' ? minhas : todos;
+  // todas as atividades da semana dos projetos que a pessoa vê (o PMO vê todos os projetos)
+  const lista = todos;
 
   const [sel, setSel] = useState<string>(lista[0] ? chave(lista[0]) : '');
   const item = lista.find(i => chave(i) === sel) || lista[0];
@@ -90,12 +85,9 @@ export function AtualizacaoPage() {
       </div>
       <div className="cols">
         <aside className="card pad atvLista">
-          <h2 className="h3" style={{ marginBottom: 2 }}>{filtro === 'Só as minhas' ? 'Minhas atividades desta semana' : 'Atividades da equipe nesta semana'}</h2>
-          <div className="sub" style={{ marginBottom: 10 }}>Todos os projetos em que estou alocado</div>
-          <Chips rotulo="Quais atividades" opcoes={['Só as minhas', 'Toda a equipe'] as const} valor={filtro}
-            aoMudar={v => { setFiltro(v); const l = v === 'Só as minhas' ? minhas : todos; setSel(l[0] ? chave(l[0]) : ''); }}
-            formatar={v => `${v} (${v === 'Só as minhas' ? minhas.length : todos.length})`} />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
+          <h2 className="h3" style={{ marginBottom: 2 }}>Atividades desta semana <span className="cnt">{lista.length}</span></h2>
+          <div className="sub" style={{ marginBottom: 10 }}>{papel === 'Técnico' ? 'Projetos em que estou alocado' : 'Todos os projetos em andamento'}</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
             {lista.map(i => {
               const [txt, cor] = rotulo(i.atividade), on = item && chave(i) === chave(item);
               return (
@@ -106,9 +98,7 @@ export function AtualizacaoPage() {
                 </button>
               );
             })}
-            {!lista.length && <p className="sub">{filtro === 'Só as minhas'
-              ? 'Nenhuma atividade sua nesta semana. Atividades sem responsável aparecem em "Toda a equipe".'
-              : 'Nenhuma atividade aberta nesta semana nos seus projetos.'}</p>}
+            {!lista.length && <p className="sub">Nenhuma atividade aberta nesta semana.</p>}
           </div>
         </aside>
 

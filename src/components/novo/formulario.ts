@@ -2,6 +2,7 @@ import type { Atividade, Dados, Fase, Gate, MembroEquipe, Nivel, NovoProjeto, Ri
 import { tecnicoPorNome } from '../../lib/pessoas';
 import { dia, diasUteis, diaUtil, linhas, somarDiasUteis, hojeIso } from '../../lib/datas';
 import { CRONOGRAMA_SYSTECH, RISCOS_SYSTECH } from '../../lib/modeloSystech';
+import { NUMERO_FASE, codigoDaFase } from '../../lib/constantes';
 
 const diaUtilIso = (s: string) => { const d = dia(s); return !!d && diaUtil(d); };
 
@@ -19,13 +20,20 @@ export interface FormProjeto {
   arquitetoEmail?: string;
 }
 
-export const novaAtividade = (n: number): LinhaAtividade => ({ codigo: String(n), nome: '', fase: n === 1 ? 'Iniciação' : 'Execução', equipe: 'Systech', inicio: '', termino: '', marco: false });
+export const novaAtividade = (codigos: string[], fase: Fase = 'Iniciação'): LinhaAtividade =>
+  ({ codigo: codigoDaFase(codigos, fase), nome: '', fase, equipe: 'Systech', inicio: '', termino: '', marco: false });
+
+/** Renumera as atividades do cadastro pela fase, na ordem da lista: Iniciação 1.0, 1.1…; Planejamento 2.0…; etc. */
+export function renumerar(linhas: LinhaAtividade[]): LinhaAtividade[] {
+  const cont: Partial<Record<Fase, number>> = {};
+  return linhas.map(l => { const k = cont[l.fase] ?? 0; cont[l.fase] = k + 1; return { ...l, codigo: `${NUMERO_FASE[l.fase]}.${k}` }; });
+}
 export const novoRisco = (n: number): LinhaRisco => ({ codigo: 'R-' + n, descricao: '', probabilidade: 'Médio', impacto: 'Médio', mitigacao: '', responsavel: '' });
 
 export const formVazio = (): FormProjeto => ({
   codigo: '', nome: '', cliente: '', tipo: 'VMware', gerente: '', arquiteto: '', patrocinador: '', contrato: '',
   inicio: '', termino: '', objetivo: '', escopoIncluido: '', escopoExcluido: '', premissas: '', dependencias: '', restricoes: '',
-  atividades: [novaAtividade(1)], riscos: [novoRisco(1)], equipe: []
+  atividades: [novaAtividade([], 'Iniciação')], riscos: [novoRisco(1)], equipe: []
 });
 
 /** Lista do que falta para enviar (vazia = pode enviar). */
@@ -99,7 +107,7 @@ export function cronogramaModelo(inicio: string): LinhaAtividade[] {
   const paralelas = CRONOGRAMA_SYSTECH.filter(x => x.paralela).map(a => ({ codigo: a.codigo, nome: a.nome, fase: a.fase, equipe: a.equipe, inicio: iniEnc, termino: fimEnc, marco: false }));
   const posExec = linhas.findIndex(l => l.fase === 'Encerramento');
   linhas.splice(posExec < 0 ? linhas.length : posExec, 0, ...paralelas);
-  return linhas;
+  return renumerar(linhas);
 }
 
 export function riscosModelo(): LinhaRisco[] {

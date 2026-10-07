@@ -1,4 +1,91 @@
-# Portal do Escritório de Projetos — v3.35 (React)
+# Portal do Escritório de Projetos — v3.46 (React)
+
+**v3.46:** sem a dica "Automático: …" embaixo do código da atividade; "Rascunhos" e "Projetos encerrados" começam fechadas.
+
+**v3.45 — código das atividades pela fase**
+- Atividade: Iniciação 1.0, 1.1, 1.2…; Planejamento 2.0…; Execução 3.0…; Monitoramento 4.0…; Encerramento 5.0….
+  Subatividade: três números (1.1.1, 1.1.2, 2.1.2…). O código é gerado automaticamente e travado.
+- No cadastro do projeto, o código acompanha a fase da linha e tudo é renumerado ao trocar a fase, incluir ou remover
+  atividades; o modelo Systech já vem nesse padrão. No cronograma, "+ Nova atividade" recalcula o código ao trocar a fase.
+- Rascunhos: seção abre e fecha, como "Projetos encerrados".
+
+
+**v3.44**
+- Portfólio: "Rascunhos" e "Projetos encerrados" ficam na coluna dos projetos (mesma largura).
+- "Atividades em andamento agora" e "Atividades atrasadas": o projeto aparece no início de cada item; a contagem das
+  atrasadas sem fundo vermelho.
+- Subatividade: código gerado automaticamente no padrão da principal (1.10 → 1.10.1, 1.10.2…) e travado; botão
+  **"+ Subatividade"** no painel da atividade principal já abre com principal, código, fase e datas preenchidos.
+
+
+**v3.43 — atividades atrasadas no portfólio**
+- Seção renomeada para **"Atividades em andamento agora"** (só as que estão no prazo).
+- Nova seção **"Atividades atrasadas"** logo abaixo: abertas que passaram do término previsto, das mais atrasadas para as
+  menos, com os dias úteis de atraso (feriados não contam), status, %, data prevista e link para o cronograma.
+
+
+**v3.42 — "Em andamento agora" no portfólio**
+- Passa a mostrar as atividades abertas cujo período inclui hoje (mesmo ainda "Planejado"), além das em andamento e
+  bloqueadas. As que começam hoje vêm primeiro, com o selo "começa hoje"; subatividades com datas próprias entram.
+- Contagem no título e, com mais de 8, o link "Ver todas nos cronogramas".
+
+
+**v3.41 — coluna "Tipo" do histórico**
+- No SharePoint em português, toda lista tem a coluna oculta DocIcon exibida como "Tipo"; o script achava que a coluna
+  Tipo do histórico já existia e não a criava. Agora o script compara só o nome interno das colunas (vale para todas)
+  e o histórico usa a coluna **TipoMudanca** ("Tipo da mudança"). Registros pendentes são reenviados ao abrir o portal.
+- Rode `provisionar-portal.ps1` (sem `-Piloto`) para criar a coluna.
+
+
+**v3.40 — histórico que não gravava em silêncio**
+- Antes, se a lista Portal Historico não existisse quando o portal abriu (ou o SharePoint recusasse a gravação), o registro
+  era descartado sem aviso. Agora o portal procura a lista de novo, mostra o motivo exato da falha (lista inexistente,
+  coluna faltando, limite do SharePoint…), guarda o registro no navegador e reenvia sozinho.
+- A aba Histórico mostra quantos registros estão pendentes, o motivo e o botão "Tentar gravar agora".
+
+
+**v3.39**
+- **Tela de carregamento** nas operações demoradas (criar projeto, reunião do Teams, excluir, gates, documentos…): se passar
+  de meio segundo, um cartão com a roda girando e a frase da operação cobre a tela até terminar.
+- **Atividade abre só para visualização** (todos os perfis). O patrocinador só vê; PMO e técnico clicam em
+  **"✎ Liberar edição"** para editar. Atividade nova abre direto no modo de edição.
+- **Histórico:** "Projeto X criado"; registros que não puderem ser gravados (SharePoint indisponível ou limitando o acesso)
+  ficam guardados no navegador e são reenviados na próxima releitura.
+- **Data simulada** (teste): `dataSimulada: '2026-10-12'` no config.js faz o portal inteiro agir como se fosse esse dia
+  (linha de hoje, atrasos, semana da atualização); o cabeçalho mostra "Data simulada".
+- Cronograma: atividade atrasada sem progresso fica com a barra inteira avermelhada.
+
+
+**v3.38 — correção do erro 429 (SharePoint "throttled")**
+- Corrigido o ciclo da aba Histórico (v3.37), que relia o histórico sem parar (~130 chamadas por segundo) e fazia o
+  SharePoint bloquear o acesso. Agora: 1 leitura ao abrir e outra só quando algo do projeto muda.
+- Quando o SharePoint responde 429/503, o portal espera o tempo pedido (Retry-After, ou 1 s, 2 s, 4 s…), pausa todas as
+  chamadas juntas e repete, sem mostrar erro.
+- Menos chamadas: documentos em 1 chamada (antes 10) e só ao abrir a aba ou no botão "Recarregar lista"; releitura
+  automática a cada 2 min (`sincronizarSegundos: 120`, mínimo 30) e só com a aba do navegador visível; consulta das
+  reuniões no Outlook no máximo a cada 5 min; pastas sem projeto no máximo a cada 10 min.
+
+
+**v3.37 — histórico do projeto**
+- Nova aba **Histórico** no projeto (PMO e patrocinador): cada mudança feita pelo portal, com data e hora, usuário (e o
+  perfil usado), tipo e o que mudou (de → para). Filtros por tipo e busca por pessoa ou texto.
+- Registra: criação, edição e exclusão do projeto; rascunho enviado/ativado; atividades e subatividades (criar, editar,
+  excluir, atualização semanal); riscos; pendências; gates (solicitar, aprovar, devolver); reuniões (agendar, alterar,
+  cancelar, remarcada no Outlook); documentos (enviar, excluir).
+- Gravado na lista **Portal Historico** (criada pelo script), pelo código do projeto — o histórico continua existindo
+  mesmo se o projeto for excluído.
+- Aba Documentos: o PMO pode **excluir** um arquivo (vai para a lixeira do SharePoint).
+- Atualizar status: sem o filtro "minhas / toda a equipe"; mostra todas as atividades da semana dos projetos da pessoa.
+- A data de "hoje" (linha vermelha do cronograma) é relida a cada minuto: muda sozinha à meia-noite.
+
+
+**v3.36 — cabeçalho e carregamento**
+- Menu na ordem Portfólio, Novo projeto, Cronogramas, Atualizar status (o link de Documentos saiu).
+- Botão com as iniciais à direita abre um menu: Abrir Teams, Abrir SharePoint (site do portal), Atualizar dados,
+  Perfil de teste e Sair (no piloto, Restaurar piloto). Fecha ao clicar fora ou com Esc.
+- Animação de carregamento: roda girando na abertura do portal e nas telas que buscam dados; barrinha animada no topo da
+  tela enquanto o portal busca ou grava algo (salvar, aprovar, criar, excluir, atualizar).
+
 
 **v3.35 — página "Cronogramas"**
 - Novo item de menu **Cronogramas** (ao lado de Novo projeto): o cronograma de todos os projetos em andamento, um bloco por

@@ -13,11 +13,13 @@ interface DrawerProps {
   rotuloSalvar?: string;
   /** botões extras no rodapé, à esquerda (ex.: Excluir, Devolver) */
   acoes?: ReactNode;
+  /** só visualização: sem o botão de salvar; "Cancelar" vira "Fechar" */
+  somenteLeitura?: boolean;
   children: ReactNode;
 }
 
 /** Painel lateral de edição. Enquanto aberto, a releitura automática espera. */
-export function Drawer({ titulo, subtitulo, aberto, salvando, erro, aoFechar, aoSalvar, rotuloSalvar = 'Salvar', acoes, children }: DrawerProps) {
+export function Drawer({ titulo, subtitulo, aberto, salvando, erro, aoFechar, aoSalvar, rotuloSalvar = 'Salvar', acoes, somenteLeitura = false, children }: DrawerProps) {
   useBloqueioSincronizacao('drawer', aberto);
   useEffect(() => {
     if (!aberto) return;
@@ -40,10 +42,10 @@ export function Drawer({ titulo, subtitulo, aberto, salvando, erro, aoFechar, ao
           {erro && <div className="msg erro">{erro}</div>}
         </form>
         <div className="drPe">
-          <button className="btn" type="button" onClick={aoFechar}>Cancelar</button>
+          <button className="btn" type="button" onClick={aoFechar}>{somenteLeitura ? 'Fechar' : 'Cancelar'}</button>
           <div className="drPeAcoes">
             {acoes}
-            <button className="btn pri" type="submit" form="drForm" disabled={salvando}>{salvando ? 'Salvando…' : rotuloSalvar}</button>
+            {!somenteLeitura && <button className="btn pri" type="submit" form="drForm" disabled={salvando}>{salvando ? 'Salvando…' : rotuloSalvar}</button>}
           </div>
         </div>
       </aside>

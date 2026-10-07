@@ -4,11 +4,12 @@ import { usePortal } from '../../../state/PortalContext';
 import { useToast } from '../../../state/ToastContext';
 import { usePapel } from '../../../state/PapelContext';
 import { macro } from '../../../lib/calculos';
-import { FASES, STATUS_ATIVIDADE } from '../../../lib/constantes';
+import { codigoDaFase, FASES, STATUS_ATIVIDADE } from '../../../lib/constantes';
 import { dma } from '../../../lib/datas';
 import { Drawer } from '../../ui/Drawer';
 import { convidados, formReuniaoInicial, ReuniaoTeams, type FormReuniao } from './ReuniaoTeams';
 import { Confirmacao } from '../../ui/Confirmacao';
+import { VisaoAtividade } from './VisaoAtividade';
 
 interface Props {
   projeto: Projeto;
@@ -19,6 +20,10 @@ interface Props {
   aoFechar: () => void;
   /** chamado ao incluir uma subatividade, com o código da atividade principal */
   aoCriarSubatividade?: (pai: string) => void;
+  /** nova subatividade já ligada a esta atividade principal */
+  paiInicial?: string;
+  /** botão "+ Subatividade" no painel de uma atividade principal */
+  aoNovaSubatividade?: (pai: string) => void;
 }
 
 /** Próximo código de subatividade: 3.2 → 3.2.1, 3.2.2… */
@@ -27,15 +32,11 @@ function proximoCodigoFilho(lista: Atividade[], pai: string): string {
   return `${pai}.${(nums.length ? Math.max(...nums) : 0) + 1}`;
 }
 
-function proximoCodigo(lista: Atividade[]): string {
-  const nums = lista.filter(a => !a.pai).map(a => Number(String(a.codigo).split('.').pop())).filter(n => !isNaN(n));
-  const pref = lista.find(a => /^\d+\.\d+$/.test(a.codigo))?.codigo.split('.')[0];
-  const n = (nums.length ? Math.max(...nums) : 0) + 1;
-  return pref ? `${pref}.${n}` : String(n);
-}
+/** Próximo código de atividade na fase (Iniciação 1.0, 1.1…; Planejamento 2.0…; Execução 3.0…). */
+const proximoCodigo = (lista: Atividade[], fase: Fase) => codigoDaFase(lista.map(a => a.codigo), fase);
 
 /** Cria, edita ou exclui uma atividade do cronograma. */
-export function EditarAtividade({ projeto, codigo, faseInicial, aoFechar, aoCriarSubatividade }: Props) {
+export function EditarAtividade({ projeto, codigo, faseInicial, aoFechar, aoCriarSubatividade, paiInicial, aoNovaSubatividade }: Props) {
   const { hoje, dados, salvarAtividade, criarAtividade, excluirAtividade, agendarReuniao, atualizarReuniao, cancelarReuniao, lerReuniao, reuniaoGravavel, fonte, email: meuEmail } = usePortal();
   const toast = useToast();
   const { pode, papel } = usePapel();
@@ -46,22 +47,25 @@ export function EditarAtividade({ projeto, codigo, faseInicial, aoFechar, aoCria
   const filhos = existente ? lista.filter(x => x.pai === existente.codigo) : [];
   const macros = macro(dados, projeto.codigo);
 
+  const principalInicial = !existente && paiInicial ? macros.find(m => m.codigo === paiInicial) : undefined;
   const [f, setF] = useState({
-    codigo: existente?.codigo || proximoCodigo(lista),
+    codigo: existente?.codigo || (principalInicial ? proximoCodigoFilho(lista, principalInicial.codigo) : proximoCodigo(lista, faseInicial || 'Iniciação')),
     nome: existente?.nome || '',
-    fase: (existente?.fase || faseInicial || 'Execução') as Fase,
+    fase: (existente?.fase || principalInicial?.fase || faseInicial || 'Iniciação') as Fase,
     equipe: existente?.equipe || 'Systech',
     status: (existente?.status || 'Planejado') as StatusAtividade,
     percentual: String(existente?.percentual ?? 0),
-    inicio: existente?.inicio || '',
-    termino: existente?.termino || '',
+    inicio: existente?.inicio || principalInicial?.inicio || '',
+    termino: existente?.termino || principalInicial?.termino || '',
     marco: existente?.marco || false,
-    pai: existente?.pai || '',
+    pai: existente?.pai || principalInicial?.codigo || '',
     descricao: existente?.descricao || '',
     observacao: existente?.observacao || '',
     responsavel: existente?.responsavel || ''
   });
   const [salvando, setSalvando] = useState(false);
+  /** atividade existente abre só para visualização; quem pode editar clica em "Liberar edição" */
+  const [liberada, setLiberada] = useState(!codigo);
   const [erro, setErro] = useState('');
   const [reuniao, setReuniao] = useState<FormReuniao>(() => formReuniaoInicial(
     projeto.equipe, '', existente?.inicio || '', meuEmail));   // título vazio = automático "Tipo · projeto · atividade"
@@ -105,6 +109,7 @@ export function EditarAtividade({ projeto, codigo, faseInicial, aoFechar, aoCria
 
   const salvar = async () => {
     if (!f.nome.trim()) { setErro('Informe o nome da atividade.'); return; }
+    if (nova && f.pai && !f.codigo.startsWith(f.pai + '.')) { setErro(`O código da subatividade deve seguir o da principal (${f.pai}.1, ${f.pai}.2…).`); return; }
     if (!f.inicio || !f.termino) { setErro('Informe início e término.'); return; }
     if (f.termino < f.inicio) { setErro('O término não pode ser antes do início.'); return; }
     // datas novas ou alteradas não podem ficar no passado (datas antigas que não mudaram continuam valendo)
@@ -174,6 +179,29 @@ export function EditarAtividade({ projeto, codigo, faseInicial, aoFechar, aoCria
     } catch (e) { setErro((e as Error).message); setConfirmarExclusao(null); }
   };
 
+  if (existente && !liberada) {
+    const podeEditar = pode('atualizarAtividade');
+    return (
+      <Drawer aberto somenteLeitura salvando={false} aoFechar={aoFechar} aoSalvar={() => undefined}
+        titulo={`${existente.codigo} · ${existente.nome}`}
+        subtitulo={`${projeto.codigo} · ${existente.fase} · ${existente.equipe}`}
+        acoes={<>
+          {pode('gerenciarAtividades') && !existente.pai && aoNovaSubatividade &&
+            <button type="button" className="btn" onClick={() => aoNovaSubatividade(existente.codigo)}>+ Subatividade</button>}
+          {podeEditar && <button type="button" className="btn pri" onClick={() => setLiberada(true)}>✎ Liberar edição</button>}
+        </>}>
+        <VisaoAtividade projeto={projeto} a={existente} filhos={filhos} />
+        {existente.reuniaoUrl && (
+          <div className="reuniaoAgendada">
+            <span>Reunião do Teams{existente.reuniaoTipo ? ` · ${existente.reuniaoTipo}` : ''}{existente.reuniaoInicio ? ` em ${quando(existente.reuniaoInicio)}` : ''}</span>
+            <a className="btn pq" href={existente.reuniaoUrl} target="_blank" rel="noopener noreferrer">Entrar no Teams ↗</a>
+          </div>
+        )}
+        {!podeEditar && <p className="sub">Visualização apenas.</p>}
+      </Drawer>
+    );
+  }
+
   return (
     <Drawer aberto salvando={salvando} erro={erro} aoFechar={aoFechar} aoSalvar={salvar}
       titulo={nova ? 'Nova atividade' : `${existente.codigo} · ${existente.nome}`}
@@ -183,10 +211,14 @@ export function EditarAtividade({ projeto, codigo, faseInicial, aoFechar, aoCria
       {!estrutura && <div className="msg info">Perfil {papel}: você atualiza status, % concluído e observação. Datas e escopo da atividade são definidos pelo PMO.</div>}
       <div className="fg2">
         <label className="campo">Código
-          <input className="ctl" value={f.codigo} onChange={muda('codigo')} disabled={!nova} title={nova ? undefined : 'O código identifica a atividade e não pode ser alterado'} />
+          <input className="ctl mono" value={f.codigo} disabled
+            title={!nova ? 'O código identifica a atividade e não pode ser alterado' : 'Gerado automaticamente'} />
         </label>
         <label className="campo">Fase
-          <select className="ctl" disabled={!estrutura} value={f.fase} onChange={e => setF(s => ({ ...s, fase: e.target.value as Fase }))}>{FASES.map(x => <option key={x}>{x}</option>)}</select>
+          <select className="ctl" disabled={!estrutura || (nova && !!f.pai)} value={f.fase} onChange={e => {
+            const fase = e.target.value as Fase;
+            setF(s => ({ ...s, fase, codigo: nova && !s.pai ? proximoCodigo(lista, fase) : s.codigo }));
+          }}>{FASES.map(x => <option key={x}>{x}</option>)}</select>
         </label>
       </div>
       <label className="campo">Atividade *<input className="ctl" value={f.nome} onChange={muda('nome')} disabled={!estrutura} placeholder="O que será feito" /></label>
@@ -202,7 +234,7 @@ export function EditarAtividade({ projeto, codigo, faseInicial, aoFechar, aoCria
           ? <label className="campo">Subatividade de
               <select className="ctl" value={f.pai} onChange={e => {
                 const pai = e.target.value, principal = macros.find(m => m.codigo === pai);
-                setF(s => ({ ...s, pai, codigo: pai ? proximoCodigoFilho(lista, pai) : proximoCodigo(lista), fase: principal ? principal.fase : s.fase,
+                setF(s => ({ ...s, pai, codigo: pai ? proximoCodigoFilho(lista, pai) : proximoCodigo(lista, s.fase), fase: principal ? principal.fase : s.fase,
                   inicio: s.inicio || principal?.inicio || '', termino: s.termino || principal?.termino || '' }));
               }}>
                 <option value="">— atividade principal —</option>

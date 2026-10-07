@@ -6,7 +6,8 @@ window.PORTAL_CONFIG = {
   sharepointHost: 'gruposystech.sharepoint.com',
   sitePath: '/sites/TesteProjetos',
   biblioteca: 'Documentos de Projetos',
-  sincronizarSegundos: 60,                                // releitura automática do SharePoint
+  sincronizarSegundos: 120,                               // releitura automática do SharePoint (mínimo 30)
+  dataSimulada: '',                                       // TESTE: finge que hoje é esta data, ex.: '2026-10-12' (vazio = data real)
 
   // ----- e-mails (permissão Mail.Send no app Portal PMO) -----
   emailRemetente: '',                                     // caixa compartilhada que envia, ex.: 'pmo@systechtecnologia.com.br' (vazio = conta logada)

@@ -9,6 +9,8 @@
   v3.23: coluna ReuniaoTipo (Implementação, Alinhamento, Interna, Execução).
   v3.24: lista Portal Tecnicos (Nome, E-mail, Função, Ativo) com os técnicos da Systech.
   v3.33: colunas da atualização semanal e do responsável em Portal Atividades.
+  v3.37: lista Portal Historico (log de mudanças de cada projeto).
+  v3.41: verificação de colunas pelo nome interno; coluna TipoMudanca no histórico ("Tipo" colidia com a coluna oculta DocIcon).
 
 .EXEMPLOS
   # só a estrutura (listas vazias)
@@ -46,7 +48,9 @@ function Lista([string]$Titulo, [string]$Url, [string]$Modelo = 'GenericList') {
     New-PnPList -Title $Titulo -Url $Url -Template $Modelo -OnQuickLaunch | Out-Null
   } else { Write-Host "$Titulo já existe" -ForegroundColor DarkGray }
 }
-function Tem([string]$L, [string]$N) { [bool](Get-PnPField -List $L -Identity $N -ErrorAction SilentlyContinue) }
+# Compara só o NOME INTERNO: no SharePoint em português, colunas ocultas têm nomes de exibição genéricos
+# (ex.: DocIcon aparece como "Tipo") e a busca por -Identity confundia as duas.
+function Tem([string]$L, [string]$N) { [bool](@(Get-PnPField -List $L -ErrorAction SilentlyContinue) | Where-Object { $_.InternalName -eq $N }) }
 function Campo([string]$L, [string]$N, [string]$Rot, [string]$Tipo, [string[]]$Opcoes = $null) {
   if (Tem $L $N) { return }
   if ($Tipo -eq 'Choice') { Add-PnPField -List $L -InternalName $N -DisplayName $Rot -Type Choice -Choices $Opcoes -AddToDefaultView | Out-Null }
@@ -274,6 +278,26 @@ foreach ($t in $TECNICOS) {
   if ($jaCadastrados -contains $t.Email.ToLower()) { continue }
   Add-PnPListItem -List $L -Values @{ Title = $t.Nome; Email = $t.Email; Funcao = 'Técnico'; Ativo = $true } | Out-Null
   Write-Host "  técnico cadastrado: $($t.Nome) <$($t.Email)>" -ForegroundColor Green
+}
+
+# ------------------------------------------------------------ Portal Historico (log de mudanças por projeto)
+$L = 'Portal Historico'; Lista $L 'Lists/PortalHistorico'; Titulo $L 'Resumo'
+if (-not (Tem $L 'ProjetoCodigo')) {
+  # texto (e não lookup): o histórico continua existindo mesmo se o projeto for excluído
+  Add-PnPFieldFromXml -List $L -FieldXml "<Field Type='Text' Name='ProjetoCodigo' StaticName='ProjetoCodigo' DisplayName='Projeto' Indexed='TRUE' />" | Out-Null
+}
+Campo $L 'TipoMudanca' 'Tipo da mudança' 'Text'
+Campo $L 'Acao' 'Ação' 'Text'
+Campo $L 'Usuario' 'Usuário' 'Text'
+if (-not (Tem $L 'Quando')) {
+  Add-PnPFieldFromXml -List $L -FieldXml "<Field Type='DateTime' Name='Quando' StaticName='Quando' DisplayName='Data e hora' Format='DateTime' Indexed='TRUE' />" | Out-Null
+}
+Campo $L 'Detalhe' 'Detalhe' 'Note'
+if (-not (Get-PnPView -List $L -Identity 'Por projeto' -ErrorAction SilentlyContinue)) {
+  try {
+    Add-PnPView -List $L -Title 'Por projeto' -Fields 'Quando', 'Usuario', 'TipoMudanca', 'Acao', 'Detalhe' `
+      -Query "<GroupBy Collapse='TRUE'><FieldRef Name='ProjetoCodigo' /></GroupBy><OrderBy><FieldRef Name='Quando' Ascending='FALSE' /></OrderBy>" -SetAsDefault | Out-Null
+  } catch { Write-Warning "Visão 'Por projeto' do histórico não criada: $($_.Exception.Message)" }
 }
 
 # ------------------------------------------------------------ biblioteca de documentos

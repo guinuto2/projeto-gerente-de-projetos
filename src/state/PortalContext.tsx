@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import type { Atividade, Dados, Gate, NovaReuniao, NovoProjeto, Pendencia, Projeto, Risco } from '../types/models';
+import type { Arquivo, Atividade, Dados, Gate, NovaReuniao, NovoProjeto, Pendencia, Projeto, RegistroHistorico, Risco } from '../types/models';
 import { PROXIMA_FASE } from '../lib/constantes';
 import { diasUteis } from '../lib/datas';
 import type { FonteDados } from '../services/FonteDados';
@@ -9,6 +9,8 @@ import { horaAgora } from '../lib/datas';
 import { corpoReuniao, emailReprogramacao, emailProjetoExcluido, emailReuniaoAlterada, emailGateAprovado, emailProjetoCriadoPeloPmo, emailSolicitacaoGate, emailSolicitacaoProjeto } from '../lib/emailProjeto';
 import { progressoFase } from '../lib/calculos';
 import { gatesFaltantes } from '../lib/gates';
+import { descrever } from '../lib/historico';
+import { usePapel } from './PapelContext';
 import { useToast } from './ToastContext';
 import { Carregando } from '../components/ui/Carregando';
 import { Mensagem } from '../components/ui/Mensagem';
@@ -20,6 +22,8 @@ interface PortalValor {
   email: string;
   hoje: string;
   sincronizando: boolean;
+  /** alguma gravação ou leitura em andamento (mostra a barrinha de carregamento no topo) */
+  ocupado: boolean;
   atualizadoEm: string;
   atualizar(manual?: boolean): Promise<void>;
   salvarAtividade(cod: string, codigo: string, campos: Partial<Atividade>): Promise<void>;
@@ -35,6 +39,16 @@ interface PortalValor {
   excluirAtividade(cod: string, codigo: string, opcoes?: { cancelarReunioes?: boolean }): Promise<void>;
   /** atualização semanal da atividade; avisa o gerente se a data prevista passar da baseline. Devolve o aviso enviado (ou vazio). */
   atualizarSemanal(cod: string, codigo: string, campos: Partial<Atividade>): Promise<string>;
+  /** envia um arquivo para a pasta do projeto (registra no histórico) */
+  enviarDocumento(cod: string, pasta: string, arquivo: File): Promise<void>;
+  /** exclui um arquivo da pasta do projeto (vai para a lixeira; registra no histórico) */
+  excluirDocumento(cod: string, pasta: string, arquivo: Arquivo): Promise<void>;
+  /** histórico de mudanças do projeto */
+  historico(cod: string): Promise<RegistroHistorico[]>;
+  /** registros do histórico esperando para ser gravados e o último erro */
+  statusHistorico: { pendentes: number; erro: string };
+  /** tenta gravar agora os registros pendentes; devolve quantos restaram */
+  reenviarHistorico(): Promise<number>;
   criarRisco(cod: string, r: Risco): Promise<void>;
   excluirRisco(cod: string, codigo: string): Promise<void>;
   criarPendencia(cod: string, x: Pendencia): Promise<void>;
@@ -70,6 +84,49 @@ interface PortalValor {
 
 const PortalContext = createContext<PortalValor | null>(null);
 
+/** Frase da tela de carregamento para cada operação que costuma demorar. */
+const MENSAGEM_ACAO: Record<string, string> = {
+  criarProjeto: 'Criando o projeto no SharePoint…', editarProjeto: 'Salvando o projeto…', excluirProjeto: 'Excluindo o projeto e tudo o que está ligado a ele…',
+  submeterRascunho: 'Enviando o rascunho…', criarAtividade: 'Incluindo a atividade…', salvarAtividade: 'Salvando a atividade…',
+  excluirAtividade: 'Excluindo a atividade…', atualizarSemanal: 'Salvando a atualização…', agendarReuniao: 'Criando a reunião no Teams e enviando os convites…',
+  atualizarReuniao: 'Atualizando a reunião no Teams…', cancelarReuniao: 'Cancelando a reunião no Teams…', solicitarGate: 'Enviando o pedido de aprovação…',
+  decidirGate: 'Registrando a decisão do gate…', criarRisco: 'Incluindo o risco…', salvarRisco: 'Salvando o risco…', excluirRisco: 'Excluindo o risco…',
+  criarPendencia: 'Incluindo a pendência…', salvarPendencia: 'Salvando a pendência…', excluirPendencia: 'Excluindo a pendência…',
+  enviarDocumento: 'Enviando o arquivo para o SharePoint…', excluirDocumento: 'Excluindo o documento…', removerGatesRepetidos: 'Limpando os gates repetidos…'
+};
+
+/** Registros do histórico que não puderam ser gravados: ficam no navegador e são reenviados. */
+const CHAVE_PENDENTES = 'portal-pmo-historico-pendente';
+const lerPendentes = (): RegistroHistorico[] => { try { return JSON.parse(localStorage.getItem(CHAVE_PENDENTES) || '[]'); } catch { return []; } };
+const salvarPendentes = (l: RegistroHistorico[]) => { try { localStorage.setItem(CHAVE_PENDENTES, JSON.stringify(l.slice(-500))); } catch { /* */ } };
+
+/** Situação da gravação do histórico (para avisar quando falha). */
+type AvisoHistorico = (s: { pendentes: number; erro: string }) => void;
+let avisarHistorico: AvisoHistorico = () => undefined;
+let ultimoErroHistorico = '';
+
+/** Tenta gravar os pendentes; devolve quantos restaram. */
+async function reenviarPendentes(f: FonteDados): Promise<number> {
+  const l = lerPendentes();
+  if (!l.length) { avisarHistorico({ pendentes: 0, erro: '' }); return 0; }
+  const restam: RegistroHistorico[] = [];
+  for (const r of l) {
+    if (restam.length) { restam.push(r); continue; }   // primeiro erro: não insiste nos demais agora
+    try { await f.registrar(r); } catch (e) { ultimoErroHistorico = (e as Error).message; restam.push(r); }
+  }
+  salvarPendentes(restam);
+  avisarHistorico({ pendentes: restam.length, erro: restam.length ? ultimoErroHistorico : '' });
+  return restam.length;
+}
+/** Grava no histórico sem travar a ação; se falhar, guarda para reenviar e avisa o motivo. */
+const registrarSeguro = (f: FonteDados, r: RegistroHistorico) => {
+  f.registrar(r).then(() => { if (lerPendentes().length) reenviarPendentes(f); }).catch(e => {
+    ultimoErroHistorico = (e as Error).message;
+    salvarPendentes([...lerPendentes(), r]);
+    avisarHistorico({ pendentes: lerPendentes().length, erro: ultimoErroHistorico });
+  });
+};
+
 /** Modo de teste dos convites: reuniaoSomentePara (prioridade) ou emailSomentePara. */
 export function testeReuniao(): string[] | null {
   const alvo = (config.reuniaoSomentePara || config.emailSomentePara || '').trim();
@@ -93,8 +150,11 @@ function destinatarios(...grupos: string[]): string {
  * Reuniões remarcadas no Outlook (o organizador aceitou outra data): grava o novo horário na atividade.
  * Atividade de um dia só, no dia da reunião, acompanha a nova data. Devolve o que mudou.
  */
+let ultimaConsultaReunioes = 0;
 async function reunioesRemarcadas(fonte: FonteDados, d: Dados): Promise<{ cod: string; codigo: string; campos: Partial<Atividade>; texto: string }[]> {
   if (!fonte.lerReunioes) return [];
+  if (Date.now() - ultimaConsultaReunioes < 5 * 60000) return [];   // no máximo a cada 5 minutos
+  ultimaConsultaReunioes = Date.now();
   const comReuniao = Object.entries(d.atividades).flatMap(([cod, l]) => l.filter(a => a.reuniaoId).map(a => ({ cod, a })));
   if (!comReuniao.length) return [];
   let atuais: Record<string, string>;
@@ -162,6 +222,30 @@ export function PortalProvider({ children }: { children: ReactNode }) {
   const [erro, setErro] = useState('');
   const [usuario, setUsuario] = useState('');
   const [sincronizando, setSincronizando] = useState(false);
+  const { papel } = usePapel();
+  /** "hoje" é relido a cada minuto: se o portal ficar aberto de um dia para o outro, a linha de hoje acompanha */
+  const [hojeAtual, setHojeAtual] = useState('');
+  useEffect(() => {
+    if (!fonte) return;
+    setHojeAtual(fonte.hoje());
+    const t = window.setInterval(() => setHojeAtual(h => (fonte.hoje() !== h ? fonte.hoje() : h)), 60000);
+    return () => window.clearInterval(t);
+  }, [fonte]);
+  /** situação da gravação do histórico */
+  const [statusHistorico, setStatusHistorico] = useState<{ pendentes: number; erro: string }>({ pendentes: lerPendentes().length, erro: '' });
+  const erroAvisado = useRef('');
+  useEffect(() => {
+    avisarHistorico = st => {
+      setStatusHistorico(st);
+      if (st.erro && st.erro !== erroAvisado.current) { erroAvisado.current = st.erro; toast(`O histórico não foi gravado no SharePoint: ${st.erro}. O registro ficou guardado e será reenviado.`); }
+    };
+    return () => { avisarHistorico = () => undefined; };
+  }, [toast]);
+  /** frase da tela de carregamento (operação que já passou de meio segundo) */
+  const [acaoLonga, setAcaoLonga] = useState<string | null>(null);
+  const longas = useRef(0);
+  /** quantas ações (gravar, aprovar, criar, excluir…) estão em andamento */
+  const [emAndamento, setEmAndamento] = useState(0);
   const [atualizadoEm, setAtualizadoEm] = useState('');
   const assinatura = useRef('');
   const ultimaSync = useRef(0);
@@ -206,6 +290,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
         ultimaSync.current = Date.now();
         setAtualizadoEm(horaAgora());
         aplicarRemarcadas(f, d);
+        if (f.modo === 'sharepoint') reenviarPendentes(f);
       } catch (e) {
         if (vivo) setErro((e as Error).message);
       }
@@ -225,6 +310,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
       return novo;
     });
     toast(`Reunião remarcada no Outlook; cronograma atualizado: ${mud.map(m => m.texto).join('; ')}.`);
+    for (const m of mud) registrarSeguro(f, { quando: new Date().toISOString(), usuario: 'Outlook (remarcação aceita pelo organizador)', projeto: m.cod, tipo: 'Reunião', acao: 'Remarcada', descricao: m.texto });
   }, [toast]);
 
   const editando = () => {
@@ -245,6 +331,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
       setAtualizadoEm(horaAgora());
       if (mudou) { setDados(novo); assinatura.current = nova; }
       aplicarRemarcadas(fonte, novo);
+      reenviarPendentes(fonte);
       if (manual) toast(mudou ? 'Dados atualizados do SharePoint.' : 'Nada mudou desde a última leitura.');
       else if (mudou) toast('Há alterações novas no SharePoint. A tela foi atualizada.');
     } catch (e) {
@@ -258,8 +345,9 @@ export function PortalProvider({ children }: { children: ReactNode }) {
   // releitura automática: intervalo + ao voltar para a aba
   useEffect(() => {
     if (!fonte || fonte.modo !== 'sharepoint') return;
-    const t = setInterval(() => atualizar(false), Math.max(15, config.sincronizarSegundos) * 1000);
-    const aoVoltar = () => { if (!document.hidden && Date.now() - ultimaSync.current > 15000) atualizar(false); };
+    // só relê com a aba do navegador visível (aba em segundo plano não gasta o limite do SharePoint)
+    const t = setInterval(() => { if (!document.hidden) atualizar(false); }, Math.max(30, config.sincronizarSegundos) * 1000);
+    const aoVoltar = () => { if (!document.hidden && Date.now() - ultimaSync.current > 60000) atualizar(false); };
     document.addEventListener('visibilitychange', aoVoltar);
     window.addEventListener('focus', aoVoltar);
     return () => { clearInterval(t); document.removeEventListener('visibilitychange', aoVoltar); window.removeEventListener('focus', aoVoltar); };
@@ -273,7 +361,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
       return p;
     };
     const v: PortalValor = {
-      fonte, dados, usuario, email: fonte.email(), hoje: fonte.hoje(), sincronizando, atualizadoEm, atualizar,
+      fonte, dados, usuario, email: fonte.email(), hoje: hojeAtual || fonte.hoje(), sincronizando, ocupado: emAndamento > 0, atualizadoEm, atualizar,
       bloquear,
 
       async salvarAtividade(cod, codigo, campos) {
@@ -413,6 +501,14 @@ export function PortalProvider({ children }: { children: ReactNode }) {
         const { assunto, html } = emailReprogramacao(p, a, nova, { causa: campos.causaAtraso || '', observacao: campos.observacao || '', impedimento: !!campos.impedimento, autor: usuario });
         try { return await fonte.enviarEmail(assunto, html, para); } catch { return ''; }
       },
+      async enviarDocumento(cod, pasta, arquivo) { await fonte.enviarArquivo(cod, pasta, arquivo); },
+      async excluirDocumento(cod, pasta, arquivo) {
+        if (!fonte.excluirArquivo) throw new Error('A exclusão de documentos funciona quando o portal está conectado ao SharePoint.');
+        await fonte.excluirArquivo(cod, pasta, arquivo);
+      },
+      historico(cod) { return fonte.historico(cod); },
+      statusHistorico,
+      reenviarHistorico() { return reenviarPendentes(fonte); },
       async criarRisco(cod, r) {
         if ((dados.riscos[cod] || []).some(x => x.codigo === r.codigo)) throw new Error(`Já existe um risco com o código ${r.codigo}.`);
         const criado = await fonte.criarRisco(projeto(cod), r);
@@ -544,8 +640,37 @@ export function PortalProvider({ children }: { children: ReactNode }) {
         aplicar(await garantirGates(fonte, await fonte.carregar()));
       }
     };
+    // toda ação assíncrona conta como "ocupado" enquanto roda (barrinha de carregamento no topo)
+    // e, se der certo, vira um registro no histórico do projeto (quem, quando, o que mudou)
+    // leituras (historico, lerReuniao) ficam de fora: senão cada leitura recriaria o contexto e dispararia outra leitura
+    const SEM_INDICADOR = new Set(['atualizar', 'bloquear', 'historico', 'lerReuniao', 'reenviarHistorico']);
+    const quem = `${usuario} (${papel})`;
+    for (const k of Object.keys(v) as (keyof PortalValor)[]) {
+      const fn = v[k];
+      if (typeof fn !== 'function' || SEM_INDICADOR.has(k)) continue;
+      (v as unknown as Record<string, unknown>)[k] = (...args: unknown[]) => {
+        const r = (fn as (...a: unknown[]) => unknown).apply(v, args);
+        if (r instanceof Promise) {
+          setEmAndamento(n => n + 1);
+          // operação demorada (mais de meio segundo): tela de carregamento com a frase da ação
+          const msg = MENSAGEM_ACAO[k];
+          let mostrou = false;
+          const timer = msg ? window.setTimeout(() => { mostrou = true; longas.current++; setAcaoLonga(msg); }, 500) : 0;
+          return r.then(res => {
+            const l = descrever(k, args, dados, res);
+            if (l) registrarSeguro(fonte, { quando: new Date().toISOString(), usuario: quem, projeto: l.cod, tipo: l.tipo, acao: l.acao, descricao: l.descricao });
+            return res;
+          }).finally(() => {
+            setEmAndamento(n => Math.max(0, n - 1));
+            if (timer) window.clearTimeout(timer);
+            if (mostrou && --longas.current <= 0) { longas.current = 0; setAcaoLonga(null); }
+          });
+        }
+        return r;
+      };
+    }
     return v;
-  }, [dados, fonte, usuario, sincronizando, atualizadoEm, atualizar, aplicar, aplicarCom, bloquear]);
+  }, [dados, fonte, usuario, papel, hojeAtual, sincronizando, emAndamento, atualizadoEm, atualizar, aplicar, aplicarCom, bloquear, statusHistorico]);
 
   if (erro) {
     return (
@@ -555,8 +680,17 @@ export function PortalProvider({ children }: { children: ReactNode }) {
       </main>
     );
   }
-  if (!valor) return <Carregando texto="Carregando o portal…" />;
-  return <PortalContext.Provider value={valor}>{children}</PortalContext.Provider>;
+  if (!valor) return <Carregando texto="Carregando o portal…" telaCheia />;
+  return (
+    <PortalContext.Provider value={valor}>
+      {children}
+      {acaoLonga && (
+        <div className="overlayCarregando" role="alertdialog" aria-busy="true" aria-label={acaoLonga}>
+          <div className="overlayCartao"><span className="spinner" aria-hidden="true" /><b>{acaoLonga}</b><span className="sub">Aguarde, isso pode levar alguns segundos.</span></div>
+        </div>
+      )}
+    </PortalContext.Provider>
+  );
 }
 
 export function usePortal(): PortalValor {
