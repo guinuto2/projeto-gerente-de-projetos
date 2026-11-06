@@ -1,0 +1,124 @@
+--------------- TEMPLATE ---------------
+
+LOTE01: 
+	Item 01:
+	Item 02:
+	Item 03:
+
+QUESTIONAMENTOS:
+	Q1.:
+	Q2.:
+	
+ATESTADOS/DECLARAÇÕES (TÉCNICO):
+	ATESTADOS:
+	DECLARAÇÃO DO FABRICANTE:
+
+PAGAMENTO:
+
+OBSERVAÇÕES:
+
+COMPETITIVIDADE:
+	HP: 
+	Dell:
+	Lenovo:
+	SuperMicro:
+	xFusion:
+
+Obs.:
+
+COTAÇÕES ADICIONAIS:
+
+SIZING:
+
+SERVIÇOS:
+
+
+Data Licitação: 01/05/2024 às 10h00
+Modo De Disputa: ABERTO/FECHADO
+Valor Estimado (Cliente): N/A
+Valor Aproximado (Lista): R$
+
+
+
+--------------- EXEMPLO ---------------
+
+Lote01: 
+	36x unidades - Servidores Tipo I Virtualização – Ready Node
+
+Lote02: 
+	22x unidades - Servidores Tipo II Virtualização – Ready Node
+
+Lote03: 
+	Item01 – 4.608x unidades (CORE) - VCF-VSP-FND-1Y - VMware vSphere Foundation – 5 Anos
+	Item02 – 1.113x unidades (AddOn TiB) - VCF-VSAN-8 - Add-on VMware vSAN para o VVF
+
+Lote04:
+    11x unidades - Switches de Rede
+
+
+QUESTIONAMENTOS:
+	Q1.: Conforme análise do Termo de Referência, é informado no item 4.26 que “Os serviços de instalação deverão ser executados por profissionais qualificados e certificados pelo fabricante dos equipamentos, e a comprovação destes requisitos deverá ser emitida pelo fabricante e encaminhada à CONTRATANTE antes da aprovação do cronograma de execução dos serviços. Caso não haja certificado específico para o produto, o fabricante deverá atestar que a revenda é capacitada para prestar o serviço.”. Entendemos que os serviços de implementação a serem contratados nessa licitação somente se referem aos equipamentos, onde não será necessário a implementação de nenhum componente do Lote 03. Está correto nosso entendimento?
+
+	Ainda sobre os itens do Lote 03, entendemos que o suporte da solução deverá ser integralmente fornecido pelo fabricante da solução, está correto nosso entendimento?
+
+
+ATESTADOS/DECLARAÇÕES (TÉCNICO):
+    Termo de Referência:
+	9.28. Comprovação de aptidão para o fornecimento de bens similares de complexidade tecnológica e operacional equivalente ou superior com o objeto desta contratação, ou com o item pertinente, por meio da apresentação de certidões ou atestados, por pessoas jurídicas de direito público ou privado, ou regularmente emitido(s) pelo conselho profissional competente, quando for o caso.
+		9.28.1. Para fins da comprovação de que trata este subitem, os atestados deverão dizer respeito a contratos executados com as seguintes características mínimas:
+			9.28.1.1. Para o Grupo 1, pelo menos 15 (quinze) unidades de servidores de rede similares ao especificado neste Termo de Referência, com a prestação de garantia e suporte técnico por 60 (sessenta) meses.
+			9.28.1.2. Para o Grupo 2, pelo menos 10 (dez) unidades de servidores de rede similares ao especificado neste Termo de Referência, com a prestação de garantia e suporte técnico por 60 (sessenta) meses.
+			9.28.1.3. Para o Grupo 3, pelo menos 1.000 (mil) núcleos em licenças de virtualização similares às especificadas neste Termo de Referência.
+			9.28.1.4. Para o Grupo 4, pelo menos 4 (quatro) unidades de similares aos especificados switches neste Termo de Referência, com a prestação de garantia e suporte técnico por 60 (sessenta) meses.
+			9.28.1.5. Para o item 15 do Grupo 5, pelo menos 1 (uma) unidade de switch similar ao especificado neste Termo de Referência, com a prestação de garantia e suporte técnico por 60 (sessenta) meses.
+
+
+PAGAMENTO:
+	Edital:
+	5.5. Se o regime tributário da empresa implicar o recolhimento de tributos em percentuais variáveis, a cotação adequada será a que corresponde à média dos efetivos recolhimentos da empresa nos últimos doze meses.
+	5.6. Independentemente do percentual de tributo inserido na planilha, no pagamento serão retidos na fonte os percentuais estabelecidos na legislação vigente.
+
+	7.9.4. Será exigida garantia adicional do licitante vencedor cuja proposta for inferior a 85% (oitenta e cinco por cento) do valor orçado pela Administração, equivalente à diferença entre este último e o valor da proposta, sem prejuízo das demais garantias exigíveis de acordo com a Lei.
+
+    Termo de Referência:
+	1.4.1. A plurianualidade do contrato para o Grupo 3 justifica-se para que as subscrições com suporte para 60 (sessenta) meses sejam pagas anualmente, sem pagamento total antecipado (upfront).
+
+	4.48. Será exigida a garantia da contratação de que tratam os arts. 96 e seguintes da Lei nº 14.133, de 2021, no percentual e condições descritas nas cláusulas do contrato.
+		4.48.1. A garantia prevista neste subitem possui uma majoração, já incluída na alíquota do contrato, nos termos do art. 145, §2º, da Lei nº 14.133, de 2021.
+	4.49. Em caso opção pelo seguro-garantia, a parte adjudicatária deverá apresentá-la, no máximo, até a data de assinatura do contrato.
+	4.50. A garantia, nas modalidades caução e fiança bancária, deverá ser prestada em até 10 (dez) dias úteis após a assinatura do contrato.
+	4.51. O contrato oferece maior detalhamento das regras que serão aplicadas em relação à garantia da contratação.
+
+	8.19. Para os itens do Grupo 3 (Licenciamento de software VMware), o pagamento será realizado anualmente, a começar no início da execução contratual, em parcela correspondente ao valor anual da subscrição, até o limite de cinco anos, devendo a Nota Fiscal ser emitida após o respectivo recebimento definitivo.
+
+	10.5.7. Além disso, como por exigência de mercado imposta pela fabricante dos produtos (itens 9 e 10) comunicada à CONTRATANTE durante a fase de planejamento da contratação, os pagamentos deverão ocorrer anualmente, e não mensalmente, foi incluída no Contrato a exigência de acréscimo de 5% (cinco por cento) sobre o valor contratado para os itens 9 e 10, assim cumprindo o disposto no § 2º do art. 145 da citada Lei nº 14.133/2021. Caso o objeto do Grupo 3 não seja executado no prazo contratual, o valor eventualmente antecipado deverá ser devolvido.
+
+
+OBSERVAÇÕES:
+	Termo de Referência:
+	5.2.16. Encaminhar à equipe de fiscalização do contrato, observados os prazos estabelecidos no subitem 5.2.10 deste instrumento, documentação que evidencie, em alinhamento com os parâmetros do Capítulo V do Decreto nº 11.129, de 11 de julho de 2022, a realização das seguintes ações e atividades:
+		5.2.16.1. promoção e participação em reuniões, apresentações, palestras e quaisquer outros eventos de natureza semelhante que evidenciam o comprometimento da alta direção da empresa em temas relacionados à integridade;
+		5.2.16.2. mapeamento dos riscos de integridade e estabelecimento de ações mitigadoras, revisadas periodicamente;
+		5.2.16.3. canal de denúncia, aberto e amplamente divulgado, com garantia do devido sigilo ao denunciante;...
+		5.2.16.5. treinamentos periódicos sobre o Programa de Integridade, que envolvam as vedações incidentes na relação público-privada;
+		5.2.16.6. promoção de campanhas para divulgar os princípios e valores que regem a empresa contratada e o serviço público, bem como outros temas sobre integridade e combate a desvios de conduta, fraudes, irregularidades e atos ilícitos;
+		5.2.16.7. adoção de medidas disciplinares, em caso de violação do Programa de Integridade, e de procedimentos e determinações que assegurem a pronta interrupção da tentativa ou da prática de desvios de conduta, fraudes, irregularidades e atos ilícitos;
+		5.2.16.8. monitoramento contínuo do Programa de Integridade, com objetivo de aperfeiçoar os mecanismos de prevenção de atos lesivos, bem como sua detecção e combate; e
+		5.2.16.9. encaminhamento semestral de relatório da execução do Programa de Integridade à equipe de fiscalização do contrato.
+
+
+COMPETITIVIDADE:
+	DELL: Dell PowerEdge R860 e Dell PowerEdge R760
+	HPE: HPE ProLiant DL560 Gen11 e HPE ProLiant DL380 Gen11
+	SUPERMICRO: MP SuperServer SYS-241E-TNRTTP,  MP SuperServer SYS-241H-TNRTTP e Hyper SuperServer SYS-121H-TNR
+
+
+COTAÇÕES ADICIONAIS
+	Será necessário a cotação de PDUs para os servidores de 4x sockets devidos as fontes de energia utilizadas.
+
+
+
+Data Licitação: 11/12/2025 às 09h00
+Modo de Disputa: ABERTO
+Valor Estimado (Cliente): VMware (Lote 03) – R$37.603.057,80
+Valor Aproximado (Lista): USD 5.546.250,00

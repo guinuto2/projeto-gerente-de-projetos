@@ -29,6 +29,16 @@ export interface FonteDados {
   registrar(r: RegistroHistorico): Promise<void>;
   /** histórico do projeto, do mais recente para o mais antigo */
   historico(cod: string): Promise<RegistroHistorico[]>;
+  /** e-mails das pessoas que já têm acesso ao site no SharePoint (lista oculta "User Information List"); null se não der para ler */
+  usuariosDoSite?(): Promise<Set<string> | null>;
+  /** documentos da Wiki editados pelos técnicos (null se a lista "Portal Wiki" ainda não existe) */
+  wikiDocs?(): Promise<import('../lib/wiki').ModeloSalvo[] | null>;
+  /** grava (cria ou substitui) um documento da Wiki */
+  salvarWikiDoc?(d: import('../lib/wiki').ModeloSalvo): Promise<void>;
+  /** arquivos da biblioteca "Wiki Tecnicos" (null se a biblioteca ainda não existe) */
+  arquivosWiki?(): Promise<{ id: string; nome: string; tamanho: number; url: string; modificado: string }[] | null>;
+  /** conteúdo de um arquivo da biblioteca da Wiki, para baixar */
+  baixarArquivoWiki?(id: string): Promise<Blob>;
   /** exclui um arquivo da biblioteca (vai para a lixeira) */
   excluirArquivo?(cod: string, pasta: string, arquivo: Arquivo): Promise<void>;
   criarRisco(p: Projeto, r: Risco): Promise<Risco>;
@@ -54,10 +64,14 @@ export interface FonteDados {
   atualizarReuniaoTeams?(id: string, r: NovaReuniao, corpoHtml: string): Promise<void>;
   /** cancela a reunião; o Outlook manda o cancelamento aos convidados */
   cancelarReuniaoTeams?(id: string, mensagem: string): Promise<void>;
+  /** funções (App Roles) do Entra ID de quem entrou; ausente no piloto */
+  papeis?(): string[];
   /** horário atual das reuniões no calendário de quem está logado (só as que ele organiza); id → início 'aaaa-mm-ddThh:mm' */
   lerReunioes?(ids: string[]): Promise<Record<string, string>>;
   /** false quando a lista Portal Atividades ainda não tem as colunas da reunião (rodar o script) */
   reuniaoGravavel?(): boolean;
+  /** false quando Portal Atividades ainda não tem as colunas Lancada/Predecessoras (rodar o script) */
+  tarefasGravaveis?(): boolean;
   /** envia e-mail pela conta logada; devolve o destinatário (só no modo SharePoint) */
   enviarEmail?(assunto: string, html: string, para?: string): Promise<string>;
   /** só no piloto: grava o estado atual no navegador */

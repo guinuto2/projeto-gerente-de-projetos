@@ -1,35 +1,41 @@
 /**
- * Perfis de TESTE. Controlam só o que a tela mostra; quem garante a segurança de verdade
- * são as permissões do site no SharePoint (Membros / Visitantes).
+ * Perfis do portal. No modo conectado vêm das funções de aplicativo (App Roles) do Entra ID atribuídas
+ * à pessoa no app "Portal PMO"; no piloto, de um seletor de demonstração. Eles controlam o que a tela
+ * mostra; quem garante a segurança dos dados são as permissões do site no SharePoint.
  *
  * Fluxo: o PMO cadastra e conduz os projetos e solicita aprovações; o Patrocinador aprova.
  */
-export type Papel = 'Patrocinador' | 'PMO' | 'Técnico';
-export const PAPEIS: Papel[] = ['Patrocinador', 'PMO', 'Técnico'];
+export type Papel = 'Patrocinador' | 'PMO' | 'Técnico' | 'Cliente';
+export const PAPEIS: Papel[] = ['Patrocinador', 'PMO', 'Técnico', 'Cliente'];
 
 export type Acao =
   | 'criarProjeto' | 'editarProjeto' | 'excluirProjeto'
   | 'solicitarGate' | 'aprovarGate'
+  | 'aprovarCadastro'       // aprovar o cadastro de um projeto (G1)
   | 'gerenciarAtividades'   // incluir, excluir, mudar nome/fase/datas/marco
   | 'atualizarAtividade'    // status, % e observação
+  | 'criarSubatividade'     // incluir subatividade dentro de uma atividade (atualização semanal)
   | 'editarRisco' | 'responderPendencia' | 'enviarDocumento';
 
 const MATRIZ: Record<Papel, Acao[]> = {
-  // só aprova (gates e cadastros) e visualiza; não cria, não edita, não exclui
+  // só aprova os gates G2 a G4 e visualiza; não cria, não edita, não exclui
   Patrocinador: ['aprovarGate'],
   // cadastra, edita e conduz os projetos; envia para aprovação do patrocinador; exclui projetos
-  PMO: ['criarProjeto', 'editarProjeto', 'excluirProjeto', 'solicitarGate', 'gerenciarAtividades', 'atualizarAtividade', 'editarRisco', 'responderPendencia', 'enviarDocumento'],
-  'Técnico': ['atualizarAtividade', 'enviarDocumento']
+  PMO: ['criarProjeto', 'editarProjeto', 'excluirProjeto', 'aprovarCadastro', 'solicitarGate', 'gerenciarAtividades', 'atualizarAtividade', 'criarSubatividade', 'editarRisco', 'responderPendencia', 'enviarDocumento'],
+  'Técnico': ['atualizarAtividade', 'criarSubatividade', 'enviarDocumento'],
+  // só consulta os projetos do seu órgão: atividades, dashboard e cronograma
+  Cliente: []
 };
 
 export const DESCRICAO_PAPEL: Record<Papel, string> = {
-  Patrocinador: 'Aprova gates e cadastros de projeto e visualiza os projetos',
-  PMO: 'Cadastra, edita e exclui projetos, cronograma e riscos; solicita aprovação ao patrocinador',
-  'Técnico': 'Atualiza status, % e observação das atividades e envia documentos'
+  Patrocinador: 'Aprova os gates G2 a G4 e visualiza os projetos',
+  PMO: 'Cria projetos (já ativos), aprova cadastros de outros, edita e exclui; solicita os gates G2 a G4 ao patrocinador',
+  'Técnico': 'Atualiza as atividades, inclui subatividades e envia documentos',
+  Cliente: 'Acompanha os projetos do seu órgão: atividades, dashboard e cronograma'
 };
 
 /** Sigla exibida no cabeçalho conforme o perfil. */
-export const SIGLA_PAPEL: Record<Papel, string> = { Patrocinador: 'PAT', PMO: 'PMO', 'Técnico': 'TO' };
+export const SIGLA_PAPEL: Record<Papel, string> = { Patrocinador: 'PAT', PMO: 'PMO', 'Técnico': 'TO', Cliente: 'CLI' };
 
 export const pode = (papel: Papel, acao: Acao): boolean => MATRIZ[papel].includes(acao);
 
@@ -44,3 +50,9 @@ export function papelSalvo(): Papel {
   } catch { return 'PMO'; }
 }
 export function salvarPapel(p: Papel) { try { localStorage.setItem(CHAVE, p); } catch { /* sem armazenamento */ } }
+
+/** Converte o valor da função do Entra ID (App Role) no perfil do portal. Valores desconhecidos são ignorados. */
+export function papelDaFuncao(valor: string): Papel | null {
+  const v = valor.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+  return v === 'pmo' ? 'PMO' : v === 'patrocinador' ? 'Patrocinador' : v === 'tecnico' ? 'Técnico' : v === 'cliente' ? 'Cliente' : null;
+}

@@ -23,6 +23,12 @@ export interface PortalConfig {
   emailAoExcluirProjeto: boolean;
   /** avisa o gerente do projeto quando a atualização semanal passa a data prevista para depois da baseline */
   emailAoReprogramar: boolean;
+  /** avisa o PMO (gerente do projeto) quando o status de uma subatividade muda */
+  emailAoMudarStatusSubatividade: boolean;
+  /** avisa o PMO (gerente do projeto) quando atividades ou subatividades ficam atrasadas */
+  emailAoAtrasar: boolean;
+  /** avisa o técnico quando o PMO lança tarefas para ele */
+  emailAoLancarTarefa: boolean;
   /** endereço do portal usado nos links dos e-mails; vazio = o endereço aberto no navegador */
   urlPortal: string;
   /** caixa compartilhada que envia os e-mails (ex.: pmo@empresa.com.br); vazio = a conta logada */
@@ -54,6 +60,9 @@ export const config: PortalConfig = {
   emailAoAlterarReuniao: true,
   emailAoExcluirProjeto: true,
   emailAoReprogramar: true,
+  emailAoMudarStatusSubatividade: true,
+  emailAoAtrasar: true,
+  emailAoLancarTarefa: true,
   urlPortal: '',
   emailRemetente: '',
   emailPatrocinador: '',

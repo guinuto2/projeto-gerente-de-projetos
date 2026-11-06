@@ -66,7 +66,7 @@ export const TIPOS_REUNIAO: TipoReuniao[] = [
 export const tipoReuniao = (nome?: string) => TIPOS_REUNIAO.find(t => t.nome === nome);
 
 /** Funções possíveis na equipe do projeto (lista fechada). */
-export const FUNCOES_EQUIPE = ['Técnico', 'Gerente de projeto', 'Arquiteto', 'Responsável do cliente', 'Responsável do fornecedor', 'Patrocinador'];
+export const FUNCOES_EQUIPE = ['Técnico', 'Gerente de projeto', 'Arquiteto', 'Fiscal', 'Responsável do cliente', 'Responsável do fornecedor', 'Patrocinador'];
 
 /** Próximo código da sequência (R-7 → R-8, DA-A16 → DA-A17); usa o prefixo mais comum da lista. */
 export function proximoCodigoSeq(codigos: string[], prefixoPadrao: string): string {
@@ -96,3 +96,21 @@ export function codigoDaFase(codigos: string[], fase: Fase): string {
   const usados = codigos.map(c => new RegExp(`^${n}\\.(\\d+)$`).exec(c.trim())).filter((m): m is RegExpExecArray => !!m).map(m => Number(m[1]));
   return `${n}.${usados.length ? Math.max(...usados) + 1 : 0}`;
 }
+
+/** Próximo código de subatividade: 3.1 → 3.1.1, 3.1.2… */
+export function codigoSubatividade(codigos: string[], pai: string): string {
+  const nums = codigos.filter(c => c.startsWith(pai + '.') && c.split('.').length === pai.split('.').length + 1)
+    .map(c => Number(c.split('.').pop())).filter(n => !isNaN(n));
+  return `${pai}.${(nums.length ? Math.max(...nums) : 0) + 1}`;
+}
+
+/** Pasta da biblioteca correspondente à fase (01 · Iniciação … 05 · Encerramento). */
+export const pastaDaFase = (fase: Fase) => PASTAS[FASES.indexOf(fase)] || PASTAS[2];
+
+/** Modelos de faturamento do projeto e a regra de cada um (mostrada no cabeçalho do projeto). */
+export const MODELOS_FATURAMENTO = ['Edital', 'Service Entitlement', 'Sem receita'] as const;
+export const REGRA_FATURAMENTO: Record<string, string> = {
+  'Service Entitlement': 'Horas lançadas × valor/hora vigente; medição mensal automática no Financeiro.',
+  'Edital': 'Valor fixo do edital, faturado por parcela após TRD definitivo.',
+  'Sem receita': 'Sem receita; horas viram custo absorvido.'
+};

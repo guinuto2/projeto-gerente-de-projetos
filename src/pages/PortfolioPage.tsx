@@ -35,14 +35,14 @@ export function PortfolioPage() {
       <main className="main">
         {pode('excluirProjeto') && <PastasSemProjeto />}
         <IndicadoresPortfolio />
-        <div className="cols">
+        <div className={`cols ${papel === 'Cliente' ? 'colsCheia' : ''}`}>
           <section className="colMain">
             <div className="linha">
               <h2 className="h2" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>Projetos{fonte.modo === 'piloto' && <span className="selo">Piloto · datas fictícias</span>}</h2>
-              <Chips rotulo="Filtrar por fase" opcoes={FILTROS} valor={filtro} aoMudar={setFiltro} />
+              {papel !== 'Técnico' && papel !== 'Cliente' && <Chips rotulo="Filtrar por fase" opcoes={FILTROS} valor={filtro} aoMudar={setFiltro} />}
             </div>
-            <input className="ctl" type="search" data-busca="" placeholder="Buscar por código, nome, cliente ou GP" aria-label="Buscar projeto"
-              value={busca} onChange={e => setBusca(e.target.value)} />
+{papel !== 'Cliente' && <input className="ctl" type="search" data-busca="" placeholder="Buscar por código, nome, cliente ou GP" aria-label="Buscar projeto"
+              value={busca} onChange={e => setBusca(e.target.value)} />}
             <div className="grid2">{visiveis.map(p => <CardProjeto key={p.codigo} projeto={p} />)}</div>
             {!visiveis.length && (
               <Vazio>
@@ -55,11 +55,13 @@ export function PortfolioPage() {
             <Rascunhos projetos={rascunhos} />
             <ProjetosEncerrados projetos={encerrados} />
           </section>
+          {papel !== 'Cliente' && (
           <aside className="aside">
-            <ProximosMarcos />
-            <EmAndamento />
-            <AtividadesAtrasadas />
-          </aside>
+              {papel !== 'Técnico' && <ProximosMarcos />}
+              <EmAndamento />
+              <AtividadesAtrasadas />
+            </aside>
+          )}
         </div>
       </main>
     </>

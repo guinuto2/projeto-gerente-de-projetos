@@ -3,6 +3,7 @@ import type { Pendencia, Projeto } from '../../../types/models';
 import { usePortal } from '../../../state/PortalContext';
 import { useToast } from '../../../state/ToastContext';
 import { proximoCodigoSeq } from '../../../lib/constantes';
+import { Mensagem } from '../../ui/Mensagem';
 import { Drawer } from '../../ui/Drawer';
 
 /** Inclui (sem código) ou responde/exclui uma pendência (questionamento ao cliente). */
@@ -15,7 +16,7 @@ export function EditarPendencia({ projeto, codigo, aoFechar }: { projeto: Projet
   const [f, setF] = useState({
     codigo: p?.codigo || proximoCodigoSeq(lista.map(x => x.codigo), 'P-'),
     pergunta: p?.pergunta || '', detalhe: p?.detalhe || '', impacto: p?.impacto || '',
-    situacao: (p?.situacao || 'Aberta') as Pendencia['situacao'], resposta: p?.resposta || ''
+    situacao: (p?.situacao || 'Aberta') as Pendencia['situacao'], resposta: p?.resposta || '', prazo: p?.prazo || ''
   });
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState('');
@@ -26,10 +27,10 @@ export function EditarPendencia({ projeto, codigo, aoFechar }: { projeto: Projet
     setSalvando(true); setErro('');
     try {
       if (nova) {
-        await criarPendencia(projeto.codigo, { codigo: f.codigo.trim(), pergunta: f.pergunta.trim(), detalhe: f.detalhe.trim(), impacto: f.impacto.trim(), situacao: f.situacao, resposta: f.resposta.trim() });
+        await criarPendencia(projeto.codigo, { codigo: f.codigo.trim(), pergunta: f.pergunta.trim(), detalhe: f.detalhe.trim(), impacto: f.impacto.trim(), situacao: f.situacao, resposta: f.resposta.trim(), prazo: f.prazo || undefined });
         toast(`Pendência ${f.codigo.trim()} incluída.`);
       } else {
-        await salvarPendencia(projeto.codigo, p.codigo, { situacao: f.situacao, resposta: f.resposta.trim() });
+        await salvarPendencia(projeto.codigo, p.codigo, { situacao: f.situacao, resposta: f.resposta.trim(), prazo: f.prazo || undefined });
         toast('Alteração salva.');
       }
       aoFechar();
@@ -43,9 +44,10 @@ export function EditarPendencia({ projeto, codigo, aoFechar }: { projeto: Projet
   };
 
   return (
-    <Drawer aberto titulo={nova ? 'Nova pendência' : `${p.codigo} · ${p.pergunta}`} subtitulo={`${projeto.codigo} · Pendência / questionamento ao cliente`}
+    <Drawer aberto somenteLeitura={projeto.situacaoCadastro === 'Encerrado'} titulo={nova ? 'Nova pendência' : `${p.codigo} · ${p.pergunta}`} subtitulo={`${projeto.codigo} · Pendência / questionamento ao cliente`}
       salvando={salvando} erro={erro} aoFechar={aoFechar} aoSalvar={salvar} rotuloSalvar={nova ? 'Incluir pendência' : 'Salvar'}
-      acoes={!nova && <button type="button" className="btn perigo" disabled={salvando} onClick={excluir}>Excluir</button>}>
+      acoes={!nova && projeto.situacaoCadastro !== 'Encerrado' && <button type="button" className="btn perigo" disabled={salvando} onClick={excluir}>Excluir</button>}>
+      {projeto.situacaoCadastro === 'Encerrado' && <Mensagem tipo="info">Projeto encerrado: somente consulta.</Mensagem>}
       {nova ? (
         <>
           <label className="campo" style={{ maxWidth: 200 }}>Código<input className="ctl" value={f.codigo} onChange={muda('codigo')} /></label>
@@ -59,6 +61,9 @@ export function EditarPendencia({ projeto, codigo, aoFechar }: { projeto: Projet
           <div><div className="sub">Impacto</div><div style={{ fontSize: 14, marginTop: 2, lineHeight: 1.5 }}>{p.impacto || '—'}</div></div>
         </>
       )}
+      <label className="campo">Prazo para o cliente responder
+        <input className="ctl" type="date" value={f.prazo} onChange={e => setF(s => ({ ...s, prazo: e.target.value }))} />
+      </label>
       <label className="campo">Situação
         <select className="ctl" value={f.situacao} onChange={e => setF(s => ({ ...s, situacao: e.target.value as Pendencia['situacao'] }))}>
           <option>Aberta</option><option>Respondida</option>

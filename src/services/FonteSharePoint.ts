@@ -20,7 +20,10 @@ export const LISTAS = {
 type ChaveLista = keyof typeof LISTAS;
 
 type Campos = Record<string, unknown>;
-interface ItemLista { id: string; fields: Campos }
+interface ItemLista { id: string; fields: Campos; lastModifiedDateTime?: string; lastModifiedBy?: { user?: { displayName?: string; email?: string } } }
+
+/** Outra pessoa alterou o item depois que ele foi carregado: a gravação foi recusada para não apagar a mudança dela. */
+export class ConflitoEdicao extends Error { }
 interface ItemDrive {
   id?: string; name: string; webUrl: string; lastModifiedDateTime: string;
   lastModifiedBy?: { user?: { displayName?: string } }; file?: unknown; folder?: unknown;
@@ -38,7 +41,8 @@ function paraColunas(campos: Campos, mapa: Record<string, string>): Campos {
     const coluna = mapa[k];
     if (!coluna) continue;
     if (coluna.startsWith('Data')) out[coluna] = dataSp(v as string);
-    else if (coluna === 'Equipe' && Array.isArray(v)) out[coluna] = (v as MembroEquipe[]).map(e => [e.nome, e.funcao, e.empresa, e.email].join(' | ')).join('\n');
+    else if (coluna === 'Equipe' && Array.isArray(v)) out[coluna] = (v as MembroEquipe[]).map(e => [e.nome, e.funcao, e.empresa, e.email, e.telefone || ''].join(' | ').replace(/ \| $/, '')).join('\n');
+    else if (coluna === 'Predecessoras' && Array.isArray(v)) out[coluna] = (v as string[]).join(', ');
     else out[coluna] = Array.isArray(v) ? v.join('\n') : v;
   }
   return out;
@@ -49,7 +53,7 @@ const COLUNAS_PROJETO: Record<string, string> = {
   gerente: 'Gerente', arquiteto: 'Arquiteto', patrocinador: 'Patrocinador', contrato: 'Contrato',
   inicio: 'DataInicio', terminoBaseline: 'DataTerminoBaseline', terminoPrevisto: 'DataTerminoPrevista', objetivo: 'Objetivo',
   escopoIncluido: 'EscopoIncluido', escopoExcluido: 'EscopoExcluido', premissas: 'Premissas', dependencias: 'Dependencias', restricoes: 'Restricoes',
-  equipe: 'Equipe'
+  equipe: 'Equipe', dataAssinatura: 'DataAssinatura', modeloFaturamento: 'ModeloFaturamento', parceiro: 'Parceiro'
 };
 const COLUNAS_ATIVIDADE: Record<string, string> = {
   nome: 'Title', codigo: 'Codigo', fase: 'Fase', equipe: 'Equipe', duracao: 'Duracao', descricao: 'Descricao', marco: 'Marco',
@@ -57,7 +61,8 @@ const COLUNAS_ATIVIDADE: Record<string, string> = {
   status: 'Status', percentual: 'Percentual', pai: 'AtividadePai', observacao: 'Observacao',
   reuniaoUrl: 'ReuniaoTeams', reuniaoInicio: 'ReuniaoInicio', reuniaoId: 'ReuniaoId', reuniaoTipo: 'ReuniaoTipo',
   responsavel: 'ResponsavelEmail', dataReal: 'DataReal', dependeRdm: 'DependeRDM', numeroRdm: 'NumeroRDM', impedimento: 'Impedimento',
-  causaAtraso: 'CausaAtraso', horasRealizadas: 'HorasRealizadas', dataUltimaAtualizacao: 'DataUltimaAtualizacao', atualizadoPor: 'AtualizadoPor'
+  causaAtraso: 'CausaAtraso', horasRealizadas: 'HorasRealizadas', dataUltimaAtualizacao: 'DataUltimaAtualizacao', atualizadoPor: 'AtualizadoPor',
+  teveReuniao: 'TeveReuniao', realizado: 'Realizado', avisoAtraso: 'AvisoAtraso', lancada: 'Lancada', predecessoras: 'Predecessoras', horasPlanejadas: 'HorasPlanejadas'
 };
 const COLUNAS_GATE: Record<string, string> = {
   nome: 'Title', gate: 'Gate', situacao: 'Situacao', data: 'DataPrevista', info: 'Info',
@@ -117,6 +122,7 @@ export class FonteSharePoint implements FonteDados {
   private idTecnicos = '';
   private idHistorico = '';
   reuniaoGravavel() { return ['ReuniaoTeams', 'ReuniaoInicio', 'ReuniaoId'].every(c => this.colunasAtividades.has(c)); }
+  tarefasGravaveis() { return ['Lancada', 'Predecessoras'].every(c => this.colunasAtividades.has(c)); }
 
   /** Colunas que o site ainda não tem (rodar provisionar-portal.ps1 cria). */
   colunasAusentes = new Set<string>();
@@ -176,14 +182,18 @@ export class FonteSharePoint implements FonteDados {
         fase: (txt(f.Fase) || 'Iniciação') as Fase, farol: (txt(f.Farol) || 'Verde') as Projeto['farol'],
         situacaoCadastro: (txt(f.Situacao) || 'Rascunho') as Projeto['situacaoCadastro'],
         gerente: txt(f.Gerente), arquiteto: txt(f.Arquiteto), patrocinador: txt(f.Patrocinador), contrato: txt(f.Contrato),
+        dataAssinatura: isoDeDataHora(f.DataAssinatura as string) || undefined,
+        modeloFaturamento: txt(f.ModeloFaturamento) || undefined,
+        parceiro: txt(f.Parceiro) || undefined,
+        criadoPor: (it as { createdBy?: { user?: { email?: string; displayName?: string } } }).createdBy?.user?.email || (it as { createdBy?: { user?: { displayName?: string } } }).createdBy?.user?.displayName || undefined,
         inicio: isoDeDataHora(f.DataInicio as string), terminoBaseline: isoDeDataHora(f.DataTerminoBaseline as string),
         terminoPrevisto: isoDeDataHora(f.DataTerminoPrevista as string), objetivo: txt(f.Objetivo),
         escopoIncluido: linhas(txt(f.EscopoIncluido)), escopoExcluido: linhas(txt(f.EscopoExcluido)),
         premissas: linhas(txt(f.Premissas)), dependencias: linhas(txt(f.Dependencias)), restricoes: linhas(txt(f.Restricoes)),
         numeros: null,
         equipe: linhas(txt(f.Equipe)).map(l => {
-          const [nome = '', funcao = '', empresa = '', email = ''] = l.split('|').map(x => x.trim());
-          return { nome, funcao, empresa, email };
+          const [nome = '', funcao = '', empresa = '', email = '', telefone = ''] = l.split('|').map(x => x.trim());
+          return telefone ? { nome, funcao, empresa, email, telefone } : { nome, funcao, empresa, email };
         }),
         fases: []
       });
@@ -194,7 +204,7 @@ export class FonteSharePoint implements FonteDados {
     for (const it of A) {
       const f = it.fields, c = projetoDe(f); if (!c) continue;
       d.atividades[c].push({
-        _id: it.id, codigo: txt(f.Codigo), nome: txt(f.Title), fase: (txt(f.Fase) || 'Execução') as Fase, equipe: txt(f.Equipe),
+        _id: it.id, _modificado: it.lastModifiedDateTime || txt(f.Modified) || undefined, codigo: txt(f.Codigo), nome: txt(f.Title), fase: (txt(f.Fase) || 'Execução') as Fase, equipe: txt(f.Equipe),
         duracao: num(f.Duracao), descricao: txt(f.Descricao), marco: !!f.Marco,
         inicio: isoDeDataHora(f.DataInicio as string), termino: isoDeDataHora(f.DataTermino as string),
         baselineInicio: isoDeDataHora(f.DataBaselineInicio as string), baselineTermino: isoDeDataHora(f.DataBaselineTermino as string),
@@ -204,7 +214,12 @@ export class FonteSharePoint implements FonteDados {
         responsavel: txt(f.ResponsavelEmail) || undefined, dataReal: isoDeDataHora(f.DataReal as string) || undefined,
         dependeRdm: !!f.DependeRDM, numeroRdm: txt(f.NumeroRDM) || undefined, impedimento: !!f.Impedimento,
         causaAtraso: txt(f.CausaAtraso) || undefined, horasRealizadas: f.HorasRealizadas == null ? undefined : num(f.HorasRealizadas),
-        dataUltimaAtualizacao: isoDeDataHora(f.DataUltimaAtualizacao as string) || undefined, atualizadoPor: txt(f.AtualizadoPor) || undefined
+        dataUltimaAtualizacao: isoDeDataHora(f.DataUltimaAtualizacao as string) || undefined, atualizadoPor: txt(f.AtualizadoPor) || undefined,
+        teveReuniao: f.TeveReuniao === undefined ? undefined : !!f.TeveReuniao, realizado: txt(f.Realizado) || undefined,
+        avisoAtraso: txt(f.AvisoAtraso) || undefined,
+        lancada: f.Lancada === undefined || f.Lancada === null ? undefined : !!f.Lancada,
+        horasPlanejadas: f.HorasPlanejadas == null ? undefined : num(f.HorasPlanejadas),
+        predecessoras: txt(f.Predecessoras) ? txt(f.Predecessoras).split(/[,;\s]+/).filter(Boolean) : undefined
       });
     }
     for (const it of R) {
@@ -220,7 +235,7 @@ export class FonteSharePoint implements FonteDados {
       const f = it.fields, c = projetoDe(f); if (!c) continue;
       d.pendencias[c].push({
         _id: it.id, codigo: txt(f.Codigo), pergunta: txt(f.Title), detalhe: txt(f.Detalhe), impacto: txt(f.Impacto),
-        situacao: (txt(f.Situacao) || 'Aberta') as Pendencia['situacao'], resposta: txt(f.Resposta)
+        situacao: (txt(f.Situacao) || 'Aberta') as Pendencia['situacao'], resposta: txt(f.Resposta), prazo: isoDeDataHora(f.Prazo as string) || undefined
       });
     }
     for (const it of D) {
@@ -262,8 +277,33 @@ export class FonteSharePoint implements FonteDados {
 
   /* ------------------------------------------------------------ gravação */
 
+  /** última gravação feita por esta sessão em cada item (para não acusar conflito com as próprias mudanças) */
+  private gravadoAgora: Record<string, string> = {};
   async salvarAtividade(_cod: string, atv: Atividade, campos: Partial<Atividade>) {
+    await this.exigirSemConflito('atividades', atv._id, atv._modificado, 'esta atividade');
     await this.patchItem('atividades', atv._id, paraColunas(campos, COLUNAS_ATIVIDADE));
+    // guarda a hora oficial (do SharePoint) desta gravação: o relógio do computador pode estar diferente do servidor
+    if (atv._id) {
+      try {
+        const it = await this.graph.get<ItemLista>(`/sites/${this.siteId}/lists/${this.ids.atividades}/items/${atv._id}?$select=id,lastModifiedDateTime`);
+        if (it.lastModifiedDateTime) this.gravadoAgora[atv._id] = it.lastModifiedDateTime;
+      } catch { /* sem a hora oficial: a próxima conferência usa a hora carregada */ }
+    }
+  }
+  /** Confere se outra pessoa alterou o item depois de ele ter sido carregado (edição ao mesmo tempo). */
+  private async exigirSemConflito(k: keyof typeof this.ids, id: string | undefined, carregado: string | undefined, oque: string) {
+    if (!id || !carregado) return;
+    let it: ItemLista;
+    try { it = await this.graph.get<ItemLista>(`/sites/${this.siteId}/lists/${this.ids[k]}/items/${id}?$select=id,lastModifiedDateTime,lastModifiedBy`); }
+    catch { return; }   // sem como conferir: não bloqueia
+    const remoto = it.lastModifiedDateTime; if (!remoto) return;
+    const referencia = [carregado, this.gravadoAgora[id]].filter(Boolean).sort().pop()!;
+    if (new Date(remoto).getTime() <= new Date(referencia).getTime()) return;
+    const quem = it.lastModifiedBy?.user;
+    if (quem?.email && quem.email.toLowerCase() === this.auth.email().toLowerCase()) return;   // foi a própria pessoa (outra aba)
+    const min = Math.max(1, Math.round((Date.now() - new Date(remoto).getTime()) / 60000));
+    const hora = new Date(remoto).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    throw new ConflitoEdicao(`${quem?.displayName || 'Outra pessoa'} alterou ${oque} há ${min} minuto(s) (às ${hora}). Os dados foram recarregados: confira a versão nova e salve de novo.`);
   }
   async criarAtividade(p: Projeto, a: Atividade): Promise<Atividade> {
     const item = await this.postItem('atividades', { ...paraColunas(a as unknown as Campos, COLUNAS_ATIVIDADE), ProjetoLookupId: Number(p._id) });
@@ -295,11 +335,19 @@ export class FonteSharePoint implements FonteDados {
   /** Histórico: lista "Portal Historico" (o script cria). Erros sobem para o portal avisar e guardar o registro. */
   async registrar(r: RegistroHistorico) {
     const id = await this.listaHistorico();
+    const basicos = {
+      Title: r.descricao.slice(0, 250), Detalhe: r.descricao, ProjetoCodigo: r.projeto, TipoMudanca: r.tipo, Acao: r.acao, Usuario: r.usuario,
+      Quando: r.quando.replace(/\.\d{3}Z$/, 'Z')
+    };
+    const extras = { ...(r.item ? { ItemCodigo: r.item } : {}), ...(r.antes ? { Antes: r.antes } : {}), ...(r.depois ? { Depois: r.depois } : {}) };
     try {
-      await this.graph.post(`/sites/${this.siteId}/lists/${id}/items`, { fields: {
-        Title: r.descricao.slice(0, 250), Detalhe: r.descricao, ProjetoCodigo: r.projeto, TipoMudanca: r.tipo, Acao: r.acao, Usuario: r.usuario,
-        Quando: r.quando.replace(/\.\d{3}Z$/, 'Z')
-      } });
+      try { await this.graph.post(`/sites/${this.siteId}/lists/${id}/items`, { fields: { ...basicos, ...extras } }); }
+      catch (e) {
+        // colunas do acompanhamento ainda não criadas (script antigo): grava o registro sem elas
+        if (Object.keys(extras).length && /Field '(ItemCodigo|Antes|Depois)' is not recognized/i.test((e as Error).message)) {
+          await this.graph.post(`/sites/${this.siteId}/lists/${id}/items`, { fields: basicos });
+        } else throw e;
+      }
     } catch (e) {
       const msg = (e as Error).message;
       // coluna faltando: diz qual é
@@ -314,8 +362,71 @@ export class FonteSharePoint implements FonteDados {
       { Prefer: 'HonorNonIndexedQueriesWarningMayFailRandomly' });
     return itens.map(it => ({
       quando: txt(it.fields.Quando), usuario: txt(it.fields.Usuario), projeto: txt(it.fields.ProjetoCodigo),
-      tipo: txt(it.fields.TipoMudanca) || txt(it.fields.Tipo), acao: txt(it.fields.Acao), descricao: txt(it.fields.Detalhe) || txt(it.fields.Title)
+      tipo: txt(it.fields.TipoMudanca) || txt(it.fields.Tipo), acao: txt(it.fields.Acao), descricao: txt(it.fields.Detalhe) || txt(it.fields.Title),
+      item: txt(it.fields.ItemCodigo) || undefined, antes: txt(it.fields.Antes) || undefined, depois: txt(it.fields.Depois) || undefined
     })).sort((a, b) => b.quando.localeCompare(a.quando));
+  }
+  /** E-mails de quem já tem acesso ao site (lista oculta "User Information List"); null se não der para ler. */
+  async usuariosDoSite() {
+    await this.preparar();
+    try {
+      const itens = await this.graph.todos<{ fields: Record<string, unknown> }>(
+        `/sites/${this.siteId}/lists/${encodeURIComponent('User Information List')}/items?$expand=fields($select=EMail,UserName,Title)&$top=999`);
+      const s = new Set<string>();
+      for (const it of itens) for (const c of [it.fields.EMail, it.fields.UserName]) if (typeof c === 'string' && c.includes('@')) s.add(c.trim().toLowerCase());
+      return s.size ? s : null;
+    } catch { return null; }
+  }
+  /** Lista "Portal Wiki": um item por documento (o conteúdo vai em JSON na coluna Conteudo). */
+  private listaWiki: string | null | undefined;
+  private async idListaWiki(): Promise<string | null> {
+    await this.preparar();
+    if (this.listaWiki !== undefined) return this.listaWiki;
+    const listas = await this.graph.todos<{ id: string; displayName: string }>(`/sites/${this.siteId}/lists?$select=id,displayName`);
+    this.listaWiki = listas.find(x => x.displayName === 'Portal Wiki')?.id || null;
+    return this.listaWiki;
+  }
+  async wikiDocs() {
+    const id = await this.idListaWiki();
+    if (!id) return null;
+    const itens = await this.graph.todos<ItemLista>(`/sites/${this.siteId}/lists/${id}/items?$expand=fields&$top=500`);
+    return itens.map(it => {
+      let secoes: { titulo: string; itens: string[] }[] = [];
+      try { secoes = JSON.parse(txt(it.fields.Conteudo) || '[]'); } catch { /* conteúdo inválido */ }
+      return { id: txt(it.fields.DocId), titulo: txt(it.fields.Title), descricao: txt(it.fields.Descricao), secoes,
+        excluido: !!it.fields.Excluido, atualizadoPor: txt(it.fields.AtualizadoPor) || undefined, atualizado: txt(it.fields.Modified) || undefined, _item: it.id };
+    }).filter(d => d.id);
+  }
+  async salvarWikiDoc(d: import('../lib/wiki').ModeloSalvo) {
+    const id = await this.idListaWiki();
+    if (!id) throw new Error('A lista "Portal Wiki" não existe. Rode o script provisionar-portal.ps1 (sem -Piloto) e recarregue o portal');
+    const campos = { Title: d.titulo.slice(0, 250), DocId: d.id, Descricao: d.descricao, Conteudo: JSON.stringify(d.secoes), Excluido: !!d.excluido, AtualizadoPor: d.atualizadoPor || this.auth.email() };
+    const filtro = encodeURIComponent(`fields/DocId eq '${d.id.replace(/'/g, "''")}'`);
+    const atuais = await this.graph.todos<ItemLista>(`/sites/${this.siteId}/lists/${id}/items?$expand=fields&$filter=${filtro}`, { Prefer: 'HonorNonIndexedQueriesWarningMayFailRandomly' });
+    if (atuais[0]) await this.graph.pedir(`/sites/${this.siteId}/lists/${id}/items/${atuais[0].id}/fields`, { method: 'PATCH', json: campos });
+    else await this.graph.post(`/sites/${this.siteId}/lists/${id}/items`, { fields: campos });
+  }
+  /** Biblioteca "Wiki Tecnicos" (arquivos para os técnicos baixarem). */
+  private driveWiki: string | null | undefined;
+  private async idDriveWiki(): Promise<string | null> {
+    await this.preparar();
+    if (this.driveWiki !== undefined) return this.driveWiki;
+    const drives = await this.graph.todos<{ id: string; name: string }>(`/sites/${this.siteId}/drives?$select=id,name`);
+    this.driveWiki = drives.find(d => d.name === 'Wiki Tecnicos')?.id || null;
+    return this.driveWiki;
+  }
+  async arquivosWiki() {
+    const id = await this.idDriveWiki();
+    if (!id) return null;
+    const itens = await this.graph.todos<{ id: string; name: string; size?: number; webUrl: string; lastModifiedDateTime: string; file?: unknown }>(
+      `/drives/${id}/root/children?$select=id,name,size,webUrl,lastModifiedDateTime,file`);
+    return itens.filter(x => x.file).map(x => ({ id: x.id, nome: x.name, tamanho: x.size || 0, url: x.webUrl, modificado: x.lastModifiedDateTime }))
+      .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+  }
+  async baixarArquivoWiki(item: string) {
+    const id = await this.idDriveWiki();
+    if (!id) throw new Error('A biblioteca "Wiki Tecnicos" não existe. Rode o script provisionar-portal.ps1 (sem -Piloto).');
+    return this.graph.baixar(`/drives/${id}/items/${item}/content`);
   }
   async excluirArquivo(_cod: string, _pasta: string, arquivo: Arquivo) {
     await this.preparar();
@@ -325,7 +436,8 @@ export class FonteSharePoint implements FonteDados {
   async excluirRisco(_cod: string, r: Risco) { await this.graph.excluir(this.url('riscos', r._id)); }
   async criarPendencia(p: Projeto, x: Pendencia): Promise<Pendencia> {
     const item = await this.postItem('pendencias', {
-      Title: x.pergunta, ProjetoLookupId: Number(p._id), Codigo: x.codigo, Detalhe: x.detalhe, Impacto: x.impacto, Situacao: x.situacao, Resposta: x.resposta || ''
+      Title: x.pergunta, ProjetoLookupId: Number(p._id), Codigo: x.codigo, Detalhe: x.detalhe, Impacto: x.impacto, Situacao: x.situacao, Resposta: x.resposta || '',
+      ...(x.prazo ? { Prazo: x.prazo } : {})
     });
     return { ...x, _id: item.id };
   }
@@ -346,7 +458,7 @@ export class FonteSharePoint implements FonteDados {
       paraColunas(campos, { situacao: 'Situacao', mitigacao: 'Mitigacao', responsavel: 'Responsavel', probabilidade: 'Probabilidade', impacto: 'Impacto' }));
   }
   async salvarPendencia(_cod: string, p: Pendencia, campos: Partial<Pendencia>) {
-    await this.graph.patch(this.url('pendencias', p._id) + '/fields', paraColunas(campos, { situacao: 'Situacao', resposta: 'Resposta' }));
+    await this.graph.patch(this.url('pendencias', p._id) + '/fields', paraColunas(campos, { situacao: 'Situacao', resposta: 'Resposta', prazo: 'Prazo' }));
   }
   async salvarProjeto(p: Projeto, campos: Partial<Projeto>) {
     await this.patchItem('projetos', p._id, paraColunas(campos, COLUNAS_PROJETO));
@@ -541,6 +653,8 @@ export class FonteSharePoint implements FonteDados {
   }
 
   /** Lê o início atual das reuniões em lote. Reuniões de outro organizador (404) são ignoradas. */
+  papeis() { return this.auth.papeis(); }
+
   async lerReunioes(ids: string[]): Promise<Record<string, string>> {
     const token = await this.auth.tokenSilencioso(['Calendars.ReadWrite']);
     const resultado: Record<string, string> = {};
@@ -581,7 +695,7 @@ export class FonteSharePoint implements FonteDados {
   }
 
   async cancelarReuniaoTeams(id: string, mensagem: string): Promise<void> {
-    await this.calendario(`/me/events/${encodeURIComponent(id)}/cancel`, 'POST', { comment: mensagem || 'Reunião cancelada pelo Portal PMO.' });
+    await this.calendario(`/me/events/${encodeURIComponent(id)}/cancel`, 'POST', { comment: mensagem || 'Reunião cancelada pela Central Systech.' });
   }
 
   linkBiblioteca(cod?: string) {

@@ -1,20 +1,25 @@
 import { useEffect, useRef, useState } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import { usePortal } from '../../state/PortalContext';
 import { useToast } from '../../state/ToastContext';
 import { config } from '../../config/config';
 import { usePapel } from '../../state/PapelContext';
-import { DESCRICAO_PAPEL, PAPEIS, SIGLA_PAPEL, type Papel } from '../../lib/permissoes';
+import { DESCRICAO_PAPEL, SIGLA_PAPEL, type Papel } from '../../lib/permissoes';
+import { aplicarTema, temaSalvo, type Tema } from '../../lib/tema';
 
 const iniciais = (nome: string) => nome.split(/\s+/).filter(Boolean).slice(0, 2).map(p => p[0]).join('').toUpperCase() || '?';
 
 export function Cabecalho() {
+  // celular: o menu fica recolhido atrás do botão ☰ e fecha sozinho ao trocar de página
+  const [menuAberto, setMenuAberto] = useState(false);
+  const local = useLocation();
+  useEffect(() => { setMenuAberto(false); }, [local.pathname]);
   const { fonte, usuario, sincronizando, ocupado, atualizadoEm, atualizar, restaurarPiloto } = usePortal();
   const toast = useToast();
-  const { papel, trocar, pode } = usePapel();
+  const { papel, trocar, pode, disponiveis } = usePapel();
   const sigla = SIGLA_PAPEL[papel];
   // o título da aba do navegador acompanha o perfil
-  useEffect(() => { document.title = `${sigla} Systech · Escritório de Projetos`; }, [sigla]);
+  useEffect(() => { document.title = `${sigla} · Central Systech`; }, [sigla]);
   const piloto = fonte.modo === 'piloto';
   const classe = ({ isActive }: { isActive: boolean }) => (isActive ? 'ativo' : '');
 
@@ -22,15 +27,19 @@ export function Cabecalho() {
     <header className="header">
       {(ocupado || sincronizando) && <div className="barraCarregando" role="progressbar" aria-label="Carregando" />}
       <div className="headerIn">
-        <NavLink className="logo" to="/"><div className="marca" title={`Perfil: ${papel}`}>{sigla}</div><div className="logoTxt">Systech · Escritório de Projetos</div></NavLink>
-        <nav className="nav" aria-label="Portal">
+        <NavLink className="logo" to="/"><div className="marca" title={`Perfil: ${papel}`}>{sigla}</div><div className="logoTxt">Central Systech</div></NavLink>
+        <button type="button" className="menuBtn" aria-label={menuAberto ? 'Fechar o menu' : 'Abrir o menu'} aria-expanded={menuAberto} aria-controls="menu-portal"
+          onClick={() => setMenuAberto(v => !v)}>{menuAberto ? '✕' : '☰'}</button>
+        <nav id="menu-portal" className={`nav ${menuAberto ? 'aberto' : ''}`} aria-label="Portal">
           <NavLink to="/" end className={classe}>Portfólio</NavLink>
           {pode('criarProjeto') && <NavLink to="/novo" className={classe}>Novo projeto</NavLink>}
-          <NavLink to="/cronogramas" className={classe}>Cronogramas</NavLink>
+          {papel !== 'Cliente' && <NavLink to="/cronogramas" className={classe}>Cronogramas</NavLink>}
           {pode('atualizarAtividade') && <NavLink to="/atualizar" className={classe}>Atualizar status</NavLink>}
+          {papel === 'Técnico' && <NavLink to="/wiki" className={classe}>Wiki</NavLink>}
+          {(papel === 'PMO' || papel === 'Patrocinador') && <NavLink to="/financeiro" className={classe}>Financeiro</NavLink>}
         </nav>
         {config.dataSimulada && <span className="dataSimulada" title="config.js: dataSimulada">Data simulada · {config.dataSimulada.split('-').reverse().join('/')}</span>}
-        <MenuUsuario nome={piloto ? 'Modo piloto' : usuario} piloto={piloto} papel={papel}
+        <MenuUsuario nome={piloto ? 'Modo piloto' : usuario} piloto={piloto} papel={papel} disponiveis={disponiveis}
           status={piloto ? 'Modo piloto · sem conexão' : sincronizando ? 'SharePoint · atualizando…' : `SharePoint · atualizado às ${atualizadoEm}`}
           sincronizando={sincronizando}
           aoAtualizar={() => atualizar(true)}
@@ -48,11 +57,14 @@ export function Cabecalho() {
 interface MenuProps {
   nome: string; piloto: boolean; papel: Papel; status: string; sincronizando: boolean;
   aoAtualizar: () => void; aoTrocarPapel: (p: Papel) => void; aoSair: () => void; aoRestaurar: () => void;
+  disponiveis: Papel[];
 }
 
-/** Botão com as iniciais que abre um pequeno menu: Teams, SharePoint, atualizar, perfil de teste e sair. */
-function MenuUsuario({ nome, piloto, papel, status, sincronizando, aoAtualizar, aoTrocarPapel, aoSair, aoRestaurar }: MenuProps) {
+/** Botão com as iniciais que abre um pequeno menu: Teams, SharePoint, atualizar, modo escuro, perfil e sair. */
+function MenuUsuario({ nome, piloto, papel, disponiveis, status, sincronizando, aoAtualizar, aoTrocarPapel, aoSair, aoRestaurar }: MenuProps) {
   const [aberto, setAberto] = useState(false);
+  const [tema, setTema] = useState<Tema>(temaSalvo);
+  const trocarTema = () => { const t: Tema = tema === 'escuro' ? 'claro' : 'escuro'; setTema(t); aplicarTema(t); };
   const caixa = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!aberto) return;
@@ -86,10 +98,18 @@ function MenuUsuario({ nome, piloto, papel, status, sincronizando, aoAtualizar, 
               <span className="ico" aria-hidden="true">↻</span>{sincronizando ? 'Atualizando…' : 'Atualizar dados'}
             </button>
           )}
-          <label className="menuItem menuPerfil">
-            <span className="ico" aria-hidden="true">◐</span>Perfil de teste
-            <select value={papel} onChange={e => aoTrocarPapel(e.target.value as Papel)}>{PAPEIS.map(p => <option key={p}>{p}</option>)}</select>
-          </label>
+          <button role="menuitemcheckbox" aria-checked={tema === 'escuro'} type="button" className="menuItem" onClick={trocarTema}>
+            <span className="ico" aria-hidden="true">{tema === 'escuro' ? '☾' : '☀'}</span>Modo escuro
+            <span className={`interruptor ${tema === 'escuro' ? 'on' : ''}`} aria-hidden="true"><i /></span>
+          </button>
+          {disponiveis.length > 1 ? (
+            <label className="menuItem menuPerfil">
+              <span className="ico" aria-hidden="true">◐</span>{piloto ? 'Perfil (piloto)' : 'Perfil'}
+              <select value={papel} onChange={e => aoTrocarPapel(e.target.value as Papel)}>{disponiveis.map(p => <option key={p}>{p}</option>)}</select>
+            </label>
+          ) : (
+            <div className="menuItem menuPerfil" title="Perfil atribuído no Entra ID"><span className="ico" aria-hidden="true">◐</span>Perfil<b style={{ marginLeft: 'auto' }}>{papel}</b></div>
+          )}
           <div className="menuSep" />
           {piloto
             ? <button role="menuitem" type="button" className="menuItem" onClick={() => { setAberto(false); aoRestaurar(); }}><span className="ico" aria-hidden="true">⟲</span>Restaurar piloto</button>

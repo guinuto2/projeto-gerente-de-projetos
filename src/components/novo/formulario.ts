@@ -1,3 +1,4 @@
+import { faltasFaturamento } from '../../lib/validacoes';
 import type { Atividade, Dados, Fase, Gate, MembroEquipe, Nivel, NovoProjeto, Risco, SituacaoCadastro, Tecnico } from '../../types/models';
 import { tecnicoPorNome } from '../../lib/pessoas';
 import { dia, diasUteis, diaUtil, linhas, somarDiasUteis, hojeIso } from '../../lib/datas';
@@ -11,7 +12,7 @@ export interface LinhaRisco { codigo: string; descricao: string; probabilidade: 
 
 export interface FormProjeto {
   codigo: string; nome: string; cliente: string; tipo: string; gerente: string; arquiteto: string;
-  patrocinador: string; contrato: string; inicio: string; termino: string; objetivo: string;
+  patrocinador: string; contrato: string; dataAssinatura: string; modeloFaturamento: string; parceiro: string; inicio: string; termino: string; objetivo: string;
   escopoIncluido: string; escopoExcluido: string; premissas: string; dependencias: string; restricoes: string;
   atividades: LinhaAtividade[];
   riscos: LinhaRisco[];
@@ -31,7 +32,7 @@ export function renumerar(linhas: LinhaAtividade[]): LinhaAtividade[] {
 export const novoRisco = (n: number): LinhaRisco => ({ codigo: 'R-' + n, descricao: '', probabilidade: 'Médio', impacto: 'Médio', mitigacao: '', responsavel: '' });
 
 export const formVazio = (): FormProjeto => ({
-  codigo: '', nome: '', cliente: '', tipo: 'VMware', gerente: '', arquiteto: '', patrocinador: '', contrato: '',
+  codigo: '', nome: '', cliente: '', tipo: 'VMware', gerente: '', arquiteto: '', patrocinador: '', contrato: '', dataAssinatura: '', modeloFaturamento: '', parceiro: '',
   inicio: '', termino: '', objetivo: '', escopoIncluido: '', escopoExcluido: '', premissas: '', dependencias: '', restricoes: '',
   atividades: [novaAtividade([], 'Iniciação')], riscos: [novoRisco(1)], equipe: []
 });
@@ -42,8 +43,11 @@ export function validar(f: FormProjeto, d: Dados, hoje: string): string[] {
   const br = (s: string) => s.split('-').reverse().join('/');
   if (!f.codigo.trim()) e.push('informe o código');
   else if (d.projetos.some(p => p.codigo.toLowerCase() === f.codigo.trim().toLowerCase())) e.push('esse código já existe');
+  else if (!/^[A-Z0-9]+(?:-[A-Z0-9]+)+$/.test(f.codigo.trim())) e.push('o código deve seguir o padrão CLIENTE-SIGLA (ex.: TRF1-VCF)');
   if (!f.nome.trim()) e.push('informe o nome');
   if (!f.cliente.trim()) e.push('informe o cliente');
+  if (!f.modeloFaturamento) e.push('escolha o modelo de faturamento');
+  e.push(...faltasFaturamento(f));
   if (!f.gerente.trim()) e.push('informe o GP');
   if (!f.inicio || !f.termino) e.push('informe início e término');
   else if (f.inicio < hoje) e.push(`o início do projeto não pode ser antes de hoje (${br(hoje)})`);
@@ -51,6 +55,7 @@ export function validar(f: FormProjeto, d: Dados, hoje: string): string[] {
   if (!f.objetivo.trim()) e.push('descreva o objetivo');
   const at = f.atividades.filter(a => a.nome.trim());
   if (!at.length) e.push('inclua ao menos uma atividade');
+  if (f.equipe.some(m => /^fiscal$/i.test(m.funcao.trim()) && !(m.telefone || '').trim())) e.push('informe o telefone do fiscal');
   if (at.some(a => !a.inicio || !a.termino || a.termino < a.inicio)) e.push('confira as datas das atividades');
   else if (at.some(a => a.inicio < hoje)) e.push(`há atividades começando antes de hoje (${br(hoje)})`);
   return e;
@@ -73,7 +78,7 @@ export function montarProjeto(f: FormProjeto, situacao: SituacaoCadastro, aprova
   return {
     projeto: {
       codigo, nome: f.nome.trim(), cliente: f.cliente.trim(), tipo: f.tipo, fase: aprovacaoPmo ? 'Planejamento' : 'Iniciação', farol: 'Verde', situacaoCadastro: situacao,
-      gerente: f.gerente.trim(), arquiteto: f.arquiteto.trim(), patrocinador: f.patrocinador.trim(), contrato: f.contrato.trim(),
+      gerente: f.gerente.trim(), arquiteto: f.arquiteto.trim(), patrocinador: f.patrocinador.trim(), contrato: f.contrato.trim(), dataAssinatura: f.dataAssinatura || undefined, modeloFaturamento: f.modeloFaturamento || undefined, parceiro: f.parceiro.trim() || undefined,
       inicio: f.inicio, terminoBaseline: f.termino, terminoPrevisto: f.termino, objetivo: f.objetivo.trim(),
       escopoIncluido: linhas(f.escopoIncluido), escopoExcluido: linhas(f.escopoExcluido), premissas: linhas(f.premissas),
       dependencias: linhas(f.dependencias), restricoes: linhas(f.restricoes), numeros: null,
@@ -116,7 +121,7 @@ export function riscosModelo(): LinhaRisco[] {
 
 /** Equipe informada + GP e arquiteto (se ainda não estiverem na lista). */
 export function montarEquipe(f: FormProjeto, tecnicos: Tecnico[] = []): MembroEquipe[] {
-  const lista = f.equipe.filter(m => m.nome.trim()).map(m => ({ nome: m.nome.trim(), funcao: m.funcao.trim(), empresa: m.empresa.trim(), email: m.email.trim() }));
+  const lista = f.equipe.filter(m => m.nome.trim()).map(m => ({ nome: m.nome.trim(), funcao: m.funcao.trim(), empresa: m.empresa.trim(), email: m.email.trim(), ...(m.telefone?.trim() ? { telefone: m.telefone.trim() } : {}) }));
   const tem = (n: string) => lista.some(m => m.nome.toLowerCase() === n.toLowerCase());
   const extra: MembroEquipe[] = [];
   // gerente e arquiteto que estão na tabela de técnicos entram com o e-mail de lá
@@ -125,4 +130,18 @@ export function montarEquipe(f: FormProjeto, tecnicos: Tecnico[] = []): MembroEq
     extra.push({ nome: f.arquiteto.trim(), funcao: 'Arquiteto', empresa: 'Systech', email: f.arquitetoEmail || tecnicoPorNome(tecnicos, f.arquiteto)?.email || '' });
   }
   return [...extra, ...lista];
+}
+
+/**
+ * Coloca uma pessoa na equipe com a função indicada, sem repetir: se ela já está na equipe (mesmo e-mail ou nome),
+ * só troca a função daquela linha; se a função já tem outra pessoa (ex.: gerente), substitui; senão, acrescenta.
+ */
+export function colocarNaEquipe(equipe: FormProjeto['equipe'], funcao: string, nome: string, email: string): FormProjeto['equipe'] {
+  const n = (s: string) => s.trim().toLowerCase();
+  const mesma = (m: FormProjeto['equipe'][number]) => (!!email && n(m.email || '') === n(email)) || n(m.nome) === n(nome);
+  const i = equipe.findIndex(mesma);
+  if (i >= 0) return equipe.map((m, k) => (k === i ? { ...m, funcao, nome, email: email || m.email, empresa: m.empresa || 'Systech' } : m));
+  const j = equipe.findIndex(m => m.funcao === funcao && (funcao === 'Gerente de projeto' || funcao === 'Arquiteto'));
+  const pessoa = { nome, funcao, empresa: 'Systech', email };
+  return j >= 0 ? equipe.map((m, k) => (k === j ? { ...m, ...pessoa } : m)) : [...equipe, pessoa];
 }

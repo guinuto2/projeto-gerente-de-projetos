@@ -1,29 +1,49 @@
+import { useState } from 'react';
 import type { FormProjeto } from './formulario';
-import { TIPOS_PROJETO } from '../../lib/constantes';
-import { ativos, tecnicoPorNome } from '../../lib/pessoas';
+import { CODIGO_PADRAO, clienteParecido, normalizarCodigo } from '../../lib/validacoes';
+import { MODELOS_FATURAMENTO, REGRA_FATURAMENTO, TIPOS_PROJETO } from '../../lib/constantes';
+import { ativos, pessoasComPapel, tecnicoPorNome, tecnicosParaCadastro } from '../../lib/pessoas';
 import { usePortal } from '../../state/PortalContext';
 
 type Campo = keyof Omit<FormProjeto, 'atividades' | 'riscos' | 'equipe'>;
-interface Props { form: FormProjeto; mudar: (c: Campo, v: string) => void; edicao?: boolean; aoEscolherArquiteto?: (nome: string, email: string) => void; dataMinima?: string }
+interface Props { form: FormProjeto; mudar: (c: Campo, v: string) => void; edicao?: boolean; aoEscolherArquiteto?: (nome: string, email: string) => void; dataMinima?: string;
+  /** pessoa do app escolhida num campo (ex.: gerente): o cadastro a coloca na equipe com a função e o e-mail */
+  aoEscolherPessoa?: (funcao: string, nome: string, email: string) => void }
 
-export function PassoDadosGerais({ form, mudar, edicao = false, aoEscolherArquiteto, dataMinima }: Props) {
+export function PassoDadosGerais({ form, mudar, edicao = false, aoEscolherArquiteto, dataMinima, aoEscolherPessoa }: Props) {
   const { dados } = usePortal();
-  const tecnicos = ativos(dados.tecnicos || []);
+  // parceiros já usados em outros projetos (sugestões do campo)
+  const parceiros = Array.from(new Set(dados.projetos.map(p => p.parceiro).filter((x): x is string => !!x))).sort();
+  const { pessoasApp } = usePortal();
+  const tecnicos = tecnicosParaCadastro(ativos(dados.tecnicos || []), pessoasApp);
+  const pmos = pessoasComPapel(pessoasApp, 'PMO');
+  // clientes já usados: sugestões e aviso de nome parecido (ex.: "TRF 1" e "TRF1")
+  const clientes = Array.from(new Set(dados.projetos.map(p => p.cliente).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  const parecido = form.cliente.trim() ? clienteParecido(form.cliente, clientes) : null;
+  const [gerenteLivre, setGerenteLivre] = useState(false);
   const antesDeHoje = (v: string) => !!dataMinima && !!v && v < dataMinima;
   const campo = (c: Campo, rotulo: string, extra: { type?: string; placeholder?: string; span?: boolean; bloqueado?: boolean; min?: string } = {}) => (
     <label className="campo" style={extra.span ? { gridColumn: 'span 2' } : undefined}>{rotulo}
-      <input className={`ctl ${extra.type === 'date' && antesDeHoje(form[c] as string) ? 'erro' : ''}`} type={extra.type || 'text'} placeholder={extra.placeholder}
+      <input className={`ctl ${extra.type === 'date' && c !== 'dataAssinatura' && antesDeHoje(form[c] as string) ? 'erro' : ''}`} type={extra.type || 'text'} placeholder={extra.placeholder}
         value={form[c]} disabled={extra.bloqueado} min={extra.min}
         title={extra.bloqueado ? 'O código identifica o projeto e não pode ser alterado' : undefined} onChange={e => mudar(c, e.target.value)} />
-      {extra.type === 'date' && antesDeHoje(form[c] as string) && <span className="dica" style={{ color: '#9A2E12' }}>Não pode ser antes de hoje ({dataMinima!.split('-').reverse().join('/')}).</span>}
+      {extra.type === 'date' && c !== 'dataAssinatura' && antesDeHoje(form[c] as string) && <span className="dica" style={{ color: '#9A2E12' }}>Não pode ser antes de hoje ({dataMinima!.split('-').reverse().join('/')}).</span>}
     </label>
   );
   return (
     <>
       <div className="fg3">
-        {campo('codigo', 'Código do projeto *', { placeholder: 'ex.: TRF2-VCF', bloqueado: edicao })}
+        <label className="campo">Código do projeto *
+          <input className={`ctl ${form.codigo && !edicao && !CODIGO_PADRAO.test(form.codigo) ? 'erro' : ''}`} placeholder="ex.: TRF2-VCF" value={form.codigo} disabled={edicao}
+            title={edicao ? 'O código identifica o projeto e não pode ser alterado' : undefined} onChange={e => mudar('codigo', normalizarCodigo(e.target.value))} />
+          {!edicao && <span className="dica" style={form.codigo && !CODIGO_PADRAO.test(form.codigo) ? { color: '#9A2E12' } : undefined}>Padrão CLIENTE-SIGLA, em maiúsculas (ex.: TRF1-VCF).</span>}
+        </label>
         {campo('nome', 'Nome do projeto *', { span: true })}
-        {campo('cliente', 'Cliente *')}
+        <label className="campo">Cliente *
+          <input className="ctl" list="clientes-usados" value={form.cliente} onChange={e => mudar('cliente', e.target.value)} />
+          <datalist id="clientes-usados">{clientes.map(c => <option key={c} value={c} />)}</datalist>
+          {parecido && <span className="dica" style={{ color: '#8A5A00' }}>Parecido com “{parecido}”, já usado em outro projeto. <button type="button" className="linkBtn" onClick={() => mudar('cliente', parecido)}>Usar esse nome</button></span>}
+        </label>
         <label className="campo">Tipo
           <select className="ctl" value={form.tipo} onChange={e => mudar('tipo', e.target.value)}>
             {TIPOS_PROJETO.map(t => <option key={t}>{t}</option>)}
@@ -32,11 +52,45 @@ export function PassoDadosGerais({ form, mudar, edicao = false, aoEscolherArquit
           </select>
         </label>
         {campo('contrato', 'Contrato / pedido')}
-        {campo('gerente', 'Gerente de projeto *')}
+        {campo('dataAssinatura', 'Assinatura do contrato', { type: 'date' })}
+        <label className="campo">Modelo de faturamento *
+          <select className={`ctl ${!form.modeloFaturamento ? 'vazioObrig' : ''}`} value={form.modeloFaturamento} onChange={e => mudar('modeloFaturamento', e.target.value)}>
+            <option value="">Selecione</option>
+            {MODELOS_FATURAMENTO.map(m => <option key={m}>{m}</option>)}
+          </select>
+          {form.modeloFaturamento && <span className="dica">{REGRA_FATURAMENTO[form.modeloFaturamento]}</span>}
+        </label>
+        <label className="campo">Parceiro (terceirização)
+          <input className="ctl" list="parceiros-conhecidos" value={form.parceiro} placeholder="Deixe vazio se a execução for própria"
+            onChange={e => mudar('parceiro', e.target.value)} />
+          <datalist id="parceiros-conhecidos">{parceiros.map(x => <option key={x} value={x} />)}</datalist>
+          <span className="dica">Empresa que vai executar o trabalho, quando a Systech terceirizar.</span>
+        </label>
+        <label className="campo">Gerente de projeto *
+          {pmos.length > 0 && !gerenteLivre ? (
+            <select className={`ctl ${!form.gerente ? 'vazioObrig' : ''}`} value={pmos.some(p => p.nome === form.gerente) ? form.gerente : form.gerente ? '__atual' : ''}
+              onChange={e => {
+                if (e.target.value === '__outra') { setGerenteLivre(true); return; }
+                if (e.target.value === '__atual') return;
+                const p = pmos.find(x => x.nome === e.target.value);
+                mudar('gerente', e.target.value);
+                if (p && aoEscolherPessoa) aoEscolherPessoa('Gerente de projeto', p.nome, p.email);
+              }}>
+              <option value="">— selecione —</option>
+              {pmos.map(p => <option key={p.email || p.nome} value={p.nome}>{p.nome}</option>)}
+              {form.gerente && !pmos.some(p => p.nome === form.gerente) && <option value="__atual">{form.gerente} (fora da lista)</option>}
+              <option value="__outra">Outra pessoa (digitar o nome)…</option>
+            </select>
+          ) : (
+            <input className="ctl" value={form.gerente} onChange={e => mudar('gerente', e.target.value)} autoFocus={gerenteLivre} />
+          )}
+          {gerenteLivre && pmos.length > 0 && <button type="button" className="linkBtn" style={{ alignSelf: 'flex-start' }} onClick={() => setGerenteLivre(false)}>← escolher da lista de PMOs</button>}
+        </label>
         <label className="campo">Arquiteto
           <select className="ctl" value={form.arquiteto} onChange={e => {
             const t = tecnicoPorNome(tecnicos, e.target.value);
             if (aoEscolherArquiteto) aoEscolherArquiteto(e.target.value, t?.email || ''); else mudar('arquiteto', e.target.value);
+            if (t && aoEscolherPessoa) aoEscolherPessoa('Arquiteto', t.nome, t.email);
           }}>
             <option value="">— selecione —</option>
             {tecnicos.map(a => <option key={a.email || a.nome} value={a.nome}>{a.nome}</option>)}

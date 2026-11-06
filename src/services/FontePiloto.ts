@@ -50,6 +50,13 @@ export class FontePiloto implements FonteDados {
   async excluirProjeto() { /* em memória */ }
   async criarAtividade(_p: unknown, atv: Atividade) { return atv; }
   async excluirAtividade() { /* em memória */ }
+  async wikiDocs() {
+    try { return JSON.parse(localStorage.getItem('portal-pmo-wiki-docs') || '[]'); } catch { return []; }
+  }
+  async salvarWikiDoc(d: import('../lib/wiki').ModeloSalvo) {
+    const l = (await this.wikiDocs()).filter((x: { id: string }) => x.id !== d.id);
+    localStorage.setItem('portal-pmo-wiki-docs', JSON.stringify([...l, { ...d, atualizado: new Date().toISOString(), atualizadoPor: 'Modo piloto' }]));
+  }
   async registrar(r: RegistroHistorico) {
     try {
       const lista = JSON.parse(localStorage.getItem('portal-pmo-historico-v1') || '[]') as RegistroHistorico[];

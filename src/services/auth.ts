@@ -11,6 +11,9 @@ export interface Autenticador {
   tokenPara(escopos: string[]): Promise<string>;
   /** e-mail (UPN) de quem entrou */
   email(): string;
+  /** funções de aplicativo (App Roles) do Entra ID atribuídas à pessoa, como vieram no token (ex.: PMO, Tecnico) */
+  papeis(): string[];
+
   /** token sem nenhuma interação; null se precisar de consentimento (usado nas leituras automáticas) */
   tokenSilencioso(escopos: string[]): Promise<string | null>;
   sair(): Promise<void>;
@@ -58,7 +61,18 @@ export class AutenticadorMsal implements Autenticador {
       return new Promise<string>(() => { /* a página será redirecionada */ });
     }
     this.pca.setActiveAccount(this.conta);
+    // renova o token ao abrir: assim uma função atribuída depois do último login já vale, sem precisar sair e entrar
+    try {
+      const r = await this.pca.acquireTokenSilent({ scopes: ESCOPOS, account: this.conta, forceRefresh: true });
+      if (r.account) this.conta = r.account;
+      this.rolesToken = ((r.idTokenClaims || {}) as { roles?: string[] }).roles;
+    } catch { /* sem renovação silenciosa: usa as funções do token guardado */ }
     return this.conta.name || this.conta.username;
+  }
+
+  private rolesToken: string[] | undefined;
+  papeis(): string[] {
+    return this.rolesToken || ((this.conta?.idTokenClaims || {}) as { roles?: string[] }).roles || [];
   }
 
   async token(): Promise<string> {
@@ -107,6 +121,8 @@ export class AutenticadorTeste implements Autenticador {
   async token() { return 'token-de-teste'; }
   async tokenPara() { return 'token-de-teste'; }
   email() { return 'teste@gruposystech.onmicrosoft.com'; }
+  /** testes automatizados: as funções vêm de localStorage (portal-pmo-roles-teste), padrão PMO */
+  papeis() { try { return JSON.parse(localStorage.getItem('portal-pmo-roles-teste') || '["PMO"]'); } catch { return ['PMO']; } }
   async tokenSilencioso() { return 'token-de-teste'; }
   async sair() { /* nada */ }
 }

@@ -1,4 +1,303 @@
-# Portal do Escritório de Projetos — v3.46 (React)
+# Central Systech — v3.92 (React)
+
+**v3.92 — e-mails para o papel certo**
+- Pedido de aprovação dos gates G2–G4: patrocinador da equipe do projeto (senão, os patrocinadores da lista Portal Tecnicos).
+- Cadastro para aprovar: PMOs da lista Portal Tecnicos.
+- Avisos ao PMO (atrasos, reprogramação, status de tarefa): gerente do projeto (senão, os PMOs da lista).
+- Projeto criado/aprovado, gate aprovado e exclusão: gerente, patrocinador e equipe do projeto. Tarefa lançada: técnico responsável.
+- emailPatrocinador/emailPmo do config.js viram último recurso. O config.js vem com emailSomentePara e reuniaoSomentePara vazios
+  (modo de teste desligado: cada e-mail e convite vai para quem deve receber).
+
+
+**v3.91 — projeto encerrado é somente consulta:** sem "Atualizar status", "Liberar edição", "+ Subatividade", "Lançar",
+"+ Nova atividade", "+ Novo risco/pendência" e "Excluir" (o painel mostra "Projeto encerrado: somente consulta"); o Atualizar
+status só lista tarefas de projetos ativos; e qualquer gravação em atividade, risco, pendência, reunião ou gate de projeto
+encerrado é recusada. Documentos continuam podendo ser enviados.
+
+
+**v3.90:** removida a exigência do "Responsável do fornecedor" na equipe para projetos com Parceiro (o campo Parceiro e o selo "Terceirizado" continuam).
+
+**v3.89 — mais validações**
+- Aviso de técnico sobrecarregado: ao criar, editar ou lançar uma tarefa, mostra as outras tarefas abertas do mesmo técnico no
+  período (em todos os projetos).
+- Aviso de horas: planejadas acima de 8 h por dia útil do período; realizadas mais de 20% acima das planejadas.
+- Edital e Service Entitlement exigem número do contrato e data de assinatura (cadastro e edição).
+- Projeto com Parceiro exige o "Responsável do fornecedor" na equipe.
+
+
+**v3.88 — validações**
+- Status coerente (Atualizar status e painel): "Concluído" exige 100%, data real e horas; 100% só com "Concluído"; "Bloqueado"
+  exige impedimento = Sim e a observação; tarefa atrasada exige a causa; data real não pode ser futura nem antes do início;
+  horas realizadas não diminuem.
+- Datas: ao criar/editar, a atividade cabe no período do projeto e a tarefa no da atividade principal (bloqueia); ao reprogramar
+  no Atualizar status, só avisa. Datas em fim de semana geram aviso.
+- Gates: G3 só com as atividades da Execução concluídas/canceladas; G4 só com tudo concluído, riscos fechados/mitigados,
+  pendências respondidas e o termo de aceite (arquivo com "TRD" ou "termo de aceite" no nome) na pasta do projeto. O checklist
+  aparece no painel do gate e o botão só libera com tudo ✓.
+- Edição ao mesmo tempo: se outra pessoa alterou a atividade depois que ela foi carregada, a gravação é recusada ("Fulano alterou
+  esta atividade há N minutos") e os dados são recarregados.
+- Cadastro: código no padrão CLIENTE-SIGLA (convertido ao digitar); cliente com sugestões e aviso de nome parecido.
+- Risco alto exige plano de mitigação. Pendência ganha "Prazo"; aberta e vencida aparece em destaque (e no portfólio).
+- Script: coluna Prazo em Portal Pendencias.
+
+
+**v3.87 — celular:** cabeçalho em uma linha com menu ☰ (abre por baixo e fecha ao trocar de página); formulários com um campo
+por linha; Atualizar status sem rolagem lateral (botões do painel quebram linha); Wiki com a barra lateral na largura da tela.
+No computador nada muda.
+
+
+**v3.86**
+- Cadastro sem o aviso "Pessoas da lista/app" (e sem o PMO simulado do piloto).
+- Atualizar status: técnico e PMO entram normalmente; sem projeto em andamento, "+ Nova tarefa" e "+ Nova subatividade" ficam
+  bloqueados, com o aviso na página.
+- Equipe sem pessoas repetidas: escolher como gerente/arquiteto alguém que já está na equipe só troca a função daquela linha;
+  as listas escondem quem já está na equipe; a mesma pessoa (nome ou e-mail) em duas linhas impede a gravação.
+
+
+**v3.85**
+- Sem permissão extra no login: saem Application.Read.All e User.ReadBasic.All (podem ser removidas do app Portal PMO).
+- Pessoas do cadastro vêm da lista **Portal Tecnicos**, pela coluna Função: Técnico/Arquiteto (arquiteto e equipe), PMO ou
+  Gerente de projeto (gerente) e Patrocinador. A coluna aceita "PMO, Patrocinador" para quem acumula papéis (rode o script).
+- Conferência da equipe ao criar/editar projeto: e-mail inválido impede a gravação; avisos para e-mail diferente do cadastrado,
+  fora do domínio @systechtecnologia.com.br, repetido, sem e-mail, gerente que não é PMO, arquiteto que não é técnico, equipe sem
+  técnico e pessoas sem acesso ao site no SharePoint (lido da lista de usuários do site, com a permissão que o portal já tem).
+- Atualizar status fica bloqueado (menu e página) enquanto não houver projeto em andamento visível para a pessoa.
+
+
+**v3.84:** as permissões para ler as pessoas do app Portal PMO (Application.Read.All e User.ReadBasic.All) passam a ser pedidas
+no próprio login: ao abrir o site, se o token ainda não as tem, o portal redireciona uma vez (por sessão) e volta com acesso.
+Técnicos, arquitetos, PMO e patrocinadores vêm do Entra ID automaticamente, sem botão. Sem o consentimento do administrador,
+o portal segue normalmente com a lista Portal Tecnicos e mostra o motivo no cadastro.
+
+
+**v3.83:** cadastro/edição de projeto — o Gerente de projeto vira uma lista com quem tem o perfil PMO no app Portal PMO (com
+"Outra pessoa…" para digitar); ao escolher o gerente ou o arquiteto, a pessoa entra na equipe com a função e o e-mail. Um aviso
+no topo mostra quantas pessoas vieram do Entra ID ou o motivo da falha, com o botão "Conectar ao Entra ID" para pedir a permissão.
+
+
+**v3.82**
+- Wiki: o técnico edita os documentos (botão "Editar", editor com prévia ao vivo, "+ Novo" e "Excluir"). As edições vão para a
+  lista **Portal Wiki** (rode o script); os textos originais continuam como ponto de partida.
+- Atualizar status do técnico sem o campo "Teve reunião no Teams?".
+- Cadastro e edição de projeto: o portal lê quem está atribuído ao app **Portal PMO** no Entra ID — gerente de projeto sugere quem
+  tem o perfil PMO (e entra na equipe ao ser escolhido), a função Patrocinador lista quem tem o perfil Patrocinador e os técnicos
+  juntam os do app com a lista Portal Tecnicos. Requer as permissões delegadas do Microsoft Graph **Application.Read.All** e
+  **User.ReadBasic.All** no registro do app, com consentimento do administrador; sem elas, o cadastro usa só a lista Portal Tecnicos.
+
+
+**v3.81:** campo **Parceiro (terceirização)** no cadastro e na edição do projeto (opcional, com sugestões dos parceiros já
+usados); aparece no cabeçalho com o selo "Terceirizado" para PMO, patrocinador e técnico — escondido do cliente. Coluna
+Parceiro em Portal Projetos (rode o script). Conferido o progresso do dashboard do cliente (avanço ponderado, igual ao do PMO).
+
+
+**v3.80:** portfólio do cliente sem a barra de busca.
+
+**v3.79 — perfis pelo Entra ID**
+- Conectado, o perfil vem só das **funções de aplicativo (App Roles)** atribuídas à pessoa no app "Portal PMO" do Entra ID
+  (Aplicativos empresariais → Portal PMO → Usuários e grupos). Valores aceitos: `PMO`, `Patrocinador`, `Tecnico` e `Cliente`.
+- O seletor de teste saiu. Quem tem uma função entra direto nela; quem tem mais de uma escolhe entre elas no menu das iniciais;
+  quem não tem nenhuma vê "Você ainda não tem um perfil na Central Systech" (sem carregar dados nem rodar avisos automáticos).
+- O token é renovado ao abrir o portal, então uma função atribuída agora já vale no próximo acesso.
+- No modo piloto (sem login) o seletor continua, como "Perfil (piloto)", para demonstração.
+
+
+**v3.78 — perfil Cliente (CLI)**
+- Novo perfil **Cliente**, só de consulta. Vê os projetos ativos e encerrados do **seu órgão**: os projetos em que alguém da
+  equipe do lado do cliente tem o mesmo domínio de e-mail (ex.: @trf1.jus.br). No piloto, ou testando com conta da Systech,
+  simula o cliente do primeiro projeto ativo.
+- Portfólio só com os cards dos projetos (sem indicadores internos nem lateral); menu só com o Portfólio.
+- Dentro do projeto, três abas: **Atividades** (por fase, com as tarefas e filtro por situação), **Dashboard** (números, gráfico
+  de pizza das atividades por situação e últimas concluídas) e **Cronograma** (somente leitura). Não vê ciclo de vida, riscos,
+  pendências, documentos, histórico, acompanhamento interno, faturamento nem tarefas não lançadas.
+
+
+**v3.77:** cronograma do projeto (PMO): clicar numa atividade volta a abrir o painel lateral (como antes). O filtro por projeto e o botão "Editar atividade" em Atualizar status continuam.
+
+**v3.76**
+- Portfólio do patrocinador: cards dos projetos no mesmo estilo dos do técnico ("Abrir projeto →").
+- Atualizar status do PMO: filtro por projeto (como no técnico).
+- Cronograma do projeto (PMO): clicar numa atividade abre a mesma atividade em Atualizar status, já selecionada — se ela não
+  estiver entre as da semana, aparece fixada no topo ("aberta pelo cronograma"). O botão "Editar atividade" abre o painel
+  completo (nome, fase, datas, pré-requisito, reunião, lançar tarefas). O patrocinador continua abrindo o painel de leitura.
+
+
+**v3.75:** nomes dos arquivos da Wiki — no disco os arquivos ficam sem acento (`public/wiki/arquivos` e
+`provisionamento/wiki-arquivos`, ex.: `instrucoes-trello.pdf`) e são exibidos e baixados com o nome certo ("Instruções TRELLO.pdf").
+O script envia para a biblioteca Wiki Tecnicos com o nome certo e manda para a lixeira os arquivos enviados antes com o nome
+quebrado; a Wiki também corrige na tela nomes quebrados vindos do SharePoint. O pacote passa a marcar os nomes como UTF-8.
+
+
+**v3.74:** Wiki — o "Baixar para Word" grava os acentos como entidades HTML (&#231;…), então o Word mostra os acentos certos
+qualquer que seja a codificação que ele escolher ao abrir o arquivo (antes podia aparecer "QualificaÃ§Ã£o").
+
+
+**v3.73 — pasta de arquivos na Wiki do técnico**
+- Novo grupo **Arquivos** na barra lateral da Wiki (abaixo de Fabricantes), com os 8 arquivos da equipe técnica (instruções
+  do Trello e da resposta de e-mail de edital, Modelo-PaP, resumo de cotações, template de apresentação, template de e-mail e
+  templates de sugestões). Cada um abre com descrição, tamanho e "Baixar"; o .txt mostra o conteúdo; a busca inclui os arquivos.
+- O script cria a biblioteca **Wiki Tecnicos** no SharePoint e envia os arquivos da pasta `provisionamento/wiki-arquivos`.
+  Conectado, o portal lista o que estiver na biblioteca (dá para incluir/trocar arquivos direto no SharePoint) e mostra
+  "Abrir no SharePoint"; sem a biblioteca (ou no piloto), usa a cópia que vem junto com o portal (`public/wiki/arquivos`).
+
+
+**v3.72:** Wiki — números dos passos sem o fundo vermelho; a busca procura dentro do texto dos documentos (sem diferenciar acentos
+e maiúsculas), mostra os resultados com os trechos encontrados e marca o termo no documento aberto; a Wiki é exclusiva do
+perfil Técnico (PMO e patrocinador não acessam nem pelo endereço).
+
+
+**v3.71:** Wiki do técnico — novos documentos "Questionamento servidores" (Q6, peças remanufaturadas OEM), "Coleta de dados Via
+Live Optics" (passo a passo, com o link a preencher em destaque) e "Disposicionar Dell" (Memory Tiering / VROC). Os documentos
+mostram passos numerados, subtítulos, "Obs." (amarelo), "NOTA" (azul) e trechos a preencher (vermelho), também no Word.
+
+
+**v3.70:** Wiki do técnico — o documento passa a se chamar "VMware - qualificações e questionamentos" e entra o documento
+"Qualificações servidores Dell + HPE + Lenovo" (BIOS/segurança, gerenciamento, sistemas operacionais, certificações NVIDIA e
+treinamento). As linhas "Obs.:" aparecem destacadas como observação interna (na tela e no Word).
+
+
+**v3.69:** Wiki do técnico — os documentos modelo padrão saíram; no lugar, um único documento "Qualificação técnica — VMware"
+(credenciamento, quadro de profissionais, gerente PMP, documentação, treinamento e os modelos de questionamentos: Qualificação
+como Expert, Suporte técnico em português modelos 01 e 02, e Subcontratação). Conteúdo em `src/lib/wiki.ts`.
+
+
+**v3.68:** o site passa a se chamar **Central Systech** (cabeçalho, aba do navegador, caminho das páginas, assunto e rodapé dos e-mails, documentos da Wiki e aviso de reunião cancelada). As mensagens de erro do Entra ID continuam citando o app "Portal PMO", que é o nome do aplicativo cadastrado.
+
+**v3.67 — Wiki do técnico**
+- Novo item **Wiki** no menu do técnico (ao lado de Atualizar status). Barra lateral com busca, **Documentos modelo**
+  (ata de reunião, relatório de atividade, checklist de implantação, plano de rollback, relatório de evidências, termo de
+  aceite/TRD e solicitação de mudança/RDM — com "Baixar para Word" e "Copiar texto") e **Fabricantes** (Dell, VMware,
+  Lenovo, Omnissa, Processadores e Servidores — sites importantes e dicas).
+- Os links dos fabricantes são fictícios (example.com). Conteúdo editável em `src/lib/wiki.ts`.
+
+
+**v3.66:** card de projeto do técnico: o tipo do projeto ocupa o lugar do gerente no bloco em destaque; o gerente aparece discreto no rodapé ("GP: …").
+
+**v3.65:** técnico sem a aba Dashboard no projeto; card de projeto do técnico no portfólio com novo visual (faixa vinho no topo, código e tipo em selos, cliente e gerente em destaque com ícone e iniciais, "Abrir tarefas do projeto").
+
+**v3.64 — perfil Técnico**
+- Portfólio: card só com nome, cliente, tipo e gerente (sem fases, farol e números); no topo só "Projetos ativos"; sem
+  filtros de fase e sem "Próximos gates e marcos"; a lateral mostra só tarefas ("Tarefas em andamento agora" e "Tarefas atrasadas").
+- Projeto: sem acesso ao ciclo de vida — a aba "Cronograma" saiu e o projeto abre direto em "Tarefas".
+- Cronogramas: sem a bolinha à esquerda das tarefas.
+- Tarefas em vermelho quando atrasadas e em amarelo quando vencem em até 3 dias úteis (aba Tarefas, Atualizar status e Cronogramas).
+
+
+**v3.63**
+- Projeto: Pendências e Decisões juntas numa aba ("Pendências e decisões"; o técnico vê só Decisões).
+- Técnico: a aba "Cronograma" volta a mostrar o gráfico (sem as tarefas não lançadas); a lista de tarefas fica na aba "Tarefas".
+- Dashboard: legenda de cores acima de cada gráfico; horas no formato realizadas/planejadas.
+- **Horas planejadas** na atividade/subatividade (campo do PMO; coluna HorasPlanejadas — rode o script).
+- Portfólio: cada card mostra atrasadas, aguardando pré-requisito, críticas (critério a definir) e horas realizadas/planejadas ("24/80 h").
+
+
+**v3.62:** o cabeçalho do projeto mostra o campo "Modelo de faturamento" (abaixo de "Assinatura do contrato" e acima da "Regra").
+
+**v3.61**
+- Cronogramas do técnico: a tarefa dele é marcada com uma bolinha vermelha (no lugar do selo "minha").
+- **Modelo de faturamento** (obrigatório no cadastro e na edição): Edital, Service Entitlement ou Sem receita. O cabeçalho
+  do projeto mostra o modelo e, logo abaixo de "Assinatura do contrato", a **Regra** de cada modelo.
+- **Dashboard** do projeto (nova aba): atividades, progresso, horas realizadas e itens críticos (critério a definir), e
+  gráficos de barras de atividades por status, faixas de progresso e horas lançadas por mês (a partir do acompanhamento).
+- Rode `provisionar-portal.ps1` (sem `-Piloto`) para criar a coluna ModeloFaturamento.
+
+
+**v3.60**
+- Pré-requisito: um único campo de seleção no painel da atividade/subatividade ("— nenhum —" ou a atividade da qual depende).
+- Lançar para o técnico mais à vista: faixa "N tarefas em preparação" no topo do cronograma do PMO, com a janela
+  "Ver e lançar" para marcar e lançar; o painel da tarefa mostra se ela já foi lançada.
+- Sem as colunas Lancada/Predecessoras no SharePoint, o portal avisa para rodar o script (antes, ignorava em silêncio).
+
+
+**v3.59 — tarefas em preparação e pré-requisitos**
+- O PMO cria tarefas/subatividades **em preparação** (o técnico não vê) e as lança depois: "Lançar para o técnico" no
+  painel da tarefa ou "Lançar N tarefas" no painel da atividade principal (ou "Lançar para o técnico agora" ao criar).
+  Ao lançar, o técnico responsável recebe um e-mail com as tarefas dele (`emailAoLancarTarefa`). Tarefas criadas pelo
+  próprio técnico e as antigas já contam como lançadas.
+- **Pré-requisitos:** no painel da atividade/subatividade, o PMO escolhe de quais outras ela depende (o portal não deixa
+  criar ciclo). Enquanto algum pré-requisito não estiver concluído, ela não pode ser iniciada nem concluída — vale em
+  qualquer tela. Listas e cronograma mostram "aguarda pré-req."; o painel mostra cada pré-requisito com ✓/○.
+- Rode `provisionar-portal.ps1` (sem `-Piloto`) para criar as colunas Lancada e Predecessoras.
+
+
+**v3.58:** lista de tarefas do técnico: a primeira linha também escurece no hover e cada tarefa mostra o código do projeto. Portfólio: "Atividades em andamento agora" mostra as tarefas (subatividades) em andamento, não mais as atividades principais.
+
+**v3.57:** lista de tarefas do técnico: sem a janela de informações ao passar o mouse; a linha só escurece.
+
+**v3.56:** lista de tarefas do técnico: janela com as datas ao passar o mouse; ao clicar, o painel mostra as informações e o botão "Atualizar status", que abre a tarefa já selecionada (na página certa) em Atualizar status.
+
+**v3.55:** aba "Cronograma" do técnico: só as tarefas (subatividades) do projeto, numa lista única (abertas da mais atrasada para a mais distante, concluídas no fim), com fonte menor.
+
+**v3.54**
+- Técnico, dentro do projeto: a lista "Atividades e tarefas" é o conteúdo da aba "Cronograma" (o gráfico saiu) e inclui as
+  tarefas concluídas (no fim de cada atividade; atividades totalmente concluídas no fim da lista).
+- **% da atividade principal calculado, não editável:** proporção das subatividades/tarefas concluídas (canceladas não
+  contam) — incluir uma tarefa nova faz o % cair até ela ser concluída. Sem subatividades: 0% até a atividade ser
+  concluída (100%). As subatividades continuam com o próprio % editável.
+
+
+**v3.53**
+- Cronogramas do técnico: todas as tarefas abertas dos projetos em que ele está (as dele com o selo "minha").
+- **Aviso de atraso ao PMO:** uma vez por dia, ao abrir o portal, o PMO (gerente) de cada projeto recebe um e-mail com as
+  atividades/subatividades que passaram do término previsto. Cada atraso é avisado uma vez (coluna AvisoAtraso); se a
+  atividade for remarcada e atrasar de novo, avisa de novo. Desliga com `emailAoAtrasar: false`.
+- PMO e patrocinador: a aba "Cronograma" do projeto passa a se chamar "Ciclo de vida".
+- Técnico dentro do projeto: no lugar do ciclo de vida, a lista de atividades e tarefas ligadas, da mais atrasada para a
+  mais distante; a aba continua "Cronograma".
+- Rode `provisionar-portal.ps1` (sem `-Piloto`) para criar a coluna AvisoAtraso.
+
+
+**v3.52**
+- "Atualizar status": "+ Nova tarefa" no cabeçalho da página (abre numa janela); "Atualizar status da tarefa" no canto
+  superior direito do painel, sem o lápis.
+- Mudar a fase de uma atividade pede confirmação; as subatividades acompanham a nova fase e **mantêm progresso, datas,
+  status e responsáveis** (antes, ao salvar a principal, as subatividades eram sobrescritas com os dados dela).
+- Cronogramas do técnico: o mesmo calendário por projeto, mas só com as tarefas (subatividades) dele em andamento ou a
+  fazer, sem as fases.
+
+
+**v3.51**
+- "Atualizar status": título novo (sem o texto da semana) e lista paginada (5 por página).
+- Técnico: as subatividades aparecem como **Tarefas** ("Tarefas 4", "+ Nova tarefa"); o cartão mostra só o título, o projeto
+  e a data prevista; filtro por projeto; atrasadas primeiro e depois as mais próximas de hoje.
+- Acompanhamento começa fechado: cada linha mostra a ação, a data e quem fez; clicando, aparecem as mudanças.
+- Cronograma: atividade/subatividade em andamento com a barra inteira escura (preta na parte feita).
+
+
+**v3.50 — acompanhamento das subatividades**
+- Atualização semanal: a subatividade abre só para leitura (informações, documentos e acompanhamento); o botão
+  **"✎ Atualizar status da subatividade"** libera o formulário, que volta para a leitura ao salvar ou cancelar.
+- **Acompanhamento** (técnico, PMO e patrocinador): cada atualização grava como a atividade estava **antes** e como ficou
+  **depois**; a linha do tempo mostra os campos que mudaram (antes riscado → depois) e "Ver como estava antes" com o
+  retrato completo. Aparece na atualização semanal, no painel da atividade e na nova aba **Acompanhamento** do projeto
+  (subatividades agrupadas pela atividade principal, com filtro abertas/concluídas/todas).
+- **E-mail ao PMO** (gerente do projeto) quando o status de uma subatividade muda (`emailAoMudarStatusSubatividade`).
+- Rode `provisionar-portal.ps1` (sem `-Piloto`) para criar as colunas ItemCodigo, Antes e Depois em Portal Historico.
+
+
+**v3.49:** em "Atualizar status", o **técnico** vê só as **subatividades** abertas dos projetos em que está (as dele primeiro,
+marcadas "minha"); o botão "+ Nova subatividade" no topo da lista deixa escolher o projeto e a atividade principal.
+O PMO continua vendo as atividades da semana.
+
+
+**v3.48 — subatividades na atualização semanal**
+- Cronograma: subatividades mostram código, status e o selo da reunião do Teams (como as atividades).
+- PMO cria a subatividade indicando o **técnico responsável**; o técnico a vê em "Atualizar status" (mesmo fora da semana).
+- Em "Atualizar status", o técnico (e o PMO) pode: incluir **subatividade** dentro da atividade (código automático e ele
+  mesmo como responsável), informar se **teve reunião no Teams**, as **horas** e **o que foi feito**, e **adicionar
+  documentos** — que vão para a pasta da fase da atividade, com o código no início do nome (ex.: "3.1.1 - relatorio.pdf").
+- Rode `provisionar-portal.ps1` (sem `-Piloto`) para criar as colunas TeveReuniao e Realizado.
+
+
+**v3.47**
+- **Modo escuro:** interruptor "Modo escuro" no menu das iniciais; a escolha fica salva no navegador e é aplicada ao
+  abrir o portal (sem piscar claro).
+- **Data de assinatura do contrato** no cadastro, na edição e no cabeçalho do projeto (coluna DataAssinatura — rode o script).
+- **Fiscal** nas funções da equipe e coluna **Telefone** na equipe (obrigatória para o fiscal).
+- **Criação de projeto sem aprovação do patrocinador:** o PMO cria o projeto já ativo (G1 aprovado por ele). Cadastros
+  de outras pessoas que ficarem "Em aprovação" são aprovados pelo PMO. Os gates G2 a G4 continuam com o patrocinador.
+- **Reunião do Teams:** "+ Convidar outra pessoa" para incluir convidados de fora da equipe, um e-mail por campo.
+- **Financeiro** no menu do PMO e do patrocinador (página reservada, em construção).
+
 
 **v3.46:** sem a dica "Automático: …" embaixo do código da atividade; "Rascunhos" e "Projetos encerrados" começam fechadas.
 

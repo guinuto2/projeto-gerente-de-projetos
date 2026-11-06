@@ -34,7 +34,7 @@ export function ProjetosEncerrados({ projetos }: { projetos: Projeto[] }) {
                     <td>{p.tipo}</td>
                     <td>{p.gerente || '—'}</td>
                     <td className="mono">{dma(encerradoEm(p))}</td>
-                    <td className="mono" style={{ color: dv > 0 ? '#9A2E12' : 'inherit' }}>{dv > 0 ? `+${dv} d` : dv < 0 ? `${dv} d` : 'no prazo'}</td>
+                    <td className="mono" style={{ color: dv > 0 ? 'var(--txt-erro)' : 'inherit' }}>{dv > 0 ? `+${dv} d` : dv < 0 ? `${dv} d` : 'no prazo'}</td>
                   </tr>
                 );
               })}

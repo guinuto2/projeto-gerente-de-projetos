@@ -1,24 +1,38 @@
 /**
  * Cores da identidade Systech usadas em estilos dinâmicos (Gantt, ciclo de vida, gates).
- * As mesmas cores estão como variáveis em styles/global.css.
+ * São variáveis CSS (definidas em styles/global.css) para acompanhar o modo claro/escuro.
  * Verde, amarelo e vermelho continuam reservados ao farol e aos status.
  */
 export const TEMA = {
-  preto: '#0B0E13',
-  grafite: '#202020',
-  cinzaMarca: '#54595F',
-  vinho: '#7E181C',
-  vinhoClaro: '#F6E9EA',
-  vinhoBorda: '#D9A9AC',
-  texto: '#181D23',
-  suave: '#575A5F',
-  borda: '#E3E4E6',
+  preto: 'var(--preto)',
+  grafite: 'var(--grafite)',
+  cinzaMarca: 'var(--cinzaMarca)',
+  vinho: 'var(--vinho)',
+  vinhoClaro: 'var(--vinhoClaro)',
+  vinhoBorda: 'var(--vinhoBorda)',
+  texto: 'var(--texto)',
+  suave: 'var(--suave)',
+  borda: 'var(--borda)',
   /* cronograma */
-  barraFundo: '#E6E7E9',
-  concluido: '#1F8A5B',   // verde: atividade concluída
-  emCurso: '#202020',
-  atrasado: '#C0392B',
-  atrasadoFundo: '#F3C9C2',
-  baseline: '#B9BCC1',
-  futuro: '#E3E4E6'
+  barraFundo: 'var(--g-barra)',
+  concluido: 'var(--g-concluido)',
+  emCurso: 'var(--g-emcurso)',
+  /** fundo da barra em andamento: a barra inteira fica escura, a parte feita mais escura ainda */
+  emCursoFundo: 'var(--g-emcursoFundo)',
+  atrasado: 'var(--g-atrasado)',
+  atrasadoFundo: 'var(--g-atrasadoFundo)',
+  baseline: 'var(--g-baseline)',
+  futuro: 'var(--g-futuro)'
 } as const;
+
+/** Tema da tela: claro ou escuro (guardado no navegador). */
+export type Tema = 'claro' | 'escuro';
+const CHAVE = 'portal-pmo-tema';
+export function temaSalvo(): Tema {
+  try { return localStorage.getItem(CHAVE) === 'escuro' ? 'escuro' : 'claro'; } catch { return 'claro'; }
+}
+export function aplicarTema(t: Tema) {
+  document.documentElement.dataset.theme = t === 'escuro' ? 'dark' : 'light';
+  document.querySelector('meta[name="color-scheme"]')?.setAttribute('content', t === 'escuro' ? 'dark' : 'light');
+  try { localStorage.setItem(CHAVE, t); } catch { /* sem armazenamento */ }
+}

@@ -27,14 +27,26 @@ export function useProjetosVisiveis() {
     fonte.modo === 'piloto' ? { nome: membros[0] || '', email: '' } : { nome: usuario, email }
   ), [fonte.modo, membros, usuario, email]);
 
+  // órgão do cliente: o domínio do e-mail (contas da Systech, usadas para testar, simulam o cliente do primeiro projeto)
+  const dominio = (e: string) => (e.split('@')[1] || '').toLowerCase();
+  const DOMINIOS_SYSTECH = ['systechtecnologia.com.br', 'systech.com.br', 'gruposystech.onmicrosoft.com'];
+  const meuDominio = dominio(identidade.email || '');
+  const simulaCliente = fonte.modo === 'piloto' || !meuDominio || DOMINIOS_SYSTECH.includes(meuDominio);
+  const clienteSimulado = dados.projetos.find(p => p.situacaoCadastro === 'Ativo')?.cliente || '';
   const podeVer = useCallback((p: Projeto) => {
     if (p.situacaoCadastro === 'Rascunho') return papel === 'PMO';   // rascunho é só do PMO
+    if (papel === 'Cliente') {
+      if (p.situacaoCadastro !== 'Ativo' && p.situacaoCadastro !== 'Encerrado') return false;
+      if (simulaCliente) return p.cliente === clienteSimulado;
+      // projetos em que alguém da equipe do lado do cliente tem o mesmo domínio de e-mail (o mesmo órgão)
+      return p.equipe.some(m => !!m.email && norm(m.empresa) !== 'systech' && dominio(m.email) === meuDominio);
+    }
     if (papel !== 'Técnico') return true;
     if (p.situacaoCadastro === 'Encerrado') return true;   // encerrados ficam abertos para consulta de todos os técnicos
     return p.equipe.some(m =>
       (!!identidade.nome && norm(m.nome) === norm(identidade.nome)) ||
       (!!identidade.email && !!m.email && norm(m.email) === norm(identidade.email)));
-  }, [papel, identidade]);
+  }, [papel, identidade, simulaCliente, clienteSimulado, meuDominio]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const todos = useMemo(() => dados.projetos.filter(podeVer), [dados.projetos, podeVer]);
   /** projetos em andamento (o que o portfólio, os indicadores e os marcos consideram) */

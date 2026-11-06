@@ -3,6 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import type { Fase, Projeto } from '../types/models';
 import { usePortal } from '../state/PortalContext';
 import { useProjetosVisiveis } from '../state/useProjetosVisiveis';
+import { usePapel } from '../state/PapelContext';
+import { lancadaParaTecnico } from '../lib/dependencias';
 import { avanco, faseAtual, macro } from '../lib/calculos';
 import { FASES, SELO_FAROL } from '../lib/constantes';
 import { TEMA } from '../lib/tema';
@@ -16,9 +18,17 @@ type FiltroFase = 'Todas' | Fase;
 /** Cronograma de todos os projetos em andamento, no mesmo molde do cronograma de cada projeto. */
 export function CronogramasPage() {
   const { dados, hoje } = usePortal();
-  const { projetos } = useProjetosVisiveis();
+  const { projetos, identidade } = useProjetosVisiveis();
+  const { papel } = usePapel();
+  const ehTecnico = papel === 'Técnico';
   const navegar = useNavigate();
-  const emAndamento = projetos.filter(p => p.situacaoCadastro === 'Ativo' && (dados.atividades[p.codigo] || []).some(a => a.inicio && a.termino));
+  // técnico: só as tarefas (subatividades) em que ele é o responsável, abertas, em ordem de data
+  const meuEmail = (p: Projeto) => (identidade.email || p.equipe.find(m => m.nome.toLowerCase() === identidade.nome.toLowerCase())?.email || '').toLowerCase();
+  // técnico: todas as tarefas (subatividades) abertas dos projetos em que está; as dele aparecem marcadas
+  const tarefas = (p: Projeto) => (dados.atividades[p.codigo] || [])
+    .filter(a => a.pai && lancadaParaTecnico(a) && a.status !== 'Concluído' && a.status !== 'Cancelado' && a.inicio && a.termino)
+    .sort((x, y) => x.inicio.localeCompare(y.inicio) || x.termino.localeCompare(y.termino));
+  const emAndamento = projetos.filter(p => p.situacaoCadastro === 'Ativo' && (ehTecnico ? tarefas(p).length > 0 : (dados.atividades[p.codigo] || []).some(a => a.inicio && a.termino)));
   const [codigo, setCodigo] = useState('');            // '' = todos os projetos
   const [fase, setFase] = useState<FiltroFase>('Todas');
   const visiveis = codigo ? emAndamento.filter(p => p.codigo === codigo) : emAndamento;
@@ -29,7 +39,7 @@ export function CronogramasPage() {
 
   // eixo de datas comum, calculado só com o que está à mostra
   const periodo = useMemo(() => {
-    const datas = visiveis.flatMap(p => (dados.atividades[p.codigo] || []).filter(a => !a.pai && filtro(a)))
+    const datas = visiveis.flatMap(p => (ehTecnico ? tarefas(p) : (dados.atividades[p.codigo] || []).filter(a => !a.pai && filtro(a))))
       .flatMap(a => [a.inicio, a.termino, a.baselineInicio, a.baselineTermino]).filter(Boolean).sort();
     return datas.length ? { ini: datas[0], fim: datas[datas.length - 1] } : null;
   }, [visiveis, dados, fase]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -56,21 +66,21 @@ export function CronogramasPage() {
   return (
     <main className="main">
       <div>
-        <div className="migalha"><Link to="/">Escritório de Projetos</Link> › Cronogramas</div>
-        <h1 className="ptit" style={{ marginTop: 8 }}>Cronogramas dos projetos em andamento</h1>
+        <div className="migalha"><Link to="/">Central Systech</Link> › Cronogramas</div>
+        <h1 className="ptit" style={{ marginTop: 8 }}>{ehTecnico ? 'Tarefas dos meus projetos' : 'Cronogramas dos projetos em andamento'}</h1>
       </div>
 
       <section className="card pad cronFiltros">
         <label className="campo" style={{ minWidth: 280 }}>Projeto
           <select className="ctl" value={codigo} onChange={e => { setCodigo(e.target.value); setFase('Todas'); }}>
-            <option value="">Todos os projetos em andamento ({emAndamento.length})</option>
+            <option value="">{ehTecnico ? 'Todos os meus projetos' : 'Todos os projetos em andamento'} ({emAndamento.length})</option>
             {emAndamento.map(p => <option key={p.codigo} value={p.codigo}>{p.codigo} · {p.nome}</option>)}
           </select>
         </label>
-        <div className="campo">Fase{codigo ? ` do ${codigo}` : ''}
+        {!ehTecnico && <div className="campo">Fase{codigo ? ` do ${codigo}` : ''}
           <Chips rotulo="Filtrar por fase" opcoes={['Todas', ...FASES] as FiltroFase[]} valor={fase} aoMudar={setFase}
             formatar={f => `${f} (${contagem(f)})`} />
-        </div>
+        </div>}
         <div className="legenda" style={{ marginLeft: 'auto' }}>
           {([['Concluído', TEMA.concluido, 8], ['Em curso', TEMA.emCurso, 8], ['Atrasado', TEMA.atrasado, 8], ['Baseline', TEMA.baseline, 3]] as [string, string, number][])
             .map(([t, c, h]) => <span key={t}><i className="pt" style={{ background: c, width: 18, height: h }} />{t}</span>)}
@@ -78,15 +88,15 @@ export function CronogramasPage() {
         </div>
       </section>
 
-      {!emAndamento.length && <Vazio>Nenhum projeto em andamento com cronograma.</Vazio>}
+      {!emAndamento.length && <Vazio>{ehTecnico ? 'Os seus projetos não têm tarefas abertas.' : 'Nenhum projeto em andamento com cronograma.'}</Vazio>}
       {periodo && visiveis.map(p => {
         const atividades = dados.atividades[p.codigo] || [];
-        const temNaFase = macro(dados, p.codigo).some(filtro);
+        const temNaFase = ehTecnico || macro(dados, p.codigo).some(filtro);
         return (
           <section key={p.codigo} className="card cronBloco">
             {cabecalho(p)}
             {temNaFase
-              ? <Gantt projeto={p} atividades={atividades} filtro={filtro} periodo={periodo}
+              ? <Gantt projeto={p} atividades={atividades} filtro={filtro} periodo={periodo} plano={ehTecnico ? tarefas(p) : undefined} minhas={ehTecnico ? meuEmail(p) : undefined}
                   aoAbrir={() => navegar(`/projeto/${encodeURIComponent(p.codigo)}/cronograma`)} />
               : <p className="sub" style={{ padding: '4px 4px 8px' }}>Sem atividades na fase {fase}.</p>}
           </section>

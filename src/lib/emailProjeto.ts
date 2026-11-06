@@ -78,13 +78,13 @@ const dadosProjeto = (p: Projeto): [string, string][] => [
 /** Projeto criado (PMO) — vai para o destinatário de teste. */
 export function emailNovoProjeto({ projeto: p }: NovoProjeto, autor: string) {
   return {
-    assunto: `[Portal PMO] Novo projeto ${p.codigo} · ${p.nome} · ${p.cliente}`,
+    assunto: `[Central Systech] Novo projeto ${p.codigo} · ${p.nome} · ${p.cliente}`,
     html: montar({
       titulo: `Novo projeto: ${p.nome}`,
       intro: `O projeto <b>${esc(p.codigo)}</b> foi cadastrado por ${esc(autor)} e está com a situação <b>${esc(p.situacaoCadastro)}</b>.`,
       dados: dadosProjeto(p), equipe: p.equipe, observacao: p.objetivo,
       botao: { texto: 'Abrir o projeto no portal', url: linkProjeto(p.codigo) },
-      rodape: 'Mensagem automática do Portal PMO.'
+      rodape: 'Mensagem automática da Central Systech.'
     })
   };
 }
@@ -92,14 +92,14 @@ export function emailNovoProjeto({ projeto: p }: NovoProjeto, autor: string) {
 /** GP enviou um projeto novo para aprovação do PMO. */
 export function emailSolicitacaoProjeto({ projeto: p, atividades, riscos }: NovoProjeto, autor: string) {
   return {
-    assunto: `[Portal PMO] Aprovação solicitada · novo projeto ${p.codigo} · ${p.cliente}`,
+    assunto: `[Central Systech] Aprovação solicitada · novo projeto ${p.codigo} · ${p.cliente}`,
     html: montar({
       titulo: 'Aprovação de projeto solicitada',
       intro: `${esc(autor)} cadastrou o projeto <b>${esc(p.codigo)} · ${esc(p.nome)}</b> e pediu a aprovação do patrocinador. A aprovação registra o gate <b>G1</b> e coloca o projeto no portfólio.`,
       dados: [...dadosProjeto(p), ['Cronograma', `${atividades.length} atividades (${atividades.filter(a => a.marco).length} marcos)`], ['Riscos', `${riscos.length} registrados`]],
       equipe: p.equipe, observacao: p.objetivo,
       botao: { texto: 'Analisar no portal', url: linkProjeto(p.codigo) },
-      rodape: 'No portal, abra o projeto e clique em "Analisar cadastro (G1)". Mensagem automática do Portal PMO.'
+      rodape: 'No portal, abra o projeto e clique em "Analisar cadastro (G1)". Mensagem automática da Central Systech.'
     })
   };
 }
@@ -107,7 +107,7 @@ export function emailSolicitacaoProjeto({ projeto: p, atividades, riscos }: Novo
 /** GP pediu a aprovação de um gate. */
 export function emailSolicitacaoGate(p: Projeto, g: Gate, progresso: { feitas: number; total: number }, autor: string) {
   return {
-    assunto: `[Portal PMO] Aprovação solicitada · ${g.gate} do projeto ${p.codigo} · ${p.cliente}`,
+    assunto: `[Central Systech] Aprovação solicitada · ${g.gate} do projeto ${p.codigo} · ${p.cliente}`,
     html: montar({
       titulo: `Aprovação do ${g.gate} solicitada`,
       intro: `${esc(autor)} pediu a aprovação do gate <b>${esc(g.nome)}</b> no projeto <b>${esc(p.codigo)} · ${esc(p.nome)}</b>.`,
@@ -119,7 +119,7 @@ export function emailSolicitacaoGate(p: Projeto, g: Gate, progresso: { feitas: n
       ],
       observacao: g.info,
       botao: { texto: 'Analisar no portal', url: linkProjeto(p.codigo) },
-      rodape: `No portal, abra o projeto, clique no losango ${g.gate} e em "Analisar pedido do PMO". Mensagem automática do Portal PMO.`
+      rodape: `No portal, abra o projeto, clique no losango ${g.gate} e em "Analisar pedido do PMO". Mensagem automática da Central Systech.`
     })
   };
 }
@@ -134,7 +134,7 @@ export function emailGateAprovado(p: Projeto, g: Gate, extra: { por: string; em:
     : encerrou ? 'O projeto foi encerrado e aparece em “Projetos encerrados” no portfólio.'
     : `O projeto avançou para a fase de <b>${esc(extra.proximaFase)}</b>.`;
   return {
-    assunto: `[Portal PMO] ${titulo} · ${p.codigo} · ${p.cliente}`,
+    assunto: `[Central Systech] ${titulo} · ${p.codigo} · ${p.cliente}`,
     html: montar({
       titulo,
       intro: `${esc(extra.por)} aprovou o gate <b>${esc(g.nome)}</b> do projeto <b>${esc(p.codigo)} · ${esc(p.nome)}</b>. ${resultado}`,
@@ -144,7 +144,7 @@ export function emailGateAprovado(p: Projeto, g: Gate, extra: { por: string; em:
         ['Parecer do patrocinador', extra.parecer || '—'], ['Fase atual', encerrou ? 'Encerrado' : extra.proximaFase]
       ],
       botao: { texto: 'Abrir o projeto no portal', url: linkProjeto(p.codigo) },
-      rodape: 'Mensagem automática do Portal PMO.'
+      rodape: 'Mensagem automática da Central Systech.'
     })
   };
 }
@@ -152,13 +152,13 @@ export function emailGateAprovado(p: Projeto, g: Gate, extra: { por: string; em:
 /** Projeto criado pelo PMO (já nasce aprovado). */
 export function emailProjetoCriadoPeloPmo({ projeto: p }: NovoProjeto, autor: string) {
   return {
-    assunto: `[Portal PMO] Projeto aprovado · ${p.codigo} · ${p.cliente}`,
+    assunto: `[Central Systech] Projeto aprovado · ${p.codigo} · ${p.cliente}`,
     html: montar({
       titulo: 'Projeto criado e aprovado pelo patrocinador',
       intro: `${esc(autor)} criou o projeto <b>${esc(p.codigo)} · ${esc(p.nome)}</b>. Ele já está ativo no portfólio, com o G1 aprovado, na fase de <b>Planejamento</b>.`,
       dados: dadosProjeto(p), equipe: p.equipe, observacao: p.objetivo,
       botao: { texto: 'Abrir o projeto no portal', url: linkProjeto(p.codigo) },
-      rodape: 'Mensagem automática do Portal PMO.'
+      rodape: 'Mensagem automática da Central Systech.'
     })
   };
 }
@@ -198,14 +198,14 @@ export function emailReuniaoAlterada(p: Projeto, a: Atividade, antes: NovaReunia
   if (entraram.length) dados.push(['Entraram', entraram.join(', ')]);
   if (sairam.length) dados.push(['Saíram', sairam.join(', ')]);
   return {
-    assunto: `[Portal PMO] Reunião alterada · ${depois.titulo} · ${quandoReuniao(depois)}`,
+    assunto: `[Central Systech] Reunião alterada · ${depois.titulo} · ${quandoReuniao(depois)}`,
     html: montar({
       titulo: 'Reunião do Teams alterada',
       intro: `A reunião <b>${esc(depois.titulo)}</b> do projeto <b>${esc(p.codigo)}</b> foi alterada. Confira as novas informações; o convite no seu calendário também foi atualizado.`,
       dados,
       observacao: depois.pauta ? `Pauta: ${depois.pauta}` : undefined,
       botao: { texto: 'Entrar na reunião do Teams', url: joinUrl || linkProjeto(p.codigo) },
-      rodape: `Projeto no portal: ${linkProjeto(p.codigo)} · Mensagem automática do Portal PMO.`
+      rodape: `Projeto no portal: ${linkProjeto(p.codigo)} · Mensagem automática da Central Systech.`
     })
   };
 }
@@ -213,10 +213,10 @@ export function emailReuniaoAlterada(p: Projeto, a: Atividade, antes: NovaReunia
 /** Projeto excluído: avisa a equipe, o PMO e o patrocinador. */
 export function emailProjetoExcluido(p: Projeto, autor: string, quando: string, removidos: [string, number][], documentos: boolean) {
   return {
-    assunto: `[Portal PMO] Projeto excluído · ${p.codigo} · ${p.cliente}`,
+    assunto: `[Central Systech] Projeto excluído · ${p.codigo} · ${p.cliente}`,
     html: montar({
       titulo: 'Projeto excluído',
-      intro: `${esc(autor)} excluiu o projeto <b>${esc(p.codigo)} · ${esc(p.nome)}</b> do Portal PMO em ${esc(dma(quando))}. Ele não aparece mais no portfólio.`,
+      intro: `${esc(autor)} excluiu o projeto <b>${esc(p.codigo)} · ${esc(p.nome)}</b> da Central Systech em ${esc(dma(quando))}. Ele não aparece mais no portfólio.`,
       dados: [
         ['Projeto', `${p.codigo} · ${p.nome}`], ['Cliente', p.cliente], ['Gerente de projeto', p.gerente],
         ['Fase em que estava', p.situacaoCadastro === 'Encerrado' ? 'Encerrado' : p.fase],
@@ -225,7 +225,7 @@ export function emailProjetoExcluido(p: Projeto, autor: string, quando: string, 
       ],
       equipe: p.equipe,
       botao: { texto: 'Abrir o portal', url: urlDoPortal() },
-      rodape: 'Você recebeu esta mensagem por fazer parte da equipe do projeto. Mensagem automática do Portal PMO.'
+      rodape: 'Você recebeu esta mensagem por fazer parte da equipe do projeto. Mensagem automática da Central Systech.'
     })
   };
 }
@@ -233,7 +233,7 @@ export function emailProjetoExcluido(p: Projeto, autor: string, quando: string, 
 /** Atualização semanal empurrou a data prevista para depois da baseline: avisa o gerente do projeto. */
 export function emailReprogramacao(p: Projeto, a: Atividade, novaData: string, info: { causa: string; observacao: string; impedimento: boolean; autor: string }) {
   return {
-    assunto: `[Portal PMO] Reprogramação · ${p.codigo} · ${a.codigo} ${a.nome}`,
+    assunto: `[Central Systech] Reprogramação · ${p.codigo} · ${a.codigo} ${a.nome}`,
     html: montar({
       titulo: 'Atividade reprogramada além da baseline',
       intro: `${esc(info.autor)} atualizou a atividade <b>${esc(a.codigo)} · ${esc(a.nome)}</b> do projeto <b>${esc(p.codigo)}</b> com uma data prevista posterior à linha de base. Avalie se é preciso uma solicitação de mudança.`,
@@ -244,7 +244,69 @@ export function emailReprogramacao(p: Projeto, a: Atividade, novaData: string, i
         ['Próximo passo / observação', info.observacao || '—']
       ],
       botao: { texto: 'Abrir o cronograma no portal', url: linkProjeto(p.codigo) },
-      rodape: 'Mensagem automática do Portal PMO.'
+      rodape: 'Mensagem automática da Central Systech.'
     })
+  };
+}
+
+/** Status de uma subatividade mudou: avisa o PMO (gerente do projeto). */
+export function emailStatusSubatividade(p: Projeto, a: Atividade, novo: Partial<Atividade>, autor: string) {
+  const status = novo.status || a.status, pct = novo.percentual ?? a.percentual;
+  const dados: [string, string][] = [
+    ['Projeto', `${p.codigo} · ${p.nome}`], ['Subatividade', `${a.codigo} · ${a.nome}`], ['Atividade principal', a.pai],
+    ['Status', `${a.status} → ${status}`], ['% concluído', `${a.percentual}% → ${pct}%`],
+    ['Término previsto', dma(novo.termino || a.termino)], ['Atualizado por', autor]
+  ];
+  if (novo.horasRealizadas !== undefined) dados.push(['Horas realizadas', `${novo.horasRealizadas} h`]);
+  if (novo.impedimento) dados.push(['Impedimento', 'Sim']);
+  return {
+    assunto: `[Central Systech] Subatividade ${a.codigo} · ${a.status} → ${status} · ${p.codigo}`,
+    html: montar({
+      titulo: `Subatividade ${status === 'Concluído' ? 'concluída' : 'atualizada'}`,
+      intro: `${esc(autor)} mudou o status da subatividade <b>${esc(a.codigo)} · ${esc(a.nome)}</b> de <b>${esc(a.status)}</b> para <b>${esc(status)}</b>.`,
+      dados,
+      observacao: [novo.realizado ? `O que foi feito: ${novo.realizado}` : '', novo.observacao ? `Próximo passo: ${novo.observacao}` : ''].filter(Boolean).join(' · ') || undefined,
+      botao: { texto: 'Abrir o projeto no portal', url: linkProjeto(p.codigo) },
+      rodape: 'Mensagem automática da Central Systech.'
+    })
+  };
+}
+
+/** Atividades/subatividades que passaram a estar atrasadas no projeto: um e-mail ao PMO com a lista. */
+export function emailAtrasos(p: Projeto, itens: { a: Atividade; dias: number; responsavel: string }[]) {
+  const linhas = itens.map(({ a, dias, responsavel }) =>
+    `<tr><td style="${BORDA};padding:6px 10px">${esc(a.codigo)}</td><td style="${BORDA};padding:6px 10px">${esc(a.nome)}${a.pai ? `<br><span style="color:#555555;font-size:12px">subatividade de ${esc(a.pai)}</span>` : ''}</td>` +
+    `<td style="${BORDA};padding:6px 10px">${esc(responsavel || '—')}</td><td style="${BORDA};padding:6px 10px">${esc(dma(a.termino))}</td>` +
+    `<td style="${BORDA};padding:6px 10px;color:#9A2E12;font-weight:bold">${dias} dia${dias > 1 ? 's' : ''} úte${dias > 1 ? 'is' : 'il'}</td><td style="${BORDA};padding:6px 10px">${esc(a.status)} · ${a.percentual}%</td></tr>`).join('');
+  return {
+    assunto: `[Central Systech] ${itens.length} atividade(s) atrasada(s) · ${p.codigo} · ${p.cliente}`,
+    html: `<!doctype html><html lang="pt-BR"><body style="margin:0;padding:12px;${FONTE}">
+<p style="margin:0 0 4px;font-size:18px"><b>Atividades atrasadas</b></p>
+<p style="margin:0 0 14px;line-height:1.5">O projeto <b>${esc(p.codigo)} · ${esc(p.nome)}</b> tem ${itens.length} atividade(s) que passaram da data de término prevista.</p>
+<table cellpadding="0" cellspacing="0" style="border-collapse:collapse;width:100%;max-width:760px;${FONTE}">
+<tr style="background:#F3F3F3"><th align="left" style="${BORDA};padding:6px 10px">Código</th><th align="left" style="${BORDA};padding:6px 10px">Atividade</th><th align="left" style="${BORDA};padding:6px 10px">Responsável</th><th align="left" style="${BORDA};padding:6px 10px">Previsto</th><th align="left" style="${BORDA};padding:6px 10px">Atraso</th><th align="left" style="${BORDA};padding:6px 10px">Situação</th></tr>
+${linhas}
+</table>
+${botao('Abrir o cronograma no portal', linkProjeto(p.codigo))}
+<p style="margin:0;font-size:12px;color:#777777">Cada atraso é avisado uma vez. Mensagem automática da Central Systech.</p>
+</body></html>`
+  };
+}
+
+/** Tarefas lançadas pelo PMO para um técnico. */
+export function emailTarefasLancadas(p: Projeto, nome: string, tarefas: Atividade[], autor: string) {
+  const linhas = tarefas.map(t => `<tr><td style="${BORDA};padding:6px 10px">${esc(t.nome)}</td><td style="${BORDA};padding:6px 10px">${esc(dma(t.inicio))}</td><td style="${BORDA};padding:6px 10px">${esc(dma(t.termino))}</td></tr>`).join('');
+  return {
+    assunto: `[Central Systech] ${tarefas.length === 1 ? 'Nova tarefa' : `${tarefas.length} novas tarefas`} para você · ${p.codigo}`,
+    html: `<!doctype html><html lang="pt-BR"><body style="margin:0;padding:12px;${FONTE}">
+<p style="margin:0 0 4px;font-size:18px"><b>${tarefas.length === 1 ? 'Nova tarefa' : 'Novas tarefas'} para você</b></p>
+<p style="margin:0 0 14px;line-height:1.5">Olá, ${esc(nome)}. ${esc(autor)} lançou ${tarefas.length === 1 ? 'uma tarefa' : `${tarefas.length} tarefas`} para você no projeto <b>${esc(p.codigo)} · ${esc(p.nome)}</b>.</p>
+<table cellpadding="0" cellspacing="0" style="border-collapse:collapse;width:100%;max-width:640px;${FONTE}">
+<tr style="background:#F3F3F3"><th align="left" style="${BORDA};padding:6px 10px">Tarefa</th><th align="left" style="${BORDA};padding:6px 10px">Início</th><th align="left" style="${BORDA};padding:6px 10px">Término previsto</th></tr>
+${linhas}
+</table>
+${botao('Abrir em Atualizar status', `${linkProjeto(p.codigo).split('#')[0]}#/atualizar`)}
+<p style="margin:0;font-size:12px;color:#777777">Mensagem automática da Central Systech.</p>
+</body></html>`
   };
 }

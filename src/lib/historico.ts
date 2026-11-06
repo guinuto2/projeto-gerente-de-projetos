@@ -5,13 +5,22 @@
 import type { Atividade, Dados, MembroEquipe, NovaReuniao, NovoProjeto, Pendencia, Projeto, Risco } from '../types/models';
 import { dma } from './datas';
 
-export interface Lancamento { cod: string; tipo: string; acao: string; descricao: string }
+export interface Lancamento { cod: string; tipo: string; acao: string; descricao: string; item?: string; antes?: string; depois?: string }
+
+/** Campos que formam o "retrato" de uma atividade no acompanhamento. */
+export const CAMPOS_RETRATO: [keyof Atividade, string][] = [
+  ['status', 'Status'], ['percentual', '% concluído'], ['inicio', 'Início previsto'], ['termino', 'Término previsto'], ['dataReal', 'Data real'],
+  ['responsavel', 'Responsável'], ['horasPlanejadas', 'Horas planejadas'], ['horasRealizadas', 'Horas realizadas'], ['teveReuniao', 'Teve reunião no Teams'], ['impedimento', 'Impedimento'],
+  ['dependeRdm', 'Depende de RDM'], ['numeroRdm', 'Nº da RDM'], ['causaAtraso', 'Causa do atraso'], ['realizado', 'O que foi feito'], ['observacao', 'Próximo passo / observação']
+];
+export const retrato = (a: Partial<Atividade>) => JSON.stringify(Object.fromEntries(CAMPOS_RETRATO.map(([k]) => [k, a[k] ?? null])));
 
 const data = (s?: string) => (s && /^\d{4}-\d{2}-\d{2}/.test(s) ? dma(s.slice(0, 10)) : s || '—');
 const hora = (s?: string) => (s ? `${data(s)} ${s.slice(11, 16)}` : '—');
 const fmt = (v: unknown, tipo?: 'data' | 'texto') => {
   if (v === undefined || v === null || v === '') return '—';
   if (typeof v === 'boolean') return v ? 'Sim' : 'Não';
+  if (Array.isArray(v)) return v.length ? v.join(', ') : '—';
   if (tipo === 'data') return data(String(v));
   return String(v);
 };
@@ -35,11 +44,11 @@ const ROTULOS_ATIVIDADE: Record<string, [string, ('data' | 'longo')?]> = {
   nome: ['nome'], fase: ['fase'], equipe: ['equipe'], inicio: ['início', 'data'], termino: ['término', 'data'], status: ['status'],
   percentual: ['%'], marco: ['marco'], responsavel: ['responsável'], descricao: ['descrição', 'longo'], observacao: ['observação', 'longo'],
   dataReal: ['data real', 'data'], dependeRdm: ['depende de RDM'], numeroRdm: ['nº RDM'], impedimento: ['impedimento'],
-  causaAtraso: ['causa do atraso'], horasRealizadas: ['horas realizadas']
+  causaAtraso: ['causa do atraso'], horasRealizadas: ['horas realizadas'], teveReuniao: ['teve reunião no Teams'], realizado: ['o que foi feito', 'longo'], predecessoras: ['pré-requisitos'], horasPlanejadas: ['horas planejadas'], lancada: ['lançada para o técnico']
 };
 const ROTULOS_PROJETO: Record<string, [string, ('data' | 'longo')?]> = {
   nome: ['nome'], cliente: ['cliente'], tipo: ['tipo'], gerente: ['gerente'], arquiteto: ['arquiteto'], farol: ['farol'],
-  inicio: ['início', 'data'], terminoPrevisto: ['término previsto', 'data'], objetivo: ['objetivo', 'longo'],
+  inicio: ['início', 'data'], terminoPrevisto: ['término previsto', 'data'], dataAssinatura: ['assinatura do contrato', 'data'], modeloFaturamento: ['modelo de faturamento'], parceiro: ['parceiro'], contrato: ['contrato'], objetivo: ['objetivo', 'longo'],
   escopoIncluido: ['escopo incluído', 'longo'], escopoExcluido: ['escopo excluído', 'longo'], premissas: ['premissas', 'longo'],
   dependencias: ['dependências', 'longo'], restricoes: ['restrições', 'longo']
 };
@@ -82,14 +91,15 @@ export function descrever(nome: string, args: unknown[], d: Dados, resultado: un
       return { cod, tipo: 'Projeto', acao: args[1] === 'ativar' ? 'Ativou o rascunho' : 'Enviou o rascunho para aprovação', descricao: projetoDe(d, cod)?.nome || cod };
     case 'criarAtividade': {
       const a = args[1] as Atividade;
-      return { cod, tipo: tipoAtv(a), acao: 'Criou', descricao: `${a.codigo} · ${a.nome} (${a.fase}, ${data(a.inicio)} a ${data(a.termino)})${a.pai ? ` dentro de ${a.pai}` : ''}` };
+      return { cod, tipo: tipoAtv(a), acao: 'Criou', item: a.codigo, depois: retrato(a), descricao: `${a.codigo} · ${a.nome} (${a.fase}, ${data(a.inicio)} a ${data(a.termino)})${a.pai ? ` dentro de ${a.pai}` : ''}` };
     }
     case 'salvarAtividade':
     case 'atualizarSemanal': {
       const a = atv(d, cod, String(args[1])); if (!a) return null;
       const partes = diferencas(a, args[2] as Partial<Atividade>, ROTULOS_ATIVIDADE);
       if (!partes.length) return null;
-      return { cod, tipo: tipoAtv(a), acao: nome === 'atualizarSemanal' ? 'Atualização semanal' : 'Editou', descricao: juntar(`${a.codigo} · ${a.nome}`, partes) };
+      return { cod, tipo: tipoAtv(a), acao: nome === 'atualizarSemanal' ? 'Atualização semanal' : 'Editou', item: a.codigo,
+        antes: retrato(a), depois: retrato({ ...a, ...(args[2] as Partial<Atividade>) }), descricao: juntar(`${a.codigo} · ${a.nome}`, partes) };
     }
     case 'excluirAtividade': {
       const a = atv(d, cod, String(args[1])); if (!a) return null;
@@ -119,6 +129,11 @@ export function descrever(nome: string, args: unknown[], d: Dados, resultado: un
       const g = projetoDe(d, cod)?.fases.find(x => x.gate === args[1]);
       const o = args[2] as { aprovar: boolean; parecer: string; congelarBaseline?: boolean };
       return { cod, tipo: 'Gate', acao: o.aprovar ? 'Aprovou' : 'Devolveu ao PMO', descricao: `${g?.nome || args[1]}${o.parecer ? ` · parecer: ${o.parecer}` : ''}${o.congelarBaseline ? ' · linha de base congelada' : ''}` };
+    }
+    case 'lancarTarefas': {
+      const cods = args[1] as string[];
+      const nomes = (d.atividades[cod] || []).filter(a => cods.includes(a.codigo)).map(a => `${a.codigo} · ${a.nome}`);
+      return { cod, tipo: 'Subatividade', acao: 'Lançou para o técnico', descricao: nomes.join('; ') };
     }
     case 'removerGatesRepetidos': return { cod, tipo: 'Gate', acao: 'Removeu repetidos', descricao: `${resultado} gate(s) repetido(s) removido(s) da lista` };
     case 'agendarReuniao': {

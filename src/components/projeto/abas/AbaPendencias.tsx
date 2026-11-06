@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { diasVencida } from '../../../lib/validacoes';
 import type { Projeto } from '../../../types/models';
 import { usePortal } from '../../../state/PortalContext';
 import { usePapel } from '../../../state/PapelContext';
@@ -8,12 +9,13 @@ import { Vazio } from '../../ui/Vazio';
 import { EditarPendencia } from '../editores/EditarPendencia';
 
 export function AbaPendencias({ projeto }: { projeto: Projeto }) {
-  const { dados } = usePortal();
+  const aberto = projeto.situacaoCadastro !== 'Encerrado';   // encerrado: só consulta
+  const { dados, hoje } = usePortal();
   const [editando, setEditando] = useState<string | null>(null);
   const { pode } = usePapel();
-  const abrir = (c: string) => { if (pode('responderPendencia')) setEditando(c); };
+  const abrir = (c: string) => { if ((aberto && pode('responderPendencia'))) setEditando(c); };
   const editor = editando && <EditarPendencia projeto={projeto} codigo={editando === 'novo' ? undefined : editando} aoFechar={() => setEditando(null)} />;
-  const botaoNovo = pode('responderPendencia') && <button type="button" className="btn pri pq" onClick={() => setEditando('novo')}>+ Nova pendência</button>;
+  const botaoNovo = (aberto && pode('responderPendencia')) && <button type="button" className="btn pri pq" onClick={() => setEditando('novo')}>+ Nova pendência</button>;
   const L = [...(dados.pendencias[projeto.codigo] || [])].sort(porCodigo);
   if (!L.length) return <><Vazio>Nenhuma pendência registrada.{botaoNovo && <><br /><br />{botaoNovo}</>}</Vazio>{editor}</>;
   return (
@@ -24,16 +26,18 @@ export function AbaPendencias({ projeto }: { projeto: Projeto }) {
       </div>
       <div className="twrap">
         <table className="tbl">
-          <thead><tr><th>ID</th><th>Pendência</th><th>Impacto</th><th>Situação</th></tr></thead>
+          <thead><tr><th>ID</th><th>Pendência</th><th>Impacto</th><th>Prazo</th><th>Situação</th></tr></thead>
           <tbody>
             {L.map(x => (
-              <tr key={x.codigo} className="cl" tabIndex={0} onClick={() => abrir(x.codigo)} onKeyDown={e => { if (e.key === 'Enter') abrir(x.codigo); }}>
+              <tr key={x.codigo} className={`cl ${diasVencida(x, hoje) ? 'pendVencida' : ''}`} tabIndex={0} onClick={() => abrir(x.codigo)} onKeyDown={e => { if (e.key === 'Enter') abrir(x.codigo); }}>
                 <td className="mono">{x.codigo}</td>
                 <td style={{ minWidth: 300 }}>
                   <div style={{ fontWeight: 500 }}>{x.pergunta}</div>
-                  {x.resposta && <div className="sub" style={{ marginTop: 4, color: '#145C3C' }}>Resposta: {x.resposta}</div>}
+                  {x.resposta && <div className="sub" style={{ marginTop: 4, color: 'var(--txt-ok)' }}>Resposta: {x.resposta}</div>}
                 </td>
                 <td style={{ minWidth: 260, color: 'var(--medio)' }}>{x.impacto}</td>
+                <td className="mono" style={{ whiteSpace: 'nowrap' }}>{x.prazo ? x.prazo.split('-').reverse().join('/') : '—'}
+                  {diasVencida(x, hoje) > 0 && <span className="tagVencida">vencida há {diasVencida(x, hoje)} dia(s)</span>}</td>
                 <td><Selo valor={x.situacao} cores={SELO_PENDENCIA} /></td>
               </tr>
             ))}

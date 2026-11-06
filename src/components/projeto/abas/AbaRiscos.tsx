@@ -10,12 +10,13 @@ import { MatrizRiscos } from './MatrizRiscos';
 import { EditarRisco } from '../editores/EditarRisco';
 
 export function AbaRiscos({ projeto }: { projeto: Projeto }) {
+  const aberto = projeto.situacaoCadastro !== 'Encerrado';   // encerrado: só consulta
   const { dados } = usePortal();
   const [editando, setEditando] = useState<string | null>(null);
   const { pode } = usePapel();
-  const abrir = (c: string) => { if (pode('editarRisco')) setEditando(c); };
+  const abrir = (c: string) => { if ((aberto && pode('editarRisco'))) setEditando(c); };
   const editor = editando && <EditarRisco projeto={projeto} codigo={editando === 'novo' ? undefined : editando} aoFechar={() => setEditando(null)} />;
-  const botaoNovo = pode('editarRisco') && <button type="button" className="btn pri pq" onClick={() => setEditando('novo')}>+ Novo risco</button>;
+  const botaoNovo = (aberto && pode('editarRisco')) && <button type="button" className="btn pri pq" onClick={() => setEditando('novo')}>+ Novo risco</button>;
   const R = dados.riscos[projeto.codigo] || [];
   if (!R.length) return <><Vazio>Nenhum risco registrado.{botaoNovo && <><br /><br />{botaoNovo}</>}</Vazio>{editor}</>;
   return (

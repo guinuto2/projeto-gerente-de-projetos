@@ -1,16 +1,21 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import type { Arquivo, Atividade, Dados, Gate, NovaReuniao, NovoProjeto, Pendencia, Projeto, RegistroHistorico, Risco } from '../types/models';
+import type { Arquivo, Atividade, Dados, Gate, NovaReuniao, NovoProjeto, Pendencia, Projeto, RegistroHistorico, Risco, Tecnico } from '../types/models';
 import { PROXIMA_FASE } from '../lib/constantes';
 import { diasUteis } from '../lib/datas';
 import type { FonteDados } from '../services/FonteDados';
 import { criarFonte } from '../services/criarFonte';
 import { config } from '../config/config';
 import { horaAgora } from '../lib/datas';
-import { corpoReuniao, emailReprogramacao, emailProjetoExcluido, emailReuniaoAlterada, emailGateAprovado, emailProjetoCriadoPeloPmo, emailSolicitacaoGate, emailSolicitacaoProjeto } from '../lib/emailProjeto';
-import { progressoFase } from '../lib/calculos';
+import { corpoReuniao, emailTarefasLancadas, emailAtrasos, emailStatusSubatividade, emailReprogramacao, emailProjetoExcluido, emailReuniaoAlterada, emailGateAprovado, emailProjetoCriadoPeloPmo, emailSolicitacaoGate, emailSolicitacaoProjeto } from '../lib/emailProjeto';
+import { percentualPrincipal, progressoFase } from '../lib/calculos';
 import { gatesFaltantes } from '../lib/gates';
 import { descrever } from '../lib/historico';
+import { iniciaria, pendentes } from '../lib/dependencias';
 import { usePapel } from './PapelContext';
+import { ConflitoEdicao } from '../services/FonteSharePoint';
+import { CAMPOS_STATUS, checklistGate, conferirDatas, conferirStatus, riscoAltoSemMitigacao } from '../lib/validacoes';
+import { pessoasDaLista, type PessoaApp } from '../lib/pessoas';
+import { PAPEIS, papelDaFuncao, type Papel } from '../lib/permissoes';
 import { useToast } from './ToastContext';
 import { Carregando } from '../components/ui/Carregando';
 import { Mensagem } from '../components/ui/Mensagem';
@@ -49,6 +54,10 @@ interface PortalValor {
   statusHistorico: { pendentes: number; erro: string };
   /** tenta gravar agora os registros pendentes; devolve quantos restaram */
   reenviarHistorico(): Promise<number>;
+  /** lança para o técnico as subatividades ainda não lançadas (e avisa por e-mail cada técnico) */
+  lancarTarefas(cod: string, codigos: string[]): Promise<void>;
+  /** pessoas para o cadastro (lista Portal Tecnicos), com o perfil de cada uma pela função */
+  pessoasApp: PessoaApp[];
   criarRisco(cod: string, r: Risco): Promise<void>;
   excluirRisco(cod: string, codigo: string): Promise<void>;
   criarPendencia(cod: string, x: Pendencia): Promise<void>;
@@ -63,6 +72,8 @@ interface PortalValor {
   lerReuniao(atividade: Atividade): Promise<NovaReuniao>;
   /** false quando a lista ainda não tem as colunas da reunião */
   reuniaoGravavel: boolean;
+  /** colunas de "lançar para o técnico" e pré-requisitos existem no SharePoint */
+  tarefasGravaveis: boolean;
   removerGatesRepetidos(cod: string): Promise<number>;
   /** rascunho → "Em aprovação" (PMO) ou → "Ativo" com G1 aprovado (patrocinador) */
   submeterRascunho(cod: string, modo: 'aprovacao' | 'ativar'): Promise<void>;
@@ -133,11 +144,30 @@ export function testeReuniao(): string[] | null {
   return alvo ? alvo.split(/[,;]/).map(x => x.trim()).filter(Boolean) : null;
 }
 
-/** E-mail do gerente do projeto (PMO): membro da equipe com função de gerente, ou com o mesmo nome. */
-const emailPatrocinador = () => config.emailPatrocinador || config.emailPmo;
+/**
+ * Destinatários por papel. Ordem: (1) quem tem o papel na equipe do projeto; (2) quem tem a função na lista Portal Tecnicos;
+ * (3) só em último caso, o endereço fixo do config.js (emailPatrocinador / emailPmo).
+ */
+let pessoasAtuais: Tecnico[] = [];   // lista Portal Tecnicos (atualizada pelo portal a cada leitura)
+const daLista = (papel: 'PMO' | 'Patrocinador') => pessoasDaLista(pessoasAtuais).filter(x => x.papeis.includes(papel) && x.email).map(x => x.email);
+/** Gerente do projeto: membro da equipe com função de gerente (ou com o nome do gerente). */
 function emailDoGp(p: Projeto): string {
   const m = p.equipe.find(x => x.email && /gerente|^gp$/i.test(x.funcao)) || p.equipe.find(x => x.email && x.nome.trim().toLowerCase() === p.gerente.trim().toLowerCase());
   return m?.email || '';
+}
+/** PMO de um projeto: o gerente dele; sem gerente com e-mail, os PMOs da lista Portal Tecnicos. Sem projeto: todos os PMOs. */
+function pmosDe(p?: Projeto): string {
+  const gp = p ? emailDoGp(p) : '';
+  if (gp) return gp;
+  const l = daLista('PMO');
+  return l.length ? l.join(', ') : (config.emailPmo || config.emailPatrocinador || '');
+}
+/** Patrocinador de um projeto: quem tem a função Patrocinador na equipe; senão os da lista Portal Tecnicos. */
+function patrocinadoresDe(p?: Projeto): string {
+  const doProjeto = (p?.equipe || []).filter(m => m.email && /patrocinador/i.test(m.funcao)).map(m => m.email);
+  if (doProjeto.length) return doProjeto.join(', ');
+  const l = daLista('Patrocinador');
+  return l.length ? l.join(', ') : (config.emailPatrocinador || config.emailPmo || '');
 }
 /** Destinatários sem repetição; em teste (emailSomentePara) tudo vai para um endereço só. */
 function destinatarios(...grupos: string[]): string {
@@ -172,6 +202,67 @@ async function reunioesRemarcadas(fonte: FonteDados, d: Dados): Promise<{ cod: s
     } catch { /* sem permissão de escrita: tenta de novo na próxima leitura */ }
   }
   return mudancas;
+}
+
+/** Status de subatividade mudou: e-mail ao PMO (gerente do projeto), sem travar a gravação. */
+function avisarStatusSubatividade(fonte: FonteDados, p: Projeto | undefined, a: Atividade | undefined, campos: Partial<Atividade>, autor: string, aviso: (m: string) => void) {
+  if (!p || !a || !a.pai || !campos.status || campos.status === a.status) return;
+  if (!config.emailAoMudarStatusSubatividade || !fonte.enviarEmail) return;
+  const para = destinatarios(pmosDe(p));
+  if (!para) return;
+  const { assunto, html } = emailStatusSubatividade(p, a, campos, autor);
+  fonte.enviarEmail(assunto, html, para).then(d => aviso(`PMO avisado da mudança de status (${d}).`)).catch(() => undefined);
+}
+
+/**
+ * Atrasos: uma vez por dia (ao abrir o portal), avisa o PMO de cada projeto sobre as atividades e subatividades que
+ * passaram do término previsto e ainda não foram avisadas. A atividade guarda o término avisado (AvisoAtraso),
+ * então cada atraso é avisado uma vez — se for remarcada e atrasar de novo, avisa de novo.
+ */
+async function verificarAtrasos(fonte: FonteDados, d: Dados): Promise<{ cod: string; codigo: string; campos: Partial<Atividade> }[]> {
+  if (!config.emailAoAtrasar || !fonte.enviarEmail || fonte.modo !== 'sharepoint') return [];
+  const hoje = fonte.hoje(), chave = 'portal-pmo-atrasos-verificados';
+  try { if (localStorage.getItem(chave) === hoje) return []; localStorage.setItem(chave, hoje); } catch { /* */ }
+  const marcados: { cod: string; codigo: string; campos: Partial<Atividade> }[] = [];
+  for (const p of d.projetos.filter(x => x.situacaoCadastro === 'Ativo')) {
+    const novos = (d.atividades[p.codigo] || []).filter(a =>
+      a.status !== 'Concluído' && a.status !== 'Cancelado' && a.termino && a.termino < hoje && a.avisoAtraso !== a.termino);
+    if (!novos.length) continue;
+    const para = destinatarios(pmosDe(p));
+    if (!para) continue;   // sem e-mail do PMO: tenta de novo quando houver
+    const nome = (e?: string) => (e ? p.equipe.find(m => m.email.toLowerCase() === e.toLowerCase())?.nome || e : '');
+    const itens = novos.map(a => ({ a, dias: Math.max(1, diasUteis(a.termino, hoje) - 1), responsavel: nome(a.responsavel) }))
+      .sort((x, y) => y.dias - x.dias);
+    try {
+      const { assunto, html } = emailAtrasos(p, itens);
+      await fonte.enviarEmail(assunto, html, para);
+      for (const a of novos) {
+        try { await fonte.salvarAtividade(p.codigo, a, { avisoAtraso: a.termino }); marcados.push({ cod: p.codigo, codigo: a.codigo, campos: { avisoAtraso: a.termino } }); }
+        catch { /* sem permissão de gravar: o aviso pode repetir amanhã */ }
+      }
+    } catch { /* e-mail falhou: tenta amanhã */ try { localStorage.removeItem(chave); } catch { /* */ } }
+  }
+  return marcados;
+}
+
+/** Recalcula o % da atividade principal (proporção das subatividades concluídas) e grava se mudou. */
+async function recalcularPrincipal(fonte: FonteDados, lista: Atividade[], cod: string, codPai: string): Promise<Partial<Atividade> | null> {
+  const pai = lista.find(a => a.codigo === codPai);
+  if (!pai) return null;
+  const pct = percentualPrincipal(pai, lista.filter(a => a.pai === codPai));
+  if (pct === pai.percentual) return null;
+  await fonte.salvarAtividade(cod, pai, { percentual: pct });
+  return { percentual: pct };
+}
+
+/** Pré-requisitos: não deixa iniciar (ou concluir) uma atividade com pré-requisito ainda não concluído. */
+function exigirPreRequisitos(a: Atividade, campos: Partial<Atividade>, lista: Atividade[]) {
+  const status = campos.status ?? a.status, pct = campos.percentual ?? a.percentual;
+  const comecando = iniciaria(status, pct) && !iniciaria(a.status, a.percentual);
+  const concluindo = status === 'Concluído' && a.status !== 'Concluído';
+  if (!comecando && !concluindo) return;
+  const falta = pendentes({ ...a, ...campos }, lista);
+  if (falta.length) throw new Error(`“${a.nome}” só pode ser iniciada depois de concluir: ${falta.map(x => `“${x.nome}” (${x.status.toLowerCase()})`).join('; ')}.`);
 }
 
 /** Gates já criados nesta sessão (chave "PROJETO|G1"), para nunca criar o mesmo duas vezes. */
@@ -222,7 +313,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
   const [erro, setErro] = useState('');
   const [usuario, setUsuario] = useState('');
   const [sincronizando, setSincronizando] = useState(false);
-  const { papel } = usePapel();
+  const { papel, definirDisponiveis, semPerfil } = usePapel();
   /** "hoje" é relido a cada minuto: se o portal ficar aberto de um dia para o outro, a linha de hoje acompanha */
   const [hojeAtual, setHojeAtual] = useState('');
   useEffect(() => {
@@ -231,6 +322,9 @@ export function PortalProvider({ children }: { children: ReactNode }) {
     const t = window.setInterval(() => setHojeAtual(h => (fonte.hoje() !== h ? fonte.hoje() : h)), 60000);
     return () => window.clearInterval(t);
   }, [fonte]);
+  useEffect(() => { pessoasAtuais = dados?.tecnicos || []; }, [dados?.tecnicos]);
+  /** pessoas para o cadastro de projetos: lista Portal Tecnicos, pela função (Técnico/Arquiteto, PMO/Gerente de projeto, Patrocinador) */
+  const pessoasApp = useMemo<PessoaApp[]>(() => pessoasDaLista(dados?.tecnicos || []), [dados?.tecnicos]);
   /** situação da gravação do histórico */
   const [statusHistorico, setStatusHistorico] = useState<{ pendentes: number; erro: string }>({ pendentes: lerPendentes().length, erro: '' });
   const erroAvisado = useRef('');
@@ -281,6 +375,11 @@ export function PortalProvider({ children }: { children: ReactNode }) {
       try {
         const f = await criarFonte();
         const nome = await f.entrar();
+        // perfis: no modo conectado, só as funções de aplicativo (App Roles) do Entra ID; no piloto, todos (demonstração)
+        const meus = f.papeis ? f.papeis().map(papelDaFuncao).filter((x): x is Papel => !!x) : PAPEIS;
+        definirDisponiveis(meus);
+        // sem nenhuma função do portal: para aqui (não carrega dados nem roda avisos automáticos)
+        if (!meus.length) { if (vivo) { setFonte(f); setUsuario(nome); } return; }
         const d = await garantirGates(f, await f.carregar());
         if (!vivo) return;
         setFonte(f);
@@ -291,6 +390,11 @@ export function PortalProvider({ children }: { children: ReactNode }) {
         setAtualizadoEm(horaAgora());
         aplicarRemarcadas(f, d);
         if (f.modo === 'sharepoint') reenviarPendentes(f);
+        verificarAtrasos(f, d).then(m => {
+          if (!m.length) return;
+          setDados(prev => { if (!prev) return prev; let n = prev; for (const x of m) n = comItem<Atividade>(n, 'atividades', x.cod, x.codigo, x.campos); assinatura.current = assinar(n); return n; });
+          toast(`PMO avisado por e-mail de ${m.length} atividade(s) atrasada(s).`);
+        });
       } catch (e) {
         if (vivo) setErro((e as Error).message);
       }
@@ -360,22 +464,72 @@ export function PortalProvider({ children }: { children: ReactNode }) {
       if (!p) throw new Error(`Projeto ${cod} não encontrado.`);
       return p;
     };
+    /** valida status e datas de uma atividade antes de gravar; erros bloqueiam, avisos voltam para mostrar depois */
+    const validarAtividade = (cod: string, atv: Atividade, campos: Partial<Atividade>, modo: 'estrutura' | 'reprogramacao'): string[] => {
+      const lista = dados.atividades[cod] || [], depois = { ...atv, ...campos } as Atividade;
+      const erros: string[] = [];
+      if (CAMPOS_STATUS.some(c => c in campos)) erros.push(...conferirStatus(atv, depois, fonte.hoje(), lista.some(x => x.pai === atv.codigo && x.status !== 'Cancelado')));
+      let avisos: string[] = [];
+      if ('inicio' in campos || 'termino' in campos) {
+        const dt = conferirDatas(depois, projeto(cod), lista, modo);
+        erros.push(...dt.erros); avisos = dt.avisos;
+      }
+      if (erros.length) throw new Error('Não foi possível salvar: ' + erros.join('; ') + '.');
+      return avisos;
+    };
+    /** avisos de validação: mostrados logo depois da mensagem de confirmação da tela */
+    const avisarDepois = (l: string[]) => { setTimeout(() => toast('Atenção: ' + l.join('; ') + '.'), 400); };
+    /** grava uma atividade; se outra pessoa mudou o item nesse meio tempo, recarrega os dados e repassa o aviso */
+    const gravarAtividade = async (cod: string, atv: Atividade, campos: Partial<Atividade>) => {
+      try { await fonte.salvarAtividade(cod, atv, campos); }
+      catch (e) { if (e instanceof ConflitoEdicao) atualizar(true).catch(() => undefined); throw e; }   // força a recarga: o painel ainda está aberto
+    };
+    /** checklist do G3/G4: bloqueia o pedido e a aprovação enquanto houver item pendente */
+    const exigirChecklist = async (p: Projeto, gate: string) => {
+      if (gate !== 'G3' && gate !== 'G4') return;
+      let temTrd: boolean | null = null;
+      if (gate === 'G4' && fonte.modo !== 'piloto') {
+        const pastas = await fonte.documentos(p.codigo).catch(() => []);
+        temTrd = pastas.some(x => x.arquivos.some(a => /\btrd\b|termo\s*de\s*aceite/i.test(a.nome)));
+      }
+      const falta = checklistGate(gate, p, dados, temTrd).filter(i => i.ok === false);
+      if (falta.length) throw new Error(`Antes do ${gate}: ${falta.map(i => i.texto).join('; ')}.`);
+    };
+
     const v: PortalValor = {
       fonte, dados, usuario, email: fonte.email(), hoje: hojeAtual || fonte.hoje(), sincronizando, ocupado: emAndamento > 0, atualizadoEm, atualizar,
       bloquear,
 
       async salvarAtividade(cod, codigo, campos) {
         const atv = (dados.atividades[cod] || []).find(a => a.codigo === codigo)!;
+        exigirPreRequisitos(atv, campos, dados.atividades[cod] || []);
         if (campos.inicio && campos.termino) campos = { ...campos, duracao: Math.max(1, diasUteis(campos.inicio, campos.termino)) };
-        await fonte.salvarAtividade(cod, atv, campos);
+        // principal: o % não é editável — vem das subatividades concluídas (ou 0/100 pelo status, se não tiver)
+        if (!atv.pai && ('percentual' in campos || 'status' in campos)) {
+          campos = { ...campos, percentual: percentualPrincipal(atv, (dados.atividades[cod] || []).filter(a => a.pai === codigo), campos.status ?? atv.status) };
+        }
+        const avisos = validarAtividade(cod, atv, campos, 'estrutura');
+        await gravarAtividade(cod, atv, campos);
+        if (avisos.length) avisarDepois(avisos);
+        avisarStatusSubatividade(fonte, dados.projetos.find(x => x.codigo === cod), atv, campos, usuario, toast);
         let novo = comItem<Atividade>(dados, 'atividades', cod, codigo, campos);
-        // subatividades acompanham a atividade macro
-        const herdado = Object.fromEntries(Object.entries({ status: campos.status, percentual: campos.percentual, inicio: campos.inicio, termino: campos.termino, fase: campos.fase }).filter(([, v]) => v !== undefined));
-        novo = { ...novo, atividades: { ...novo.atividades, [cod]: novo.atividades[cod].map(a => (a.pai === codigo ? { ...a, ...herdado } as Atividade : a)) } };
+        // mudança de fase: as subatividades acompanham a nova fase, mantendo progresso, datas, status e o resto
+        if (campos.fase && campos.fase !== atv.fase) {
+          for (const sub of (dados.atividades[cod] || []).filter(a => a.pai === codigo && a.fase !== campos.fase)) {
+            await fonte.salvarAtividade(cod, sub, { fase: campos.fase });
+          }
+          novo = { ...novo, atividades: { ...novo.atividades, [cod]: novo.atividades[cod].map(a => (a.pai === codigo ? { ...a, fase: campos.fase! } : a)) } };
+        }
+        // subatividade mudou de status: a principal recalcula o %
+        if (atv.pai && 'status' in campos) {
+          const doPai = await recalcularPrincipal(fonte, novo.atividades[cod] || [], cod, atv.pai);
+          if (doPai) novo = comItem<Atividade>(novo, 'atividades', cod, atv.pai, doPai);
+        }
         aplicar(novo);
       },
       async salvarRisco(cod, codigo, campos) {
         const r = (dados.riscos[cod] || []).find(x => x.codigo === codigo)!;
+        if (riscoAltoSemMitigacao({ ...r, ...campos })) throw new Error('Risco alto (impacto alto, probabilidade média ou alta): informe o plano de mitigação.');
         await fonte.salvarRisco(cod, r, campos);
         aplicar(comItem<Risco>(dados, 'riscos', cod, codigo, campos));
       },
@@ -389,11 +543,13 @@ export function PortalProvider({ children }: { children: ReactNode }) {
       },
       async solicitarGate(cod, gate) {
         const p = projeto(cod), g = p.fases.find(x => x.gate === gate)!;
+        await exigirChecklist(p, gate);
         await fonte.salvarGate(p, g, { situacao: 'Aguardando aprovação' });
         aplicar({ ...dados, projetos: dados.projetos.map(x => x.codigo !== cod ? x : { ...x, fases: x.fases.map(y => (y.gate === gate ? { ...y, situacao: 'Aguardando aprovação' } : y)) }) });
       },
       async decidirGate(cod, gate, { aprovar, parecer, congelarBaseline }) {
         const p = projeto(cod), g = p.fases.find(x => x.gate === gate)!;
+        if (aprovar) await exigirChecklist(p, gate);
         const hojeAgora = fonte.hoje();
         const camposGate = aprovar
           ? { situacao: 'Aprovado' as const, aprovadoPor: usuario, dataAprovacao: hojeAgora, parecer }
@@ -433,8 +589,17 @@ export function PortalProvider({ children }: { children: ReactNode }) {
         const p = projeto(cod);
         if ((dados.atividades[cod] || []).some(a => a.codigo === atv.codigo)) throw new Error(`Já existe uma atividade com o código ${atv.codigo}.`);
         const completa: Atividade = { ...atv, duracao: atv.duracao || Math.max(1, diasUteis(atv.inicio, atv.termino)) };
+        const dt = conferirDatas(completa, p, dados.atividades[cod] || [], 'estrutura');
+        if (dt.erros.length) throw new Error('Não foi possível criar: ' + dt.erros.join('; ') + '.');
+        if (dt.avisos.length) avisarDepois(dt.avisos);
         const criada = await fonte.criarAtividade(p, completa);
-        aplicar({ ...dados, atividades: { ...dados.atividades, [cod]: [...(dados.atividades[cod] || []), criada] } });
+        const lista = [...(dados.atividades[cod] || []), criada];
+        let novo: Dados = { ...dados, atividades: { ...dados.atividades, [cod]: lista } };
+        if (criada.pai) {
+          const doPai = await recalcularPrincipal(fonte, lista, cod, criada.pai);
+          if (doPai) novo = comItem<Atividade>(novo, 'atividades', cod, criada.pai, doPai);
+        }
+        aplicar(novo);
         return criada;
       },
       async excluirProjeto(cod, opcoes) {
@@ -451,8 +616,8 @@ export function PortalProvider({ children }: { children: ReactNode }) {
       async avisarExclusaoProjeto(p, removidos, documentos) {
         if (!fonte.enviarEmail) throw new Error('no modo piloto o e-mail não é enviado');
         const equipe = p.equipe.map(m => m.email).filter(Boolean).join(', ');
-        const para = destinatarios(equipe, emailDoGp(p), emailPatrocinador());
-        if (!para) throw new Error('ninguém da equipe tem e-mail e emailPatrocinador está vazio');
+        const para = destinatarios(equipe, pmosDe(p), patrocinadoresDe(p));
+        if (!para) throw new Error('ninguém da equipe tem e-mail e não há PMO nem patrocinador na lista Portal Tecnicos');
         const { assunto, html } = emailProjetoExcluido(p, usuario, fonte.hoje(), removidos, documentos);
         return fonte.enviarEmail(assunto, html, para);
       },
@@ -464,9 +629,9 @@ export function PortalProvider({ children }: { children: ReactNode }) {
           if (g1) await fonte.salvarGate(p, g1, { situacao: 'Aguardando aprovação' });
           aplicar({ ...dados, projetos: dados.projetos.map(x => x.codigo !== cod ? x : {
             ...x, situacaoCadastro: 'Em aprovação', fases: x.fases.map(g => (g.gate === 'G1' ? { ...g, situacao: 'Aguardando aprovação' } : g)) }) });
-          if (config.emailAoSolicitarAprovacao && fonte.enviarEmail && emailPatrocinador()) {
+          if (config.emailAoSolicitarAprovacao && fonte.enviarEmail && pmosDe()) {
             const { assunto, html } = emailSolicitacaoProjeto({ ...novoProj, projeto: { ...p, situacaoCadastro: 'Em aprovação' } }, usuario);
-            fonte.enviarEmail(assunto, html, destinatarios(emailPatrocinador())).catch(() => undefined);
+            fonte.enviarEmail(assunto, html, destinatarios(pmosDe())).catch(() => undefined);
           }
           return;
         }
@@ -477,7 +642,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
           ...x, situacaoCadastro: 'Ativo', fase: 'Planejamento', fases: x.fases.map(g => (g.gate === 'G1' ? { ...g, ...aprov } : g)) }) });
         if (config.emailAoCriarProjeto && fonte.enviarEmail) {
           const { assunto, html } = emailProjetoCriadoPeloPmo({ ...novoProj, projeto: { ...p, situacaoCadastro: 'Ativo', fase: 'Planejamento' } }, usuario);
-          fonte.enviarEmail(assunto, html, destinatarios(emailDoGp(p), emailPatrocinador()) || undefined).catch(() => undefined);
+          fonte.enviarEmail(assunto, html, destinatarios(pmosDe(p), patrocinadoresDe(p)) || undefined).catch(() => undefined);
         }
       },
       async removerGatesRepetidos(cod) {
@@ -489,17 +654,49 @@ export function PortalProvider({ children }: { children: ReactNode }) {
       },
       async atualizarSemanal(cod, codigo, campos) {
         const a = (dados.atividades[cod] || []).find(x => x.codigo === codigo)!;
+        exigirPreRequisitos(a, campos, dados.atividades[cod] || []);
+        const lista = dados.atividades[cod] || [];
+        if (!a.pai) campos = { ...campos, percentual: percentualPrincipal(a, lista.filter(x => x.pai === codigo), campos.status ?? a.status) };
+        const avisosData = validarAtividade(cod, a, campos, 'reprogramacao');
         const registro = { ...campos, dataUltimaAtualizacao: fonte.hoje(), atualizadoPor: usuario };
-        await fonte.salvarAtividade(cod, a, registro);
+        await gravarAtividade(cod, a, registro);
+        if (avisosData.length) avisarDepois(avisosData);
+        avisarStatusSubatividade(fonte, dados.projetos.find(x => x.codigo === cod), a, campos, usuario, toast);
         aplicarCom(d => comItem<Atividade>(d, 'atividades', cod, codigo, registro));
+        if (a.pai && campos.status && campos.status !== a.status) {
+          const doPai = await recalcularPrincipal(fonte, lista.map(x => (x.codigo === codigo ? { ...x, ...registro } : x)), cod, a.pai);
+          if (doPai) aplicarCom(d => comItem<Atividade>(d, 'atividades', cod, a.pai, doPai));
+        }
         // reprogramação: nova data prevista depois da baseline (e diferente da que já estava)
         const nova = campos.termino;
         if (!nova || !a.baselineTermino || nova <= a.baselineTermino || nova === a.termino) return '';
         if (!config.emailAoReprogramar || !fonte.enviarEmail) return '';
-        const p = projeto(cod), para = destinatarios(emailDoGp(p));
+        const p = projeto(cod), para = destinatarios(pmosDe(p));
         if (!para) return '';
         const { assunto, html } = emailReprogramacao(p, a, nova, { causa: campos.causaAtraso || '', observacao: campos.observacao || '', impedimento: !!campos.impedimento, autor: usuario });
         try { return await fonte.enviarEmail(assunto, html, para); } catch { return ''; }
+      },
+      async lancarTarefas(cod, codigos) {
+        const p = projeto(cod);
+        const alvo = (dados.atividades[cod] || []).filter(a => codigos.includes(a.codigo) && a.pai && a.lancada === false);
+        if (fonte.tarefasGravaveis && !fonte.tarefasGravaveis()) throw new Error('a lista Portal Atividades ainda não tem a coluna "Lançada para o técnico". Rode o script provisionar-portal.ps1 (sem -Piloto) e recarregue o portal');
+        const semResp = alvo.filter(a => !a.responsavel);
+        if (semResp.length) throw new Error(`Escolha o técnico responsável antes de lançar: ${semResp.map(a => a.codigo).join(', ')}.`);
+        let novo = dados;
+        for (const a of alvo) { await fonte.salvarAtividade(cod, a, { lancada: true }); novo = comItem<Atividade>(novo, 'atividades', cod, a.codigo, { lancada: true }); }
+        aplicar(novo);
+        // um e-mail por técnico com as tarefas dele
+        if (config.emailAoLancarTarefa && fonte.enviarEmail) {
+          const porTecnico = new Map<string, Atividade[]>();
+          for (const a of alvo) porTecnico.set(a.responsavel!.toLowerCase(), [...(porTecnico.get(a.responsavel!.toLowerCase()) || []), a]);
+          for (const [email, tarefas] of porTecnico) {
+            const nome = p.equipe.find(m => m.email.toLowerCase() === email)?.nome || email;
+            const para = destinatarios(email);
+            if (!para) continue;
+            const { assunto, html } = emailTarefasLancadas(p, nome, tarefas, usuario);
+            fonte.enviarEmail(assunto, html, para).catch(() => undefined);
+          }
+        }
       },
       async enviarDocumento(cod, pasta, arquivo) { await fonte.enviarArquivo(cod, pasta, arquivo); },
       async excluirDocumento(cod, pasta, arquivo) {
@@ -508,8 +705,10 @@ export function PortalProvider({ children }: { children: ReactNode }) {
       },
       historico(cod) { return fonte.historico(cod); },
       statusHistorico,
+      pessoasApp,
       reenviarHistorico() { return reenviarPendentes(fonte); },
       async criarRisco(cod, r) {
+        if (riscoAltoSemMitigacao(r)) throw new Error('Risco alto (impacto alto, probabilidade média ou alta): informe o plano de mitigação.');
         if ((dados.riscos[cod] || []).some(x => x.codigo === r.codigo)) throw new Error(`Já existe um risco com o código ${r.codigo}.`);
         const criado = await fonte.criarRisco(projeto(cod), r);
         aplicar({ ...dados, riscos: { ...dados.riscos, [cod]: [...(dados.riscos[cod] || []), criado] } });
@@ -578,6 +777,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
         return fonte.obterReuniaoTeams(a.reuniaoId);
       },
       reuniaoGravavel: !fonte.reuniaoGravavel || fonte.reuniaoGravavel(),
+      tarefasGravaveis: !fonte.tarefasGravaveis || fonte.tarefasGravaveis(),
       async excluirAtividade(cod, codigo, opcoes) {
         const lista = dados.atividades[cod] || [];
         const alvo = lista.filter(a => a.codigo === codigo || a.pai === codigo);
@@ -588,7 +788,14 @@ export function PortalProvider({ children }: { children: ReactNode }) {
           }
         }
         for (const a of alvo) await fonte.excluirAtividade(cod, a);
-        aplicar({ ...dados, atividades: { ...dados.atividades, [cod]: lista.filter(a => !alvo.includes(a)) } });
+        const restante = lista.filter(a => !alvo.includes(a));
+        let novo: Dados = { ...dados, atividades: { ...dados.atividades, [cod]: restante } };
+        const excluida = lista.find(a => a.codigo === codigo);
+        if (excluida?.pai) {
+          const doPai = await recalcularPrincipal(fonte, restante, cod, excluida.pai);
+          if (doPai) novo = comItem<Atividade>(novo, 'atividades', cod, excluida.pai, doPai);
+        }
+        aplicar(novo);
       },
       async criarProjeto(novoProjeto) {
         await fonte.criarProjeto(novoProjeto);
@@ -606,24 +813,24 @@ export function PortalProvider({ children }: { children: ReactNode }) {
       },
       async avisarPmoProjeto(novoProjeto) {
         if (!fonte.enviarEmail) throw new Error('no modo piloto o e-mail não é enviado');
-        if (!emailPatrocinador()) throw new Error('defina emailPatrocinador no config.js');
+        if (!pmosDe()) throw new Error('não há PMO com e-mail na lista Portal Tecnicos (nem emailPmo no config.js)');
         const { assunto, html } = emailSolicitacaoProjeto(novoProjeto, usuario);
-        return fonte.enviarEmail(assunto, html, destinatarios(emailPatrocinador()));
+        return fonte.enviarEmail(assunto, html, destinatarios(pmosDe()));   // cadastro: quem aprova é o PMO
       },
       async avisarPmoGate(cod, gate) {
         if (!fonte.enviarEmail) throw new Error('no modo piloto o e-mail não é enviado');
-        if (!emailPatrocinador()) throw new Error('defina emailPatrocinador no config.js');
         const p = projeto(cod), g = p.fases.find(x => x.gate === gate)!;
+        if (!patrocinadoresDe(p)) throw new Error('o projeto não tem patrocinador com e-mail na equipe nem na lista Portal Tecnicos');
         const fases = g.fase === 'Encerramento' ? ['Monitoramento', 'Encerramento'] as const : [g.fase];
         const prog = fases.map(f => progressoFase(dados, cod, f)).reduce((s, x) => ({ feitas: s.feitas + x.feitas, total: s.total + x.total }), { feitas: 0, total: 0 });
         const { assunto, html } = emailSolicitacaoGate(p, g, prog, usuario);
-        return fonte.enviarEmail(assunto, html, destinatarios(emailPatrocinador()));
+        return fonte.enviarEmail(assunto, html, destinatarios(patrocinadoresDe(p)));   // G2–G4: quem aprova é o patrocinador
       },
       async avisarAprovacao(cod, gate, parecer) {
         if (!fonte.enviarEmail) throw new Error('no modo piloto o e-mail não é enviado');
         const p = projeto(cod), g = p.fases.find(x => x.gate === gate)!;
-        const para = destinatarios(emailDoGp(p), emailPatrocinador());
-        if (!para) throw new Error('o gerente do projeto não tem e-mail na equipe e emailPatrocinador está vazio');
+        const para = destinatarios(pmosDe(p), patrocinadoresDe(p), p.equipe.map(m => m.email).filter(Boolean).join(', '));
+        if (!para) throw new Error('ninguém do projeto tem e-mail e não há PMO nem patrocinador na lista Portal Tecnicos');
         const proxima = gate === 'G4' ? 'Encerrado' : (PROXIMA_FASE[g.fase] || p.fase);
         const { assunto, html } = emailGateAprovado(p, g, { por: usuario, em: fonte.hoje(), parecer, proximaFase: proxima });
         return fonte.enviarEmail(assunto, html, para);
@@ -631,7 +838,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
       async enviarEmailCriacao(novoProjeto) {
         if (!fonte.enviarEmail) throw new Error('no modo piloto o e-mail não é enviado');
         // projeto criado pelo PMO já nasce aprovado: avisa GP e PMO
-        const para = destinatarios(emailDoGp(novoProjeto.projeto), emailPatrocinador());
+        const para = destinatarios(pmosDe(novoProjeto.projeto), patrocinadoresDe(novoProjeto.projeto));
         const { assunto, html } = emailProjetoCriadoPeloPmo(novoProjeto, usuario);
         return fonte.enviarEmail(assunto, html, para || undefined);
       },
@@ -643,12 +850,18 @@ export function PortalProvider({ children }: { children: ReactNode }) {
     // toda ação assíncrona conta como "ocupado" enquanto roda (barrinha de carregamento no topo)
     // e, se der certo, vira um registro no histórico do projeto (quem, quando, o que mudou)
     // leituras (historico, lerReuniao) ficam de fora: senão cada leitura recriaria o contexto e dispararia outra leitura
-    const SEM_INDICADOR = new Set(['atualizar', 'bloquear', 'historico', 'lerReuniao', 'reenviarHistorico']);
+    const ACOES_BLOQUEADAS_ENCERRADO = new Set<string>(['salvarAtividade', 'criarAtividade', 'excluirAtividade', 'atualizarSemanal', 'lancarTarefas',
+      'salvarRisco', 'criarRisco', 'excluirRisco', 'salvarPendencia', 'criarPendencia', 'excluirPendencia',
+      'agendarReuniao', 'atualizarReuniao', 'cancelarReuniao', 'solicitarGate', 'decidirGate']);
+    const SEM_INDICADOR = new Set(['atualizar', 'bloquear', 'historico', 'lerReuniao', 'reenviarHistorico', 'carregarPessoasApp']);
     const quem = `${usuario} (${papel})`;
     for (const k of Object.keys(v) as (keyof PortalValor)[]) {
       const fn = v[k];
       if (typeof fn !== 'function' || SEM_INDICADOR.has(k)) continue;
       (v as unknown as Record<string, unknown>)[k] = (...args: unknown[]) => {
+        // projeto encerrado: somente leitura (atividades, riscos, pendências, reuniões e gates)
+        if (ACOES_BLOQUEADAS_ENCERRADO.has(k) && typeof args[0] === 'string' && dados.projetos.find(p => p.codigo === args[0])?.situacaoCadastro === 'Encerrado')
+          return Promise.reject(new Error('Projeto encerrado: somente leitura. Não é possível alterar atividades, riscos, pendências, reuniões ou gates.'));
         const r = (fn as (...a: unknown[]) => unknown).apply(v, args);
         if (r instanceof Promise) {
           setEmAndamento(n => n + 1);
@@ -658,7 +871,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
           const timer = msg ? window.setTimeout(() => { mostrou = true; longas.current++; setAcaoLonga(msg); }, 500) : 0;
           return r.then(res => {
             const l = descrever(k, args, dados, res);
-            if (l) registrarSeguro(fonte, { quando: new Date().toISOString(), usuario: quem, projeto: l.cod, tipo: l.tipo, acao: l.acao, descricao: l.descricao });
+            if (l) registrarSeguro(fonte, { quando: new Date().toISOString(), usuario: quem, projeto: l.cod, tipo: l.tipo, acao: l.acao, descricao: l.descricao, item: l.item, antes: l.antes, depois: l.depois });
             return res;
           }).finally(() => {
             setEmAndamento(n => Math.max(0, n - 1));
@@ -670,7 +883,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
       };
     }
     return v;
-  }, [dados, fonte, usuario, papel, hojeAtual, sincronizando, emAndamento, atualizadoEm, atualizar, aplicar, aplicarCom, bloquear, statusHistorico]);
+  }, [dados, fonte, usuario, papel, hojeAtual, sincronizando, emAndamento, atualizadoEm, atualizar, aplicar, aplicarCom, bloquear, statusHistorico, pessoasApp]);
 
   if (erro) {
     return (
@@ -680,6 +893,19 @@ export function PortalProvider({ children }: { children: ReactNode }) {
       </main>
     );
   }
+  if (semPerfil && fonte) return (
+    <main className="semPerfil">
+      <div className="card semPerfilCartao">
+        <div className="vazioIcone" aria-hidden="true">?</div>
+        <h1 className="h2" style={{ fontSize: 22, fontWeight: 700 }}>Você ainda não tem um perfil na Central Systech</h1>
+        <p className="sub" style={{ fontSize: 14, lineHeight: 1.6 }}>
+          Entrou como <b>{usuario || fonte.email()}</b>, mas nenhuma função do portal (PMO, Patrocinador, Técnico ou Cliente) está atribuída a esta conta
+          no aplicativo <b>Portal PMO</b> do Entra ID. Peça ao PMO ou à TI para atribuir o seu perfil e entre de novo.
+        </p>
+        <button type="button" className="btn pri" onClick={() => fonte.sair()}>Sair e entrar com outra conta</button>
+      </div>
+    </main>
+  );
   if (!valor) return <Carregando texto="Carregando o portal…" telaCheia />;
   return (
     <PortalContext.Provider value={valor}>

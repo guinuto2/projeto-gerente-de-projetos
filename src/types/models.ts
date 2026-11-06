@@ -21,7 +21,7 @@ export interface Gate {
   parecer?: string;
 }
 
-export interface MembroEquipe { nome: string; funcao: string; empresa: string; email: string }
+export interface MembroEquipe { nome: string; funcao: string; empresa: string; email: string; telefone?: string }
 
 /** Técnico da Systech (lista Portal Tecnicos). */
 export interface Tecnico { _id?: string; nome: string; email: string; funcao: string; ativo: boolean }
@@ -44,6 +44,14 @@ export interface Projeto {
   arquiteto: string;
   patrocinador: string;
   contrato: string;
+  /** data de assinatura do contrato */
+  dataAssinatura?: string;
+  /** Edital, Service Entitlement ou Sem receita */
+  modeloFaturamento?: string;
+  /** empresa parceira, quando o trabalho é terceirizado (vazio = execução própria) */
+  parceiro?: string;
+  /** quem cadastrou o projeto (e-mail ou nome) */
+  criadoPor?: string;
   inicio: string;
   terminoBaseline: string;
   terminoPrevisto: string;
@@ -61,6 +69,8 @@ export interface Projeto {
 }
 
 export interface Atividade {
+  /** quando o item foi alterado pela última vez no SharePoint (para detectar edição ao mesmo tempo) */
+  _modificado?: string;
   _id?: string;
   codigo: string;
   nome: string;
@@ -93,6 +103,18 @@ export interface Atividade {
   impedimento?: boolean;
   causaAtraso?: string;
   horasRealizadas?: number;
+  /** horas previstas para a atividade/subatividade (definidas pelo PMO) */
+  horasPlanejadas?: number;
+  /** atualização: a atividade teve reunião no Teams? */
+  teveReuniao?: boolean;
+  /** atualização: o que foi feito */
+  realizado?: string;
+  /** término previsto a que o último aviso de atraso ao PMO se referiu (evita avisar duas vezes) */
+  avisoAtraso?: string;
+  /** subatividade criada pelo PMO e ainda não lançada para o técnico (false = o técnico não vê) */
+  lancada?: boolean;
+  /** códigos das atividades/subatividades que precisam estar concluídas antes desta começar */
+  predecessoras?: string[];
   dataUltimaAtualizacao?: string;
   atualizadoPor?: string;
 }
@@ -131,6 +153,8 @@ export interface Pendencia {
   impacto: string;
   situacao: 'Aberta' | 'Respondida';
   resposta?: string;
+  /** prazo para o cliente responder (ISO); aberta e vencida aparece em destaque */
+  prazo?: string;
 }
 
 export interface Decisao { _id?: string; codigo: string; decisao: string; descricao: string; justificativa: string; impacto: string }
@@ -148,6 +172,11 @@ export interface RegistroHistorico {
   /** Criou, Editou, Excluiu, Aprovou… */
   acao: string;
   descricao: string;
+  /** código da atividade/subatividade a que o registro se refere */
+  item?: string;
+  /** retrato da atividade antes e depois da mudança (JSON) */
+  antes?: string;
+  depois?: string;
 }
 export interface PastaDocumentos { pasta: string; url: string; arquivos: Arquivo[] }
 

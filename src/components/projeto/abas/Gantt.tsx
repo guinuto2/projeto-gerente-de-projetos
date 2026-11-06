@@ -8,6 +8,7 @@ import { dia, dm, iso } from '../../../lib/datas';
 import { Selo } from '../../ui/Selo';
 import { TEMA } from '../../../lib/tema';
 import { DicaAtividade } from './DicaAtividade';
+import { aguardando, situacaoPrazo } from '../../../lib/dependencias';
 
 interface Props {
   /** subatividades abertas por atividade principal (controlado pela aba) */
@@ -19,6 +20,10 @@ interface Props {
   aoAbrir: (codigo: string) => void;
   /** período fixo do eixo de datas (usado na página de todos os cronogramas, para alinhar os projetos) */
   periodo?: { ini: string; fim: string };
+  /** lista simples (sem fases): mostra só estas atividades/tarefas, em ordem de data (cronograma do técnico) */
+  plano?: Atividade[];
+  /** e-mail de quem está vendo: as tarefas dele ganham o selo "minha" */
+  minhas?: string;
 }
 
 /** Cronograma em barras: previsto (preenchido pelo %), baseline (linha cinza), marcos e hoje. */
@@ -67,7 +72,7 @@ export function Gantt(props: Props) {
     return (
       <>
         {mudouBaseline && <div className="gbase" style={{ left: `${pos(a.baselineInicio)}%`, width: `${larg(a.baselineInicio, a.baselineTermino)}%` }} title={`Baseline ${dm(a.baselineInicio)}–${dm(a.baselineTermino)}`} />}
-        <div className="gbar" {...eventosDica(a)} style={{ left: `${pos(a.inicio)}%`, width: `${larg(a.inicio, a.termino)}%`, background: atrasada(a) ? TEMA.atrasadoFundo : TEMA.barraFundo }}>
+        <div className="gbar" {...eventosDica(a)} style={{ left: `${pos(a.inicio)}%`, width: `${larg(a.inicio, a.termino)}%`, background: atrasada(a) ? TEMA.atrasadoFundo : a.status === 'Em andamento' ? TEMA.emCursoFundo : a.status === 'Concluído' ? TEMA.concluido : TEMA.barraFundo }}>
           <i style={{ width: `${a.percentual}%`, background: corBarra(a) }} />
         </div>
         {a.marco && <div className="gmarco" {...eventosDica(a)} style={{ left: `calc(${pos(a.termino) + larg(a.termino, a.termino)}% - 7px)`, background: a.status === 'Concluído' ? TEMA.concluido : TEMA.vinho }} />}
@@ -79,10 +84,23 @@ export function Gantt(props: Props) {
     <div className="gwrap">
       <div className="gantt">
         <div className="grow ghead">
-          <div className="gcel"><span className="gcod">Cód.</span><span className="gnome">Atividade</span><span>Equipe</span></div>
+          <div className="gcel">{props.plano ? <span className="gnome">Tarefa</span> : <><span className="gcod">Cód.</span><span className="gnome">Atividade</span><span>Equipe</span></>}</div>
           <div className="gtl">{escala.semanas.map(s => <span key={s} className="gsemL" style={{ left: `${pos(s)}%` }}>{dm(s)}</span>)}</div>
         </div>
-        {FASES.map(f => {
+        {props.plano && props.plano.map(t => (
+          <div key={t.codigo} className={`grow gclick prazo-${situacaoPrazo(t, hoje) || 'ok'}`} role="button" tabIndex={0} onClick={() => aoAbrir(t.codigo)} onKeyDown={e => { if (e.key === 'Enter') aoAbrir(t.codigo); }}>
+            <div className="gcel">
+              <span className="gnome" title={t.nome}>{t.nome}</span>
+              {t.reuniaoUrl && (
+                <a className="teams" href={t.reuniaoUrl} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
+                  title="Entrar na reunião do Teams">{t.reuniaoTipo || 'Teams'}{t.reuniaoInicio ? ` ${t.reuniaoInicio.slice(8, 10)}/${t.reuniaoInicio.slice(5, 7)} ${t.reuniaoInicio.slice(11, 16)}` : ''}</a>
+              )}
+              {t.status !== 'Planejado' && <Selo valor={t.status} cores={SELO_STATUS} />}
+            </div>
+            <div className="gtl">{grade}{barra(t)}</div>
+          </div>
+        ))}
+        {!props.plano && FASES.map(f => {
           const lista = macro(dados, projeto.codigo).filter(a => a.fase === f && filtro(a));
           if (!lista.length) return null;
           return (
@@ -100,6 +118,7 @@ export function Gantt(props: Props) {
                           : <span className="tog" />}
                         <span className="gcod">{a.codigo}</span>
                         <span className="gnome" title={a.nome}>{a.nome}</span>
+                      {aguardando(a, atividades) && <span className="tagLock" title={`Aguarda: ${(a.predecessoras || []).join(', ')}`}>aguarda pré-req.</span>}
                         {a.reuniaoUrl && (
                           <a className="teams" href={a.reuniaoUrl} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
                             title={`Entrar na reunião do Teams${a.reuniaoTipo ? ` (${a.reuniaoTipo})` : ''}`}>{a.reuniaoTipo || 'Teams'}{a.reuniaoInicio ? ` ${a.reuniaoInicio.slice(8, 10)}/${a.reuniaoInicio.slice(5, 7)} ${a.reuniaoInicio.slice(11, 16)}` : ''}</a>
@@ -112,7 +131,15 @@ export function Gantt(props: Props) {
                     {aberto && filhos.map(s => (
                       <div key={s.codigo} className="grow gclick" role="button" tabIndex={0} onClick={() => aoAbrir(s.codigo)} onKeyDown={e => { if (e.key === 'Enter') aoAbrir(s.codigo); }}>
                         <div className="gcel" style={{ paddingLeft: 40 }}>
+                          <span className="gcod" style={{ fontSize: 11.5 }}>{s.codigo}</span>
                           <span className="gnome sub" style={{ fontSize: 12.5, color: 'var(--medio)' }} title={s.nome}>{s.nome}</span>
+                          {s.reuniaoUrl && (
+                            <a className="teams" href={s.reuniaoUrl} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
+                              title={`Entrar na reunião do Teams${s.reuniaoTipo ? ` (${s.reuniaoTipo})` : ''}`}>{s.reuniaoTipo || 'Teams'}{s.reuniaoInicio ? ` ${s.reuniaoInicio.slice(8, 10)}/${s.reuniaoInicio.slice(5, 7)} ${s.reuniaoInicio.slice(11, 16)}` : ''}</a>
+                          )}
+                          {s.lancada === false && <span className="tagPrep" title="Ainda não lançada para o técnico">não lançada</span>}
+                          {aguardando(s, atividades) && <span className="tagLock" title={`Aguarda: ${(s.predecessoras || []).join(', ')}`}>aguarda pré-req.</span>}
+                          {s.status !== 'Planejado' && <Selo valor={s.status} cores={SELO_STATUS} />}
                           <span className={`geq ${classeEquipe(s.equipe)}`}>{s.equipe}</span>
                         </div>
                         <div className="gtl" style={{ opacity: 0.6 }}>{grade}{barra(s)}</div>

@@ -12,7 +12,8 @@ export interface FormReuniao {
   pauta: string;
   /** e-mail → convidado? (começa com todos da equipe marcados) */
   marcados: Record<string, boolean>;
-  extras: string;
+  /** convidados de fora da equipe, um e-mail por campo */
+  extras: string[];
 }
 
 /** Quem fica marcado por padrão: todos com e-mail, ou só a equipe Systech nas reuniões internas. */
@@ -28,12 +29,14 @@ export function marcacaoPadrao(equipe: MembroEquipe[], meuEmail: string, tipo: s
 
 export function formReuniaoInicial(equipe: MembroEquipe[], titulo: string, data: string, meuEmail: string): FormReuniao {
   const tipo = 'Alinhamento';
-  return { ativa: false, tipo, titulo, data, hora: '10:00', duracaoMin: tipoReuniao(tipo)!.duracaoMin, pauta: '', marcados: marcacaoPadrao(equipe, meuEmail, tipo), extras: '' };
+  return { ativa: false, tipo, titulo, data, hora: '10:00', duracaoMin: tipoReuniao(tipo)!.duracaoMin, pauta: '', marcados: marcacaoPadrao(equipe, meuEmail, tipo), extras: [] };
 }
+
+const emailValido = (x: string) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x.trim());
 
 /** Convidados finais: marcados da equipe + e-mails extras, sem repetição. */
 export function convidados(f: FormReuniao): string[] {
-  const extras = f.extras.split(/[,;\s]+/).map(x => x.trim().toLowerCase()).filter(x => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x));
+  const extras = f.extras.map(x => x.trim().toLowerCase()).filter(emailValido);
   return Array.from(new Set([...Object.keys(f.marcados).filter(k => f.marcados[k]), ...extras]));
 }
 
@@ -120,9 +123,18 @@ export function ReuniaoTeams({ form: f, aoMudar, equipe, meuEmail, disponivel, m
             ) : <p className="sub">Ninguém da equipe tem e-mail cadastrado. Inclua e-mails em “Editar projeto → Equipe” ou use o campo abaixo.</p>}
             {semEmail.length > 0 && <p className="sub" style={{ marginTop: 6 }}>Sem e-mail na equipe (não serão convidados): {semEmail.map(m => m.nome).join(', ')}.</p>}
           </div>
-          <label className="campo">Outros convidados (opcional)
-            <input className="ctl" value={f.extras} onChange={e => muda('extras', e.target.value)} placeholder="email@cliente.com.br, outro@empresa.com.br" />
-          </label>
+          <div className="campo">Convidados de fora da equipe
+            <div className="extras">
+              {f.extras.map((x, i) => (
+                <div key={i} className="extraLinha">
+                  <input className={`ctl ${x.trim() && !emailValido(x) ? 'erro' : ''}`} type="email" placeholder="email@cliente.com.br" value={x} autoFocus={i === f.extras.length - 1 && !x}
+                    aria-label={`E-mail do convidado ${i + 1}`} onChange={e => muda('extras', f.extras.map((y, k) => (k === i ? e.target.value : y)))} />
+                  <button type="button" className="rm" aria-label="Remover convidado" onClick={() => muda('extras', f.extras.filter((_, k) => k !== i))}>×</button>
+                </div>
+              ))}
+              <button type="button" className="btn pq maisConvidado" onClick={() => muda('extras', [...f.extras, ''])}>+ Convidar outra pessoa</button>
+            </div>
+          </div>
           <div className="sub">{lista.length} convidado(s). Você é o organizador.</div>
           {teste && (
             <div className="msg info">

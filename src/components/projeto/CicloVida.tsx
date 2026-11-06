@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { EstadoFase, Fase, Gate, Projeto } from '../../types/models';
 import { usePortal } from '../../state/PortalContext';
+import { checklistGate } from '../../lib/validacoes';
 import { usePapel } from '../../state/PapelContext';
 import { useToast } from '../../state/ToastContext';
 import { config } from '../../config/config';
@@ -11,10 +12,10 @@ import { Losango } from '../ui/Losango';
 import { TEMA } from '../../lib/tema';
 
 function cores(selecionada: boolean, e: EstadoFase): [string, string, string] {
-  if (selecionada) return [TEMA.preto, '#fff', TEMA.preto];
-  if (e === 'Concluída') return ['#E8F5EE', '#145C3C', '#A9D8C6'];   // verde: fase concluída
+  if (selecionada) return ['var(--fase-sel-bg)', 'var(--fase-sel-txt)', 'var(--fase-sel-bg)'];
+  if (e === 'Concluída') return ['var(--fase-ok-bg)', 'var(--fase-ok-txt)', 'var(--fase-ok-bd)'];   // verde: fase concluída
   if (e === 'Em andamento') return [TEMA.vinhoClaro, TEMA.vinho, TEMA.vinhoBorda];
-  return ['#FAFAFB', '#8A8D92', TEMA.borda];
+  return ['var(--fase-no-bg)', 'var(--fase-no-txt)', TEMA.borda];
 }
 
 interface Props {
@@ -44,8 +45,19 @@ export function CicloVida({ projeto: p, faseSel, aoSelecionar, aoDecidir }: Prop
   const toast = useToast();
   // o gate só abre quando a pessoa clica no losango (clicar na fase apenas filtra o cronograma)
   const [gateAberto, setGateAberto] = useState<string | null>(null);
+  useEffect(() => { setGateAberto(null); }, [p.codigo]);   // ao trocar de projeto, o painel do gate fecha
   const gate = gateAberto ? p.fases.find(g => g.gate === gateAberto) : undefined;
   const bloqueio = gate ? gateBloqueante(p, gate) : undefined;
+  // G1 (cadastro) é aprovado pelo PMO; G2 a G4 pelo patrocinador
+  const podeAprovar = !!gate && (gate.gate === 'G1' ? pode('aprovarCadastro') : pode('aprovarGate'));
+  // G3/G4: o que falta para pedir (e aprovar) o gate; o TRD é procurado na pasta do projeto
+  const { fonte } = usePortal();
+  const [temTrd, setTemTrd] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (gate?.gate !== 'G4' || gate.situacao === 'Aprovado' || fonte.modo === 'piloto') return;
+    fonte.documentos(p.codigo).then(l => setTemTrd(l.some(x => x.arquivos.some(a => /\btrd\b|termo\s*de\s*aceite/i.test(a.nome))))).catch(() => setTemTrd(false));
+  }, [gate?.gate, gate?.situacao, p.codigo, fonte]);
+  const checklist = gate ? checklistGate(gate.gate, p, dados, gate.gate === 'G4' && fonte.modo !== 'piloto' ? temTrd ?? false : null) : [];
 
   const solicitar = async (g: Gate) => {
     try { await solicitarGate(p.codigo, g.gate); toast(`${g.gate} enviado para aprovação do patrocinador.`); }
@@ -111,14 +123,19 @@ export function CicloVida({ projeto: p, faseSel, aoSelecionar, aoDecidir }: Prop
                 Aprovado{gate.aprovadoPor ? ` por ${gate.aprovadoPor}` : ''}{gate.dataAprovacao ? ` em ${dma(gate.dataAprovacao)}` : ''}{gate.parecer ? ` · ${gate.parecer}` : ''}
               </div>
             )}
-            {gate.situacao === 'Pendente' && gate.parecer && <div className="sub" style={{ fontSize: 13, marginTop: 4, color: '#9A2E12' }}>Devolvido: {gate.parecer}</div>}
+            {gate.situacao === 'Pendente' && gate.parecer && <div className="sub" style={{ fontSize: 13, marginTop: 4, color: 'var(--txt-erro)' }}>Devolvido: {gate.parecer}</div>}
             {bloqueio && gate.situacao !== 'Aprovado' && <div className="sub" style={{ fontSize: 13, marginTop: 4 }}>Só pode ser aprovado depois do {bloqueio.gate}.</div>}
-            {!bloqueio && gate.situacao === 'Aguardando aprovação' && !pode('aprovarGate') && <div className="sub" style={{ fontSize: 13, marginTop: 4 }}>Aguardando a decisão do patrocinador.</div>}
+            {checklist.length > 0 && gate.situacao !== 'Aprovado' && (
+              <ul className="checkGate">
+                {checklist.map(i => <li key={i.texto} className={i.ok === false ? 'nao' : i.ok ? 'sim' : 'talvez'}><span aria-hidden="true">{i.ok === false ? '✗' : i.ok ? '✓' : '–'}</span>{i.texto}</li>)}
+              </ul>
+            )}
+            {!bloqueio && gate.situacao === 'Aguardando aprovação' && !podeAprovar && <div className="sub" style={{ fontSize: 13, marginTop: 4 }}>Aguardando a decisão do patrocinador.</div>}
           </div>
           {gate.situacao !== 'Aprovado' && !bloqueio && (
             <div className="gateAcoes">
-              {gate.situacao === 'Pendente' && pode('solicitarGate') && <button type="button" className="btn pq" onClick={() => solicitar(gate)}>Solicitar aprovação</button>}
-              {pode('aprovarGate') && <button type="button" className="btn pq ok" onClick={() => aoDecidir(gate)}>{gate.situacao === 'Aguardando aprovação' ? 'Analisar pedido do PMO' : `Aprovar ${gate.gate}`}</button>}
+              {gate.situacao === 'Pendente' && pode('solicitarGate') && !podeAprovar && <button type="button" className="btn pq" disabled={checklist.some(i => i.ok === false)} onClick={() => solicitar(gate)}>Solicitar aprovação</button>}
+              {podeAprovar && <button type="button" className="btn pq ok" onClick={() => aoDecidir(gate)}>{gate.situacao === 'Aguardando aprovação' ? 'Analisar pedido do PMO' : `Aprovar ${gate.gate}`}</button>}
             </div>
           )}
         </div>

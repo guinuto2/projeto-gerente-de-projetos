@@ -1,8 +1,10 @@
 import { useState } from 'react';
+import { riscoAltoSemMitigacao } from '../../../lib/validacoes';
 import type { Nivel, Projeto, Risco, SituacaoRisco } from '../../../types/models';
 import { usePortal } from '../../../state/PortalContext';
 import { useToast } from '../../../state/ToastContext';
 import { NIVEIS, SITUACOES_RISCO, proximoCodigoSeq } from '../../../lib/constantes';
+import { Mensagem } from '../../ui/Mensagem';
 import { Drawer } from '../../ui/Drawer';
 
 /** Inclui (sem código) ou edita/exclui um risco do projeto. */
@@ -49,9 +51,10 @@ export function EditarRisco({ projeto, codigo, aoFechar }: { projeto: Projeto; c
   };
 
   return (
-    <Drawer aberto titulo={novo ? 'Novo risco' : `${r.codigo} · ${r.descricao}`} subtitulo={`${projeto.codigo} · ${novo ? 'riscos' : r.cenarios ? 'Cenários ' + r.cenarios : 'Risco'}`}
+    <Drawer aberto somenteLeitura={projeto.situacaoCadastro === 'Encerrado'} titulo={novo ? 'Novo risco' : `${r.codigo} · ${r.descricao}`} subtitulo={`${projeto.codigo} · ${novo ? 'riscos' : r.cenarios ? 'Cenários ' + r.cenarios : 'Risco'}`}
       salvando={salvando} erro={erro} aoFechar={aoFechar} aoSalvar={salvar} rotuloSalvar={novo ? 'Incluir risco' : 'Salvar'}
-      acoes={!novo && <button type="button" className="btn perigo" disabled={salvando} onClick={excluir}>Excluir</button>}>
+      acoes={!novo && projeto.situacaoCadastro !== 'Encerrado' && <button type="button" className="btn perigo" disabled={salvando} onClick={excluir}>Excluir</button>}>
+      {projeto.situacaoCadastro === 'Encerrado' && <Mensagem tipo="info">Projeto encerrado: somente consulta.</Mensagem>}
       {novo ? (
         <>
           <div className="fg2">
@@ -74,7 +77,10 @@ export function EditarRisco({ projeto, codigo, aoFechar }: { projeto: Projeto; c
         </label>
         {!novo && <label className="campo">Responsável<input className="ctl" value={f.responsavel} onChange={muda('responsavel')} /></label>}
       </div>
-      <label className="campo">Mitigação / ação preventiva<textarea className="ctl" value={f.mitigacao} onChange={muda('mitigacao')} /></label>
+      <label className="campo">Mitigação / ação preventiva{f.impacto === 'Alto' && f.probabilidade !== 'Baixo' ? ' *' : ''}
+        <textarea className={`ctl ${riscoAltoSemMitigacao(f) ? 'vazioObrig' : ''}`} value={f.mitigacao} onChange={muda('mitigacao')} />
+        {f.impacto === 'Alto' && f.probabilidade !== 'Baixo' && <span className="dica" style={riscoAltoSemMitigacao(f) ? { color: '#9A2E12' } : undefined}>Risco alto (impacto alto, probabilidade média ou alta): o plano de mitigação é obrigatório.</span>}
+      </label>
       {novo
         ? <label className="campo">Plano de contingência<textarea className="ctl" rows={2} value={f.contingencia} onChange={muda('contingencia')} placeholder="O que fazer se o risco acontecer" /></label>
         : r.contingencia && <div><div className="sub">Plano de contingência</div><div style={{ fontSize: 14, marginTop: 2 }}>{r.contingencia}</div></div>}

@@ -11,6 +11,18 @@
   v3.33: colunas da atualização semanal e do responsável em Portal Atividades.
   v3.37: lista Portal Historico (log de mudanças de cada projeto).
   v3.41: verificação de colunas pelo nome interno; coluna TipoMudanca no histórico ("Tipo" colidia com a coluna oculta DocIcon).
+  v3.47: coluna DataAssinatura (assinatura do contrato) em Portal Projetos.
+  v3.48: colunas TeveReuniao e Realizado em Portal Atividades.
+  v3.50: colunas ItemCodigo, Antes e Depois em Portal Historico (acompanhamento das subatividades).
+  v3.53: coluna AvisoAtraso em Portal Atividades (aviso de atraso ao PMO).
+  v3.59: colunas Lancada e Predecessoras em Portal Atividades.
+  v3.61: coluna ModeloFaturamento em Portal Projetos.
+  v3.63: coluna HorasPlanejadas em Portal Atividades.
+  v3.73: biblioteca "Wiki Tecnicos" com os arquivos da pasta wiki-arquivos (Wiki dos técnicos).
+  v3.81: coluna Parceiro em Portal Projetos (terceirização).
+  v3.82: lista Portal Wiki (documentos da Wiki editados pelos técnicos).
+  v3.85: coluna Função de Portal Tecnicos aceita PMO e Patrocinador (e preenchimento livre).
+  v3.88: coluna Prazo em Portal Pendencias.
 
 .EXEMPLOS
   # só a estrutura (listas vazias)
@@ -105,6 +117,11 @@ Campo $L 'Gerente' 'Gerente de projeto' 'Text'
 Campo $L 'Arquiteto' 'Arquiteto' 'Text'
 Campo $L 'Patrocinador' 'Patrocinador' 'Text'
 Campo $L 'Contrato' 'Contrato / pedido' 'Text'
+CampoData $L 'DataAssinatura' 'Assinatura do contrato'
+# v3.61: modelo de faturamento
+Campo $L 'ModeloFaturamento' 'Modelo de faturamento' 'Choice' @('Edital', 'Service Entitlement', 'Sem receita')
+# v3.81: parceiro (terceirização)
+Campo $L 'Parceiro' 'Parceiro (terceirização)' 'Text'
 CampoData $L 'DataInicio' 'Início'
 CampoData $L 'DataTerminoBaseline' 'Término (baseline)'
 CampoData $L 'DataTerminoPrevista' 'Término previsto'
@@ -148,6 +165,16 @@ Campo $L 'CausaAtraso' 'Causa do atraso' 'Choice' @('Cliente / acesso', 'Fabrica
 Campo $L 'HorasRealizadas' 'Horas realizadas' 'Number'
 CampoData $L 'DataUltimaAtualizacao' 'Última atualização'
 Campo $L 'AtualizadoPor' 'Atualizado por' 'Text'
+# v3.48: atualização semanal — teve reunião e o que foi feito
+Campo $L 'TeveReuniao' 'Teve reunião no Teams' 'Boolean'
+Campo $L 'Realizado' 'O que foi feito' 'Note'
+# v3.53: término a que o último aviso de atraso ao PMO se referiu
+Campo $L 'AvisoAtraso' 'Aviso de atraso (término avisado)' 'Text'
+# v3.59: tarefas em preparação (lançadas para o técnico) e pré-requisitos
+Campo $L 'Lancada' 'Lançada para o técnico' 'Boolean'
+Campo $L 'Predecessoras' 'Pré-requisitos (códigos)' 'Text'
+# v3.63: horas planejadas
+Campo $L 'HorasPlanejadas' 'Horas planejadas' 'Number'
 # status "A confirmar" na lista de opções
 try { Atualizar-Opcoes $L 'Status' @('Planejado', 'Em andamento', 'Bloqueado', 'A confirmar', 'Concluído', 'Cancelado') } catch { Write-Warning "Opções de Status não atualizadas: $($_.Exception.Message)" }
 
@@ -172,6 +199,8 @@ Campo $L 'Detalhe' 'Detalhamento' 'Note'
 Campo $L 'Impacto' 'Impacto' 'Note'
 Campo $L 'Situacao' 'Situação' 'Choice' @('Aberta', 'Respondida')
 Campo $L 'Resposta' 'Resposta do cliente' 'Note'
+# v3.88: prazo da pendência (aberta e vencida aparece em destaque)
+CampoData $L 'Prazo' 'Prazo'
 
 # ------------------------------------------------------------ Portal Gates
 # O título NÃO pode se chamar "Gate": o PnP acharia que a coluna interna Gate já existe (bug da v1/v2 do script).
@@ -264,7 +293,12 @@ Campo $L 'Impacto' 'Impacto / observação' 'Note'
 # ------------------------------------------------------------ Portal Tecnicos (tabela de técnicos da Systech)
 $L = 'Portal Tecnicos'; Lista $L 'Lists/PortalTecnicos'; Titulo $L 'Nome'
 Campo $L 'Email' 'E-mail' 'Text'
-Campo $L 'Funcao' 'Função' 'Choice' @('Técnico', 'Arquiteto', 'Gerente de projeto')
+Campo $L 'Funcao' 'Função' 'Choice' @('Técnico', 'Arquiteto', 'PMO', 'Patrocinador', 'Gerente de projeto')
+# v3.85: PMO e Patrocinador também nesta lista (o cadastro de projetos tira daqui gerente, arquiteto e equipe).
+# Preenchimento livre ligado: quem acumula papéis pode ficar como "PMO, Patrocinador".
+try {
+  Set-PnPField -List $L -Identity 'Funcao' -Values @{ Choices = [string[]]@('Técnico', 'Arquiteto', 'PMO', 'Patrocinador', 'Gerente de projeto'); FillInChoice = $true } | Out-Null
+} catch { Write-Warning "Não foi possível atualizar as opções da coluna Função de Portal Tecnicos: $($_.Exception.Message)" }
 Campo $L 'Ativo' 'Ativo' 'Boolean'
 # cadastro inicial: inclui só quem ainda não está na lista (compara pelo e-mail)
 $TECNICOS = @(
@@ -293,11 +327,55 @@ if (-not (Tem $L 'Quando')) {
   Add-PnPFieldFromXml -List $L -FieldXml "<Field Type='DateTime' Name='Quando' StaticName='Quando' DisplayName='Data e hora' Format='DateTime' Indexed='TRUE' />" | Out-Null
 }
 Campo $L 'Detalhe' 'Detalhe' 'Note'
+# v3.50: acompanhamento das subatividades (item e retrato antes/depois)
+Campo $L 'ItemCodigo' 'Atividade' 'Text'
+Campo $L 'Antes' 'Antes da mudança' 'Note'
+Campo $L 'Depois' 'Depois da mudança' 'Note'
 if (-not (Get-PnPView -List $L -Identity 'Por projeto' -ErrorAction SilentlyContinue)) {
   try {
     Add-PnPView -List $L -Title 'Por projeto' -Fields 'Quando', 'Usuario', 'TipoMudanca', 'Acao', 'Detalhe' `
       -Query "<GroupBy Collapse='TRUE'><FieldRef Name='ProjetoCodigo' /></GroupBy><OrderBy><FieldRef Name='Quando' Ascending='FALSE' /></OrderBy>" -SetAsDefault | Out-Null
   } catch { Write-Warning "Visão 'Por projeto' do histórico não criada: $($_.Exception.Message)" }
+}
+
+# ------------------------------------------------------------ Wiki dos técnicos (arquivos para download)
+# Biblioteca separada da dos projetos (para não aparecer como "pasta sem projeto"). O portal lista o que estiver nela:
+# para incluir ou trocar arquivos, basta enviá-los por aqui ou direto pelo SharePoint.
+# documentos da Wiki editados pelos técnicos no portal (um item por documento; o conteúdo vai em JSON)
+$L = 'Portal Wiki'; Lista $L 'Lists/PortalWiki'; Titulo $L 'Título'
+Campo $L 'DocId' 'Identificador' 'Text'
+Campo $L 'Descricao' 'Descrição' 'Note'
+Campo $L 'Conteudo' 'Conteúdo (JSON)' 'Note'
+Campo $L 'Excluido' 'Excluído' 'Boolean'
+Campo $L 'AtualizadoPor' 'Atualizado por' 'Text'
+Lista 'Wiki Tecnicos' 'WikiTecnicos' 'DocumentLibrary'
+$pastaWiki = Join-Path $PSScriptRoot 'wiki-arquivos'
+# os arquivos ficam no disco sem acento (o zip extraído no Windows quebrava os nomes) e sobem com o nome certo
+$nomesWiki = [ordered]@{
+  'instrucoes-trello.pdf'                         = 'Instruções TRELLO.pdf'
+  'instrucoes-resposta-email-analise-edital.pdf'  = 'Instruções de resposta de E-mail para Análise de Edital.pdf'
+  'modelo-pap.xlsx'                               = 'Modelo-PaP.xlsx'
+  'resumo-cotacoes-servidores-hci.xlsx'           = 'Resumo de Cotações - Servidores-HCI.xlsx'
+  'template-systech-apresentacao-clientes.pptx'   = 'Template SYSTECH - Apresentação para Clientes.pptx'
+  'template-email.txt'                            = 'Template de E-Mail.txt'
+  'template-sugestoes-corpo-email.xlsx'           = 'Template de Sugestões para o corpo do E-mail.xlsx'
+  'template-sugestoes.xlsx'                       = 'Template de Sugestões.xlsx'
+}
+# remove (para a lixeira) os arquivos enviados antes com o nome quebrado
+try {
+  foreach ($velho in @(Get-PnPFolderItem -FolderSiteRelativeUrl 'WikiTecnicos' -ItemType File -ErrorAction Stop)) {
+    if ($velho.Name -match '[\u2500-\u257F]|Ã|Â|#U00[0-9a-fA-F]{2}|\?') {
+      Remove-PnPFile -ServerRelativeUrl $velho.ServerRelativeUrl -Recycle -Force -ErrorAction Stop
+      Write-Host "  Wiki: removido (nome quebrado) $($velho.Name)" -ForegroundColor DarkYellow
+    }
+  }
+} catch { Write-Warning "Não foi possível revisar os nomes da biblioteca Wiki Tecnicos: $($_.Exception.Message)" }
+if (Test-Path $pastaWiki) {
+  foreach ($arq in Get-ChildItem -Path $pastaWiki -File) {
+    $nome = if ($nomesWiki.Contains($arq.Name)) { $nomesWiki[$arq.Name] } else { $arq.Name }
+    try { Add-PnPFile -Path $arq.FullName -Folder 'WikiTecnicos' -NewFileName $nome | Out-Null; Write-Host "  Wiki: $nome" -ForegroundColor DarkGray }
+    catch { Write-Warning "Arquivo da Wiki não enviado ($nome): $($_.Exception.Message)" }
+  }
 }
 
 # ------------------------------------------------------------ biblioteca de documentos

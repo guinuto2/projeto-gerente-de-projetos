@@ -12,7 +12,8 @@ import { PassoEscopo } from '../components/novo/PassoEscopo';
 import { PassoCronograma } from '../components/novo/PassoCronograma';
 import { PassoRiscos } from '../components/novo/PassoRiscos';
 import { EditorEquipe } from '../components/novo/EditorEquipe';
-import { cronogramaModelo, formVazio, montarEquipe, montarProjeto, riscosModelo, validar, type FormProjeto } from '../components/novo/formulario';
+import { ConferenciaEquipe, useConferencia } from '../components/novo/ConferenciaEquipe';
+import { cronogramaModelo, formVazio, montarEquipe, montarProjeto, riscosModelo, validar, type FormProjeto, colocarNaEquipe } from '../components/novo/formulario';
 
 const PASSOS = ['Dados gerais e termo de abertura', 'Escopo, premissas e restrições', 'Cronograma e marcos', 'Riscos'];
 
@@ -39,17 +40,21 @@ export function NovoProjetoPage() {
     toast('Cronograma padrão Systech aplicado a partir do início informado. Ajuste o que for preciso.');
   };
 
-  const ehPatrocinador = pode('aprovarGate');
+  // quem cria o projeto (PMO) já o cria aprovado: não precisa do patrocinador
+  const ehPatrocinador = pode('criarProjeto');
+  const conf = useConferencia(form);
   const enviar = async (situacao: SituacaoCadastro) => {
     // rascunho: basta código (sem repetir) e nome; o resto pode ser completado depois
     const faltas = situacao === 'Rascunho'
       ? pendencias.filter(p => /código|nome/.test(p))
       : pendencias;
     if (faltas.length) { setErro('Faltam dados: ' + faltas.join('; ') + '.'); setConfirmar(false); return; }
+    if (situacao !== 'Rascunho' && conf.erros.length) { setErro('Corrija antes de gravar: ' + conf.erros.join('; ') + '.'); setConfirmar(false); return; }
     setEnviando(true); setErro('');
     try {
       // PMO cria já ativo: G1 aprovado por ele e projeto em Planejamento
-      const novo = montarProjeto(form, situacao, situacao === 'Ativo' ? { por: fonte.modo === 'piloto' ? 'Patrocinador (piloto)' : usuario, em: fonte.hoje() } : undefined, dados.tecnicos);
+      const novo = montarProjeto(form, situacao, situacao === 'Ativo' ? { por: fonte.modo === 'piloto' ? 'PMO (piloto)' : usuario, em: fonte.hoje() } : undefined, dados.tecnicos);
+      novo.projeto.criadoPor = fonte.modo === 'piloto' ? usuario : (fonte.email() || usuario);
       await criarProjeto(novo);
       toast(situacao === 'Rascunho' ? 'Rascunho salvo. Ele fica em “Rascunhos”, no portfólio.' : situacao === 'Ativo' ? 'Projeto criado e ativo no portfólio.' : 'Projeto enviado para aprovação do patrocinador.');
       navegar(`/projeto/${encodeURIComponent(novo.projeto.codigo)}`);
@@ -67,16 +72,16 @@ export function NovoProjetoPage() {
   };
 
   if (!pode('criarProjeto')) {
-    return <main className="main"><Mensagem tipo="info">O perfil <b>{papel}</b> não cadastra projetos. Troque o perfil de teste no cabeçalho para PMO ou Patrocinador.</Mensagem></main>;
+    return <main className="main"><Mensagem tipo="info">O perfil <b>{papel}</b> não cadastra projetos. Só o PMO cadastra projetos.</Mensagem></main>;
   }
 
   return (
     <main className="main" style={{ maxWidth: 1200 }}>
       <div>
-        <div className="migalha"><Link to="/">Escritório de Projetos</Link> › Novo projeto</div>
+        <div className="migalha"><Link to="/">Central Systech</Link> › Novo projeto</div>
         <h1 className="ptit" style={{ marginTop: 8 }}>Cadastrar projeto</h1>
         <p className="pdesc" style={{ marginTop: 6 }}>{ehPatrocinador
-          ? 'Como patrocinador, você cria o projeto direto: ele entra ativo no portfólio, com o G1 aprovado, na fase de Planejamento.'
+          ? 'O projeto entra ativo no portfólio assim que for criado, com o G1 aprovado por você, na fase de Planejamento.'
           : 'O PMO preenche e envia. O projeto entra no portfólio depois que o patrocinador aprova o cadastro, que registra o gate G1.'}</p>
       </div>
       <div className="passos">
@@ -88,7 +93,8 @@ export function NovoProjetoPage() {
       </div>
       <section className="card" style={{ padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: 18 }}>
         {passo === 0 && <>
-          <PassoDadosGerais form={form} mudar={mudar} dataMinima={hoje} aoEscolherArquiteto={(nome, email) => setForm(f => (f ? { ...f, arquiteto: nome, arquitetoEmail: email } : f))} />
+          <PassoDadosGerais form={form} mudar={mudar} dataMinima={hoje} aoEscolherArquiteto={(nome, email) => setForm(f => (f ? { ...f, arquiteto: nome, arquitetoEmail: email } : f))}
+            aoEscolherPessoa={(funcao: string, nome: string, email: string) => setForm(f => (f ? { ...f, equipe: colocarNaEquipe(f.equipe, funcao, nome, email) } : f))} />
           <h3 className="h3" style={{ fontSize: 15 }}>Equipe do projeto</h3>
           <EditorEquipe equipe={form.equipe} aoMudar={e => setForm(f => ({ ...f, equipe: e }))} />
         </>}
@@ -104,16 +110,18 @@ export function NovoProjetoPage() {
               : <>
                   <button type="button" className="btn" disabled={enviando} onClick={() => enviar('Rascunho')}>Salvar rascunho</button>
                   {ehPatrocinador
-                    ? <button type="button" className="btn pri" disabled={enviando} onClick={() => { if (pendencias.length) { setErro('Faltam dados: ' + pendencias.join('; ') + '.'); return; } setConfirmar(true); }}>Criar projeto</button>
+                    ? <button type="button" className="btn pri" disabled={enviando} onClick={() => { if (pendencias.length) { setErro('Faltam dados: ' + pendencias.join('; ') + '.'); return; } if (conf.erros.length) { setErro('Corrija antes de gravar: ' + conf.erros.join('; ') + '.'); return; } setConfirmar(true); }}>Criar projeto</button>
                     : <button type="button" className="btn pri" disabled={enviando} onClick={() => enviar('Em aprovação')}>{enviando ? 'Enviando…' : 'Enviar para aprovação do patrocinador'}</button>}
                 </>}
           </span>
         </div>
         {passo === PASSOS.length - 1 && pendencias.length > 0 && <div className="aviso">Antes de enviar: {pendencias.join('; ')}.</div>}
+        {passo === PASSOS.length - 1 && <ConferenciaEquipe conf={conf} />}
       </section>
       {confirmar && (
         <Confirmacao titulo={`Criar o projeto ${form.codigo.trim().toUpperCase()}?`} rotuloConfirmar="Confirmar criação" ocupado={enviando} erro={erro}
           aoCancelar={() => setConfirmar(false)} aoConfirmar={() => enviar('Ativo')}>
+          {conf.avisos.length > 0 && <div style={{ marginBottom: 10 }}><ConferenciaEquipe conf={conf} /></div>}
           <ul className="ul" style={{ marginTop: 0 }}>
             <li><b>{form.nome}</b> · {form.cliente} · {form.tipo}</li>
             <li>GP: {form.gerente || '—'}{form.arquiteto ? ` · Arquiteto: ${form.arquiteto}` : ''}</li>

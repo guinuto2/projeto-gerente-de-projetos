@@ -9,6 +9,8 @@ import { NovoProjetoPage } from './pages/NovoProjetoPage';
 import { EditarProjetoPage } from './pages/EditarProjetoPage';
 import { AtualizacaoPage } from './pages/AtualizacaoPage';
 import { CronogramasPage } from './pages/CronogramasPage';
+import { FinanceiroPage } from './pages/FinanceiroPage';
+import { WikiPage } from './pages/WikiPage';
 
 /**
  * HashRouter (#/projeto/...) para funcionar em qualquer hospedagem estática
@@ -29,6 +31,8 @@ export default function App() {
             <Route path="/editar/:codigo" element={<EditarProjetoPage />} />
             <Route path="/atualizar" element={<AtualizacaoPage />} />
             <Route path="/cronogramas" element={<CronogramasPage />} />
+            <Route path="/financeiro" element={<FinanceiroPage />} />
+            <Route path="/wiki" element={<WikiPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </HashRouter>

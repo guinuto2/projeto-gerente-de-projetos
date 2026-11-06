@@ -21,38 +21,55 @@ import { AbaDecisoes } from '../components/projeto/abas/AbaDecisoes';
 import { DecidirGate } from '../components/projeto/editores/DecidirGate';
 import { AvisoRascunho } from '../components/projeto/AvisoRascunho';
 import { AbaHistorico } from '../components/projeto/abas/AbaHistorico';
+import { AtividadesCliente } from '../components/cliente/AtividadesCliente';
+import { DashboardCliente } from '../components/cliente/DashboardCliente';
+import { AbaDashboard } from '../components/projeto/abas/AbaDashboard';
+import { ListaAtividadesTecnico } from '../components/projeto/ListaAtividadesTecnico';
+import { AbaAcompanhamento } from '../components/projeto/abas/AbaAcompanhamento';
 import { ExportarCronograma } from '../components/projeto/ExportarCronograma';
 
 export function ProjetoPage() {
-  const { codigo = '', aba = 'cronograma' } = useParams();
+  const { codigo = '', aba = '' } = useParams();   // sem aba no endereço: cada perfil abre na sua aba inicial
   const navegar = useNavigate();
   const { dados, fonte, removerGatesRepetidos } = usePortal();
   const toast = useToast();
   const [limpando, setLimpando] = useState(false);
   const { pode, papel } = usePapel();
+  const { usuario, email: meuEmail } = usePortal();
   const { podeVer } = useProjetosVisiveis();
   const [faseSel, setFaseSel] = useState<Fase | null>(null);
   const [gateAberto, setGateAberto] = useState<string | null>(null);
   useEffect(() => { setFaseSel(null); window.scrollTo(0, 0); }, [codigo]);
 
   const p = dados.projetos.find(x => x.codigo === codigo);
-  if (!p || !podeVer(p)) return <main className="main"><Vazio>{!p ? `Projeto "${codigo}" não encontrado.` : p.situacaoCadastro === 'Rascunho' ? 'Este projeto ainda é um rascunho do PMO.' : 'Você não faz parte da equipe deste projeto.'} <Link to="/">Voltar ao portfólio</Link></Vazio></main>;
+  if (!p || !podeVer(p)) return <main className="main"><Vazio>{!p ? `Projeto "${codigo}" não encontrado.` : p.situacaoCadastro === 'Rascunho' ? 'Este projeto ainda é um rascunho do PMO.' : papel === 'Cliente' ? 'Este projeto não é do seu órgão.' : 'Você não faz parte da equipe deste projeto.'} <Link to="/">Voltar ao portfólio</Link></Vazio></main>;
 
   const abas: Aba[] = [
-    { id: 'cronograma', rotulo: 'Cronograma', contagem: macro(dados, p.codigo).length },
+    { id: 'cronograma', rotulo: papel === 'Técnico' ? 'Cronograma' : 'Ciclo de vida', contagem: macro(dados, p.codigo).length },
+    ...(papel === 'Técnico' ? [{ id: 'tarefas', rotulo: 'Tarefas', contagem: (dados.atividades[p.codigo] || []).filter(a => a.pai && a.lancada !== false && a.status !== 'Concluído' && a.status !== 'Cancelado').length }] : []),
+    { id: 'dashboard', rotulo: 'Dashboard' },
     { id: 'riscos', rotulo: 'Riscos', contagem: riscosAbertos(dados, p.codigo).length },
-    { id: 'pendencias', rotulo: 'Pendências', contagem: pendenciasAbertas(dados, p.codigo).length },
+    { id: 'pendencias', rotulo: papel === 'Técnico' ? 'Decisões' : 'Pendências e decisões',
+      contagem: papel === 'Técnico' ? (dados.decisoes[p.codigo] || []).length : pendenciasAbertas(dados, p.codigo).length },
     { id: 'escopo', rotulo: 'Escopo e premissas' },
     { id: 'documentos', rotulo: 'Documentos' },
-    { id: 'decisoes', rotulo: 'Decisões', contagem: (dados.decisoes[p.codigo] || []).length },
+    { id: 'acompanhamento', rotulo: 'Acompanhamento', contagem: (dados.atividades[p.codigo] || []).filter(a => a.pai && a.status !== 'Concluído' && a.status !== 'Cancelado').length },
     { id: 'historico', rotulo: 'Histórico' }
   ];
   // o técnico não vê escopo, riscos, pendências nem o histórico
-  const OCULTAS_TECNICO = ['riscos', 'pendencias', 'escopo', 'historico'];
-  const abasVisiveis = papel === 'Técnico' ? abas.filter(a => !OCULTAS_TECNICO.includes(a.id)) : abas;
-  const abaAtiva = abasVisiveis.some(a => a.id === aba) ? aba : 'cronograma';
+  const OCULTAS_TECNICO = ['cronograma', 'dashboard', 'riscos', 'escopo', 'historico'];   // o técnico não vê o ciclo de vida, só as tarefas
+  // cliente: só atividades, dashboard e cronograma (somente leitura)
+  const ABAS_CLIENTE: Aba[] = [
+    { id: 'atividades', rotulo: 'Atividades', contagem: (dados.atividades[p.codigo] || []).filter(a => !a.pai && a.status !== 'Cancelado').length },
+    { id: 'painel', rotulo: 'Dashboard' },
+    { id: 'cronograma', rotulo: 'Cronograma' }
+  ];
+  const abasVisiveis = papel === 'Cliente' ? ABAS_CLIENTE : papel === 'Técnico' ? abas.filter(a => !OCULTAS_TECNICO.includes(a.id)) : abas;
+  const abaPedida = aba === 'decisoes' ? 'pendencias' : aba;   // links antigos da aba Decisões
+  const abaAtiva = abasVisiveis.some(a => a.id === abaPedida) ? abaPedida : (papel === 'Técnico' ? 'tarefas' : papel === 'Cliente' ? 'atividades' : 'cronograma');
   const irAba = (id: string) => navegar(`/projeto/${encodeURIComponent(p.codigo)}/${id}`);
   const selecionarFase = (f: Fase | null) => { setFaseSel(f); if (abaAtiva !== 'cronograma') irAba('cronograma'); };
+  const criadoPorMim = !!p?.criadoPor && [usuario, meuEmail].some(x => x && x.toLowerCase() === p.criadoPor!.toLowerCase());
   const g1 = p.fases.find(g => g.gate === 'G1');
   const decidir = (g: Gate) => setGateAberto(g.gate);
   const gateEmDecisao = gateAberto ? p.fases.find(g => g.gate === gateAberto) : undefined;
@@ -60,7 +77,7 @@ export function ProjetoPage() {
   return (
     <main className="main" style={{ gap: 20 }}>
       <div className="linha">
-        <div className="migalha"><Link to="/">Escritório de Projetos</Link> › <Link to="/">Projetos</Link> › {p.codigo}</div>
+        <div className="migalha"><Link to="/">Central Systech</Link> › <Link to="/">Projetos</Link> › {p.codigo}</div>
         {fonte.modo === 'piloto' && <span className="selo">Piloto · datas fictícias</span>}
       </div>
       {(p.gatesRepetidos?.length || 0) > 0 && pode('editarProjeto') && (
@@ -81,12 +98,12 @@ export function ProjetoPage() {
       )}
       {p.situacaoCadastro === 'Em aprovação' && (
         <Mensagem tipo="info" className="linha">
-          <span>Cadastro enviado pelo PMO e aguardando aprovação do patrocinador. A aprovação registra o gate G1 e coloca o projeto no portfólio.</span>
-          {g1 && pode('aprovarGate') && <button type="button" className="btn ok pq" onClick={() => decidir(g1)}>Analisar cadastro (G1)</button>}
+          <span>Cadastro aguardando aprovação do PMO. A aprovação registra o gate G1 e coloca o projeto no portfólio.</span>
+          {g1 && pode('aprovarCadastro') && <button type="button" className="btn ok pq" onClick={() => decidir(g1)}>{criadoPorMim ? 'Ativar projeto' : 'Analisar cadastro (G1)'}</button>}
         </Mensagem>
       )}
       {/* pedidos do PMO aguardando o patrocinador (o G1 de cadastro já tem o aviso acima) */}
-      {p.fases.filter(g => g.situacao === 'Aguardando aprovação' && !(g.gate === 'G1' && p.situacaoCadastro === 'Em aprovação')).map(g => (
+      {papel !== 'Cliente' && p.fases.filter(g => g.situacao === 'Aguardando aprovação' && g.gate !== 'G1').map(g => (
         <Mensagem key={g.gate} tipo="info" className="linha">
           <span>O PMO pediu a aprovação do <b>{g.nome}</b>{pode('aprovarGate') ? '.' : '. Aguardando a decisão do patrocinador.'}</span>
           {pode('aprovarGate') && <button type="button" className="btn ok pq" onClick={() => decidir(g)}>Analisar pedido</button>}
@@ -94,16 +111,33 @@ export function ProjetoPage() {
       ))}
       <CabecalhoProjeto projeto={p} />
       {papel === 'PMO' && <IndicadoresProjeto projeto={p} />}
-      <CicloVida projeto={p} faseSel={faseSel} aoSelecionar={selecionarFase} aoDecidir={decidir} />
+      {papel !== 'Técnico' && papel !== 'Cliente' && <CicloVida projeto={p} faseSel={faseSel} aoSelecionar={selecionarFase} aoDecidir={decidir} />}
       <section className="card">
         <Abas abas={abasVisiveis} ativa={abaAtiva} aoMudar={irAba} direita={<ExportarCronograma projeto={p} />} />
         <div className="painelAba">
           {abaAtiva === 'cronograma' && <AbaCronograma projeto={p} faseSel={faseSel} limparFase={() => setFaseSel(null)} />}
+          {abaAtiva === 'atividades' && <AtividadesCliente projeto={p} />}
+          {abaAtiva === 'painel' && <DashboardCliente projeto={p} />}
+          {abaAtiva === 'tarefas' && <ListaAtividadesTecnico projeto={p} />}
+          {abaAtiva === 'dashboard' && <AbaDashboard projeto={p} />}
           {abaAtiva === 'riscos' && <AbaRiscos projeto={p} />}
-          {abaAtiva === 'pendencias' && <AbaPendencias projeto={p} />}
+          {abaAtiva === 'pendencias' && (
+            <div className="secoesAba">
+              {papel !== 'Técnico' && (
+                <section>
+                  <h2 className="h3 secaoTitulo">Pendências <span className="cnt">{pendenciasAbertas(dados, p.codigo).length} abertas</span></h2>
+                  <AbaPendencias projeto={p} />
+                </section>
+              )}
+              <section>
+                <h2 className="h3 secaoTitulo">Decisões <span className="cnt">{(dados.decisoes[p.codigo] || []).length}</span></h2>
+                <AbaDecisoes projeto={p} />
+              </section>
+            </div>
+          )}
           {abaAtiva === 'escopo' && <AbaEscopo projeto={p} />}
           {abaAtiva === 'documentos' && <AbaDocumentos projeto={p} />}
-          {abaAtiva === 'decisoes' && <AbaDecisoes projeto={p} />}
+          {abaAtiva === 'acompanhamento' && <AbaAcompanhamento projeto={p} />}
           {abaAtiva === 'historico' && <AbaHistorico projeto={p} />}
         </div>
       </section>

@@ -15,7 +15,7 @@ export function AvisoRascunho({ projeto: p }: { projeto: Projeto }) {
   const [ocupado, setOcupado] = useState(false);
   const [erro, setErro] = useState('');
   const faltam = pendenciasRascunho(dados, p, hoje);
-  const ehPatrocinador = false;   // rascunho é só do PMO: ele envia para aprovação
+  const ehPatrocinador = true;   // rascunho é só do PMO: ao concluir, o projeto já entra ativo
   const g1 = p.fases.find(g => g.gate === 'G1');
   const devolvido = !!g1?.parecer && g1.situacao === 'Pendente';
 
@@ -27,7 +27,7 @@ export function AvisoRascunho({ projeto: p }: { projeto: Projeto }) {
         toast(`Rascunho ${p.codigo} excluído.`); navegar('/'); return;
       }
       await submeterRascunho(p.codigo, acao === 'ativar' ? 'ativar' : 'aprovacao');
-      toast(acao === 'ativar' ? 'Projeto ativado: entrou no portfólio com o G1 aprovado.' : 'Projeto enviado para aprovação do patrocinador.');
+      toast(acao === 'ativar' ? 'Projeto criado: entrou no portfólio com o G1 aprovado.' : 'Projeto enviado para aprovação do patrocinador.');
       setAcao(null); setOcupado(false);
     } catch (e) { setErro((e as Error).message); setOcupado(false); }
   };
@@ -39,7 +39,7 @@ export function AvisoRascunho({ projeto: p }: { projeto: Projeto }) {
         <span style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <Link className="btn pq" to={`/editar/${encodeURIComponent(p.codigo)}`}>Editar dados</Link>
           <button type="button" className="btn pq pri" disabled={faltam.length > 0} title={faltam.length ? 'Complete os itens pendentes' : undefined}
-            onClick={() => setAcao(ehPatrocinador ? 'ativar' : 'enviar')}>{ehPatrocinador ? 'Ativar projeto' : 'Enviar para aprovação'}</button>
+            onClick={() => setAcao(ehPatrocinador ? 'ativar' : 'enviar')}>{ehPatrocinador ? 'Criar projeto' : 'Enviar para aprovação'}</button>
           <button type="button" className="btn pq perigo" onClick={() => setAcao('excluir')}>Excluir rascunho</button>
         </span>
       </div>
@@ -47,8 +47,8 @@ export function AvisoRascunho({ projeto: p }: { projeto: Projeto }) {
       {faltam.length > 0 && <div style={{ fontSize: 13 }}>Falta: {faltam.join(' · ')}. O cronograma é completado na aba Cronograma, abaixo.</div>}
       {acao && (
         <Confirmacao ocupado={ocupado} erro={erro} aoCancelar={() => setAcao(null)} aoConfirmar={confirmar}
-          titulo={acao === 'excluir' ? `Excluir o rascunho ${p.codigo}?` : acao === 'ativar' ? `Ativar o projeto ${p.codigo}?` : `Enviar ${p.codigo} para aprovação?`}
-          rotuloConfirmar={acao === 'excluir' ? 'Excluir rascunho' : acao === 'ativar' ? 'Ativar projeto' : 'Enviar para aprovação'}>
+          titulo={acao === 'excluir' ? `Excluir o rascunho ${p.codigo}?` : acao === 'ativar' ? `Criar o projeto ${p.codigo}?` : `Enviar ${p.codigo} para aprovação?`}
+          rotuloConfirmar={acao === 'excluir' ? 'Excluir rascunho' : acao === 'ativar' ? 'Criar projeto' : 'Enviar para aprovação'}>
           <p className="sub" style={{ fontSize: 14 }}>
             {acao === 'excluir' ? 'O rascunho, o cronograma, os riscos e a pasta de documentos (lixeira do SharePoint) serão removidos.'
               : acao === 'ativar' ? 'O projeto entra ativo no portfólio, com o G1 aprovado por você, na fase de Planejamento.'

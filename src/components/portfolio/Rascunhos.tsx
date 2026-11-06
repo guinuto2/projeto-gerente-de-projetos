@@ -30,8 +30,8 @@ export function Rascunhos({ projetos }: { projetos: Projeto[] }) {
                   <td>{p.cliente || '—'}</td>
                   <td>{p.gerente || '—'}</td>
                   <td>{faltam.length
-                    ? <span className="stp" style={{ background: '#FFF1D1', color: '#7A5200' }}>Falta: {faltam.length} item(ns)</span>
-                    : <span className="stp" style={{ background: '#D7F0E3', color: '#145C3C' }}>Pronto para enviar</span>}</td>
+                    ? <span className="stp tagAviso">Falta: {faltam.length} item(ns)</span>
+                    : <span className="stp tagOk">Pronto para enviar</span>}</td>
                   <td><button type="button" className="btn pq" onClick={e => { e.stopPropagation(); abrir(p); }}>Continuar</button></td>
                 </tr>
               );

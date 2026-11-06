@@ -72,3 +72,14 @@ export function progressoFase(d: Dados, cod: string, fase: Fase): { feitas: numb
   const abertas = l.filter(a => a.status !== 'Concluído' && a.status !== 'Cancelado');
   return { feitas: l.length - abertas.length, total: l.length, abertas };
 }
+
+/**
+ * % da atividade principal, calculado (não editável):
+ * com subatividades/tarefas → proporção das concluídas (canceladas não contam);
+ * sem subatividades → 0% até a atividade ser concluída (100%).
+ */
+export function percentualPrincipal(a: Atividade, subs: Atividade[], statusDaPrincipal = a.status): number {
+  const validas = subs.filter(s => s.status !== 'Cancelado');
+  if (!validas.length) return statusDaPrincipal === 'Concluído' ? 100 : 0;
+  return Math.round((validas.filter(s => s.status === 'Concluído').length / validas.length) * 100);
+}

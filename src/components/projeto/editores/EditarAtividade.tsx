@@ -1,15 +1,22 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { Atividade, Fase, NovaReuniao, Projeto, StatusAtividade } from '../../../types/models';
 import { usePortal } from '../../../state/PortalContext';
 import { useToast } from '../../../state/ToastContext';
 import { usePapel } from '../../../state/PapelContext';
 import { macro } from '../../../lib/calculos';
-import { codigoDaFase, FASES, STATUS_ATIVIDADE } from '../../../lib/constantes';
+import { codigoDaFase, codigoSubatividade, FASES, STATUS_ATIVIDADE } from '../../../lib/constantes';
 import { dma } from '../../../lib/datas';
 import { Drawer } from '../../ui/Drawer';
 import { convidados, formReuniaoInicial, ReuniaoTeams, type FormReuniao } from './ReuniaoTeams';
 import { Confirmacao } from '../../ui/Confirmacao';
 import { VisaoAtividade } from './VisaoAtividade';
+import { Mensagem } from '../../ui/Mensagem';
+import { diasUteis } from '../../../lib/datas';
+import { avisoFimDeSemana, avisoHorasPlanejadas, avisoSobrecarga, tarefasNoPeriodo } from '../../../lib/validacoes';
+import { candidatas } from '../../../lib/dependencias';
+import { percentualPrincipal } from '../../../lib/calculos';
+import { AcompanhamentoAtividade } from '../AcompanhamentoAtividade';
 
 interface Props {
   projeto: Projeto;
@@ -26,21 +33,19 @@ interface Props {
   aoNovaSubatividade?: (pai: string) => void;
 }
 
-/** Próximo código de subatividade: 3.2 → 3.2.1, 3.2.2… */
-function proximoCodigoFilho(lista: Atividade[], pai: string): string {
-  const nums = lista.filter(a => a.pai === pai).map(a => Number(a.codigo.split('.').pop())).filter(n => !isNaN(n));
-  return `${pai}.${(nums.length ? Math.max(...nums) : 0) + 1}`;
-}
+const proximoCodigoFilho = (lista: Atividade[], pai: string) => codigoSubatividade(lista.map(a => a.codigo), pai);
 
 /** Próximo código de atividade na fase (Iniciação 1.0, 1.1…; Planejamento 2.0…; Execução 3.0…). */
 const proximoCodigo = (lista: Atividade[], fase: Fase) => codigoDaFase(lista.map(a => a.codigo), fase);
 
 /** Cria, edita ou exclui uma atividade do cronograma. */
 export function EditarAtividade({ projeto, codigo, faseInicial, aoFechar, aoCriarSubatividade, paiInicial, aoNovaSubatividade }: Props) {
-  const { hoje, dados, salvarAtividade, criarAtividade, excluirAtividade, agendarReuniao, atualizarReuniao, cancelarReuniao, lerReuniao, reuniaoGravavel, fonte, email: meuEmail } = usePortal();
+  const { hoje, dados, salvarAtividade, criarAtividade, excluirAtividade, agendarReuniao, atualizarReuniao, cancelarReuniao, lerReuniao, reuniaoGravavel, fonte, email: meuEmail, lancarTarefas, tarefasGravaveis } = usePortal();
   const toast = useToast();
   const { pode, papel } = usePapel();
-  const estrutura = pode('gerenciarAtividades');   // nome, fase, equipe, datas, marco, descrição
+  const navegar = useNavigate();
+  const encerrado = projeto.situacaoCadastro === 'Encerrado';   // projeto encerrado: só consulta
+  const estrutura = pode('gerenciarAtividades') && !encerrado;   // nome, fase, equipe, datas, marco, descrição
   const lista = dados.atividades[projeto.codigo] || [];
   const existente = codigo ? lista.find(x => x.codigo === codigo) : undefined;
   const nova = !existente;
@@ -61,8 +66,14 @@ export function EditarAtividade({ projeto, codigo, faseInicial, aoFechar, aoCria
     pai: existente?.pai || principalInicial?.codigo || '',
     descricao: existente?.descricao || '',
     observacao: existente?.observacao || '',
-    responsavel: existente?.responsavel || ''
+    responsavel: existente?.responsavel || '',
+    predecessoras: existente?.predecessoras || ([] as string[]),
+    horasPlanejadas: existente?.horasPlanejadas === undefined ? '' : String(existente.horasPlanejadas),
+    /** nova subatividade: já lançar para o técnico? (padrão: não — o PMO lança depois) */
+    lancar: false
   });
+  // outras tarefas abertas do mesmo técnico no período (todos os projetos)
+  const sobrecarga = avisoSobrecarga(tarefasNoPeriodo(dados, f.responsavel, f.inicio, f.termino, existente ? { projeto: projeto.codigo, codigo: existente.codigo } : undefined));
   const [salvando, setSalvando] = useState(false);
   /** atividade existente abre só para visualização; quem pode editar clica em "Liberar edição" */
   const [liberada, setLiberada] = useState(!codigo);
@@ -90,7 +101,7 @@ export function EditarAtividade({ projeto, codigo, faseInicial, aoFechar, aoCria
       const marcados: Record<string, boolean> = {};
       for (const e of daEquipe) if (e !== meuEmail.toLowerCase()) marcados[e] = r.participantes.includes(e);
       setReuniao({ ativa: true, tipo: r.tipo, titulo: r.titulo, data: r.inicio.slice(0, 10), hora: r.inicio.slice(11, 16), duracaoMin: r.duracaoMin, pauta: '',
-        marcados, extras: r.participantes.filter(e => !daEquipe.has(e)).join(', ') });
+        marcados, extras: r.participantes.filter(e => !daEquipe.has(e)) });
       setEditandoReuniao(true);
     } catch (e) { setErro('Não foi possível abrir a reunião: ' + (e as Error).message); }
     finally { setCarregandoReuniao(false); }
@@ -107,7 +118,12 @@ export function EditarAtividade({ projeto, codigo, faseInicial, aoFechar, aoCria
   };
   const muda = (k: keyof typeof f) => (e: { target: { value: string } }) => setF(s => ({ ...s, [k]: e.target.value }));
 
+  /** mudar a fase de uma atividade existente pede confirmação */
+  const [confirmarFase, setConfirmarFase] = useState(false);
+  const faseConfirmada = useRef(false);
   const salvar = async () => {
+    if (existente && f.fase !== existente.fase && !faseConfirmada.current) { setConfirmarFase(true); return; }
+    faseConfirmada.current = false;
     if (!f.nome.trim()) { setErro('Informe o nome da atividade.'); return; }
     if (nova && f.pai && !f.codigo.startsWith(f.pai + '.')) { setErro(`O código da subatividade deve seguir o da principal (${f.pai}.1, ${f.pai}.2…).`); return; }
     if (!f.inicio || !f.termino) { setErro('Informe início e término.'); return; }
@@ -122,8 +138,10 @@ export function EditarAtividade({ projeto, codigo, faseInicial, aoFechar, aoCria
     const campos = {
       nome: f.nome.trim(), fase: f.fase, equipe: f.equipe.trim() || 'Systech', status: f.status, percentual: pct,
       inicio: f.inicio, termino: f.termino, marco: f.marco, descricao: f.descricao.trim(), observacao: f.observacao.trim(),
-      responsavel: f.responsavel
+      responsavel: f.responsavel, predecessoras: f.predecessoras,
+      horasPlanejadas: f.horasPlanejadas === '' ? undefined : Math.max(0, Number(f.horasPlanejadas) || 0)
     };
+    if (nova && f.pai && f.lancar && !f.responsavel) { setErro('Escolha o técnico responsável para lançar a tarefa.'); setSalvando(false); return; }
     // validação da reunião antes de gravar qualquer coisa
     const vaiReunir = reuniao.ativa && (editandoReuniao || podeAgendar);
     const dataReuniao = reuniao.data || f.inicio;
@@ -136,6 +154,7 @@ export function EditarAtividade({ projeto, codigo, faseInicial, aoFechar, aoCria
       if (nova) {
         atv = await criarAtividade(projeto.codigo, {
           ...campos, codigo: f.codigo.trim(), pai: f.pai, duracao: 0,
+          ...(f.pai ? { lancada: f.lancar } : {}),
           // nova atividade entra com a baseline igual ao previsto
           baselineInicio: f.inicio, baselineTermino: f.termino
         });
@@ -179,25 +198,37 @@ export function EditarAtividade({ projeto, codigo, faseInicial, aoFechar, aoCria
     } catch (e) { setErro((e as Error).message); setConfirmarExclusao(null); }
   };
 
+  const lancar = async (codigos: string[]) => {
+    try { await lancarTarefas(projeto.codigo, codigos); toast(codigos.length === 1 ? 'Tarefa lançada para o técnico.' : `${codigos.length} tarefas lançadas para os técnicos.`); }
+    catch (e) { toast((e as Error).message); }
+  };
   if (existente && !liberada) {
-    const podeEditar = pode('atualizarAtividade');
+    const podeEditar = pode('atualizarAtividade') && !encerrado;
     return (
       <Drawer aberto somenteLeitura salvando={false} aoFechar={aoFechar} aoSalvar={() => undefined}
         titulo={`${existente.codigo} · ${existente.nome}`}
         subtitulo={`${projeto.codigo} · ${existente.fase} · ${existente.equipe}`}
         acoes={<>
-          {pode('gerenciarAtividades') && !existente.pai && aoNovaSubatividade &&
+          {!encerrado && pode('gerenciarAtividades') && existente.pai && existente.lancada === false &&
+            <button type="button" className="btn" onClick={() => lancar([existente.codigo])}>Lançar para o técnico</button>}
+          {!encerrado && pode('gerenciarAtividades') && !existente.pai && filhos.some(x => x.lancada === false) &&
+            <button type="button" className="btn" onClick={() => lancar(filhos.filter(x => x.lancada === false).map(x => x.codigo))}>Lançar {filhos.filter(x => x.lancada === false).length} tarefa(s)</button>}
+          {!encerrado && pode('gerenciarAtividades') && !existente.pai && aoNovaSubatividade &&
             <button type="button" className="btn" onClick={() => aoNovaSubatividade(existente.codigo)}>+ Subatividade</button>}
-          {podeEditar && <button type="button" className="btn pri" onClick={() => setLiberada(true)}>✎ Liberar edição</button>}
+          {papel === 'Técnico'
+            ? (!encerrado && existente.pai && existente.status !== 'Concluído' && existente.status !== 'Cancelado' &&
+                <button type="button" className="btn pri" onClick={() => navegar(`/atualizar?item=${encodeURIComponent(`${projeto.codigo}|${existente.codigo}`)}`)}>Atualizar status</button>)
+            : podeEditar && <button type="button" className="btn pri" onClick={() => setLiberada(true)}>✎ Liberar edição</button>}
         </>}>
-        <VisaoAtividade projeto={projeto} a={existente} filhos={filhos} />
+        <VisaoAtividade projeto={projeto} a={existente} filhos={filhos} lista={lista} mostrarLancamento={papel === 'PMO' || papel === 'Patrocinador'} />
         {existente.reuniaoUrl && (
           <div className="reuniaoAgendada">
             <span>Reunião do Teams{existente.reuniaoTipo ? ` · ${existente.reuniaoTipo}` : ''}{existente.reuniaoInicio ? ` em ${quando(existente.reuniaoInicio)}` : ''}</span>
             <a className="btn pq" href={existente.reuniaoUrl} target="_blank" rel="noopener noreferrer">Entrar no Teams ↗</a>
           </div>
         )}
-        {!podeEditar && <p className="sub">Visualização apenas.</p>}
+        {papel !== 'Cliente' && <AcompanhamentoAtividade projeto={projeto} a={existente} compacto />}
+        {encerrado ? <Mensagem tipo="info">Projeto encerrado: somente consulta.</Mensagem> : !podeEditar && <p className="sub">Visualização apenas.</p>}
       </Drawer>
     );
   }
@@ -224,12 +255,35 @@ export function EditarAtividade({ projeto, codigo, faseInicial, aoFechar, aoCria
       <label className="campo">Atividade *<input className="ctl" value={f.nome} onChange={muda('nome')} disabled={!estrutura} placeholder="O que será feito" /></label>
       <div className="fg2">
         <label className="campo">Equipe<input className="ctl" value={f.equipe} onChange={muda('equipe')} disabled={!estrutura} placeholder="Systech, cliente ou ambos" /></label>
-        <label className="campo">Responsável
+        <label className="campo">{f.pai ? 'Técnico responsável' : 'Responsável'}
           <select className="ctl" value={f.responsavel} onChange={muda('responsavel')} disabled={!estrutura}>
-            <option value="">— sem responsável —</option>
+            <option value="">{f.pai ? '— escolha o técnico —' : '— sem responsável —'}</option>
             {projeto.equipe.filter(m => m.email).map(m => <option key={m.email} value={m.email.toLowerCase()}>{m.nome} · {m.funcao}</option>)}
           </select>
+          {estrutura && f.pai && sobrecarga && <span className="dica fds">Atenção: {projeto.equipe.find(m => m.email.toLowerCase() === f.responsavel)?.nome || 'esse técnico'} {sobrecarga}.</span>}
         </label>
+        {estrutura && !tarefasGravaveis && <Mensagem tipo="info">Para lançar tarefas e usar pré-requisitos, rode o script provisionar-portal.ps1 (sem -Piloto) e recarregue o portal.</Mensagem>}
+        {nova && f.pai && estrutura && (
+          <label className="chk"><input type="checkbox" checked={f.lancar} onChange={e => setF(s => ({ ...s, lancar: e.target.checked }))} />
+            Lançar para o técnico agora <span className="sub">(sem marcar, a tarefa fica em preparação e o técnico não a vê)</span></label>
+        )}
+        {estrutura && (
+          <label className="campo">Horas planejadas
+            <input className="ctl" type="number" min={0} step={0.5} placeholder="0" value={f.horasPlanejadas} onChange={e => setF(s => ({ ...s, horasPlanejadas: e.target.value }))} />
+            {avisoHorasPlanejadas(Number(f.horasPlanejadas), diasUteis(f.inicio, f.termino)) && <span className="dica fds">Atenção: {avisoHorasPlanejadas(Number(f.horasPlanejadas), diasUteis(f.inicio, f.termino))}.</span>}
+          </label>
+        )}
+        {estrutura && (
+          <label className="campo">Pré-requisito
+            <select className="ctl" value={f.predecessoras[0] || ''} onChange={e => setF(s => ({ ...s, predecessoras: e.target.value ? [e.target.value] : [] }))}>
+              <option value="">— nenhum —</option>
+              {candidatas(nova ? [...lista, { codigo: f.codigo, pai: f.pai, nome: f.nome } as unknown as Atividade] : lista, f.codigo).map(c => (
+                <option key={c.codigo} value={c.codigo}>{c.pai ? '   ↳ ' : ''}{c.codigo} · {c.nome}{c.status === 'Concluído' ? ' (concluída)' : ''}</option>
+              ))}
+            </select>
+            <span className="dica">Só pode começar quando o pré-requisito estiver concluído.</span>
+          </label>
+        )}
         {nova
           ? <label className="campo">Subatividade de
               <select className="ctl" value={f.pai} onChange={e => {
@@ -244,9 +298,16 @@ export function EditarAtividade({ projeto, codigo, faseInicial, aoFechar, aoCria
           : <label className="campo">Status
               <select className="ctl" value={f.status} onChange={e => setF(s => ({ ...s, status: e.target.value as StatusAtividade }))}>{STATUS_ATIVIDADE.map(s => <option key={s}>{s}</option>)}</select>
             </label>}
-        <label className="campo">Início previsto *<input className="ctl" type="date" min={nova || f.inicio !== existente?.inicio ? hoje : undefined} value={f.inicio} onChange={muda('inicio')} disabled={!estrutura} /></label>
-        <label className="campo">Término previsto *<input className="ctl" type="date" min={nova || f.termino !== existente?.termino ? (f.inicio > hoje ? f.inicio : hoje) : undefined} value={f.termino} onChange={muda('termino')} disabled={!estrutura} /></label>
-        {!nova && <label className="campo">% concluído<input className="ctl" type="number" min={0} max={100} value={f.percentual} onChange={muda('percentual')} /></label>}
+        <label className="campo">Início previsto *<input className="ctl" type="date" min={nova || f.inicio !== existente?.inicio ? hoje : undefined} value={f.inicio} onChange={muda('inicio')} disabled={!estrutura} />{estrutura && avisoFimDeSemana(f.inicio) && <span className="dica fds">Atenção: {avisoFimDeSemana(f.inicio)}.</span>}</label>
+        <label className="campo">Término previsto *<input className="ctl" type="date" min={nova || f.termino !== existente?.termino ? (f.inicio > hoje ? f.inicio : hoje) : undefined} value={f.termino} onChange={muda('termino')} disabled={!estrutura} />{estrutura && avisoFimDeSemana(f.termino) && <span className="dica fds">Atenção: {avisoFimDeSemana(f.termino)}.</span>}</label>
+        {!nova && (existente?.pai
+          ? <label className="campo">% concluído<input className="ctl" type="number" min={0} max={100} value={f.percentual} onChange={muda('percentual')} /></label>
+          : <label className="campo">% concluído
+              <input className="ctl" type="number" disabled value={percentualPrincipal(existente!, filhos, f.status)} />
+              <span className="dica">{filhos.filter(x => x.status !== 'Cancelado').length
+                ? `Calculado: ${filhos.filter(x => x.status === 'Concluído').length} de ${filhos.filter(x => x.status !== 'Cancelado').length} subatividades concluídas`
+                : 'Sem subatividades: 0% até concluir a atividade'}</span>
+            </label>)}
       </div>
       <label className="checar"><input type="checkbox" disabled={!estrutura} checked={f.marco} onChange={e => setF(s => ({ ...s, marco: e.target.checked }))} />
         <span>É um marco<br /><span className="sub">Entrega que exige aceite do cliente; aparece com losango no Gantt e em “Próximos marcos”.</span></span></label>
@@ -284,6 +345,16 @@ export function EditarAtividade({ projeto, codigo, faseInicial, aoFechar, aoCria
           <label className="campo">Mensagem aos convidados (opcional)
             <textarea className="ctl" rows={3} value={cancelar.mensagem} onChange={e => setCancelar({ ...cancelar, mensagem: e.target.value })} placeholder="Ex.: reunião remarcada para a próxima semana." />
           </label>
+        </Confirmacao>
+      )}
+      {confirmarFase && existente && (
+        <Confirmacao titulo={`Mudar ${existente.codigo} de fase?`} rotuloConfirmar="Mudar de fase"
+          aoCancelar={() => setConfirmarFase(false)}
+          aoConfirmar={() => { setConfirmarFase(false); faseConfirmada.current = true; salvar(); }}>
+          <p className="sub" style={{ fontSize: 14 }}>
+            A atividade <b>{existente.nome}</b> passa de <b>{existente.fase}</b> para <b>{f.fase}</b>.
+            {filhos.length > 0 && <> As {filhos.length} subatividades acompanham a nova fase e mantêm progresso, datas, status e responsáveis.</>}
+          </p>
         </Confirmacao>
       )}
       {confirmarExclusao && existente && (

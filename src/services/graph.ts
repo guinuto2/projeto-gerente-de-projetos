@@ -57,6 +57,13 @@ export class GraphClient {
   }
 
   get<T>(c: string) { return this.pedir<T>(c); }
+  /** Conteúdo binário (ex.: /drives/{id}/items/{id}/content — o Graph redireciona para o link de download). */
+  async baixar(caminho: string): Promise<Blob> {
+    const url = caminho.startsWith('http') ? caminho : `https://graph.microsoft.com/v1.0${caminho}`;
+    const r = await fetchGraph(url, { headers: { Authorization: 'Bearer ' + await this.auth.token() } });
+    if (!r.ok) throw new Error(`Não foi possível baixar o arquivo (${r.status}).`);
+    return r.blob();
+  }
   post<T>(c: string, json: unknown) { return this.pedir<T>(c, { method: 'POST', json }); }
   patch<T>(c: string, json: unknown) { return this.pedir<T>(c, { method: 'PATCH', json }); }
   excluir(c: string) { return this.pedir<null>(c, { method: 'DELETE' }); }

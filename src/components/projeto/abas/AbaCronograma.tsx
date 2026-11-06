@@ -7,21 +7,25 @@ import { dm } from '../../../lib/datas';
 import { Chips } from '../../ui/Chips';
 import { Vazio } from '../../ui/Vazio';
 import { Gantt } from './Gantt';
+import { lancadaParaTecnico } from '../../../lib/dependencias';
+import { LancarTarefas } from './LancarTarefas';
 import { TEMA } from '../../../lib/tema';
 import { EditarAtividade } from '../editores/EditarAtividade';
 
 interface Props { projeto: Projeto; faseSel: Fase | null; limparFase: () => void }
 
 export function AbaCronograma({ projeto, faseSel, limparFase }: Props) {
+  const aberto = projeto.situacaoCadastro !== 'Encerrado';   // encerrado: só consulta
   const { dados, hoje, fonte } = usePortal();
-  const { pode } = usePapel();
+  const { pode, papel } = usePapel();
   const [equipe, setEquipe] = useState('Todas');
   const [abertos, setAbertos] = useState<Record<string, boolean>>({});
   /** nova subatividade aberta a partir do painel da atividade principal */
   const [subDe, setSubDe] = useState<string | undefined>(undefined);
   /** código da atividade em edição, ou 'nova' */
   const [editando, setEditando] = useState<string | null>(null);
-  const atividades = dados.atividades[projeto.codigo] || [];
+  // o técnico não vê as tarefas que o PMO ainda não lançou
+  const atividades = (dados.atividades[projeto.codigo] || []).filter(a => (papel !== 'Técnico' && papel !== 'Cliente') || lancadaParaTecnico(a));
   const editor = editando && (
     <EditarAtividade key={editando + (subDe || '')} projeto={projeto} codigo={editando === 'nova' ? undefined : editando} faseInicial={faseSel}
       paiInicial={editando === 'nova' ? subDe : undefined}
@@ -31,14 +35,14 @@ export function AbaCronograma({ projeto, faseSel, limparFase }: Props) {
   );
   if (!atividades.length) return (
     <>
-      <Vazio>Nenhuma atividade no cronograma ainda.{pode('gerenciarAtividades') && <><br /><br /><button type="button" className="btn pri" onClick={() => setEditando('nova')}>+ Nova atividade</button></>}</Vazio>
+      <Vazio>Nenhuma atividade no cronograma ainda.{(aberto && pode('gerenciarAtividades')) && <><br /><br /><button type="button" className="btn pri" onClick={() => setEditando('nova')}>+ Nova atividade</button></>}</Vazio>
       {editor}
     </>
   );
   if (!atividades.some(a => a.inicio && a.termino)) return (
     <>
       <Vazio>As atividades ainda não têm datas. Abra cada uma para informar início e término.<br /><br />
-        {pode('gerenciarAtividades') && <button type="button" className="btn pri" onClick={() => setEditando('nova')}>+ Nova atividade</button>}</Vazio>
+        {(aberto && pode('gerenciarAtividades')) && <button type="button" className="btn pri" onClick={() => setEditando('nova')}>+ Nova atividade</button>}</Vazio>
       <ul className="ul">{atividades.map(a => <li key={a.codigo}><button type="button" className="btn pq" onClick={() => setEditando(a.codigo)}>{a.codigo} · {a.nome}</button></li>)}</ul>
       {editor}
     </>
@@ -47,9 +51,10 @@ export function AbaCronograma({ projeto, faseSel, limparFase }: Props) {
   const legenda: [string, string, number][] = [['Concluído', TEMA.concluido, 8], ['Em curso', TEMA.emCurso, 8], ['Atrasado', TEMA.atrasado, 8], ['Baseline', TEMA.baseline, 3]];
   return (
     <>
+      {(aberto && pode('gerenciarAtividades')) && <LancarTarefas projeto={projeto} />}
       <div className="linha" style={{ marginBottom: 14 }}>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-          {pode('gerenciarAtividades') && <button type="button" className="btn pri pq" onClick={() => setEditando('nova')}>+ Nova atividade</button>}
+          {(aberto && pode('gerenciarAtividades')) && <button type="button" className="btn pri pq" onClick={() => setEditando('nova')}>+ Nova atividade</button>}
           <Chips rotulo="Filtrar por equipe" opcoes={equipes} valor={equipe} aoMudar={setEquipe} formatar={e => (e === 'Todas' ? 'Todas as equipes' : e)} />
         </div>
         <div className="legenda">
