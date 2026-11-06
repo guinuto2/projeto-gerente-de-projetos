@@ -93,13 +93,13 @@ export function NovoProjetoPage() {
       </div>
       <section className="card" style={{ padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: 18 }}>
         {passo === 0 && <>
-          <PassoDadosGerais form={form} mudar={mudar} dataMinima={hoje} aoEscolherArquiteto={(nome, email) => setForm(f => (f ? { ...f, arquiteto: nome, arquitetoEmail: email } : f))}
+          <PassoDadosGerais form={form} mudar={mudar} aoEscolherArquiteto={(nome, email) => setForm(f => (f ? { ...f, arquiteto: nome, arquitetoEmail: email } : f))}
             aoEscolherPessoa={(funcao: string, nome: string, email: string) => setForm(f => (f ? { ...f, equipe: colocarNaEquipe(f.equipe, funcao, nome, email) } : f))} />
           <h3 className="h3" style={{ fontSize: 15 }}>Equipe do projeto</h3>
           <EditorEquipe equipe={form.equipe} aoMudar={e => setForm(f => ({ ...f, equipe: e }))} />
         </>}
         {passo === 1 && <PassoEscopo form={form} mudar={mudar} />}
-        {passo === 2 && <PassoCronograma dataMinima={hoje} linhas={form.atividades} aoMudar={l => setForm(f => ({ ...f, atividades: l }))} aoUsarModelo={usarCronogramaModelo} />}
+        {passo === 2 && <PassoCronograma linhas={form.atividades} aoMudar={l => setForm(f => ({ ...f, atividades: l }))} aoUsarModelo={usarCronogramaModelo} />}
         {passo === 3 && <PassoRiscos linhas={form.riscos} aoMudar={l => setForm(f => ({ ...f, riscos: l }))} aoUsarModelo={() => setForm(f => ({ ...f, riscos: riscosModelo() }))} />}
         {erro && <Mensagem tipo="erro">{erro}</Mensagem>}
         <div className="linha" style={{ borderTop: '1px solid var(--borda2)', paddingTop: 16 }}>

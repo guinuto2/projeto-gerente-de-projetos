@@ -418,10 +418,20 @@ export class FonteSharePoint implements FonteDados {
   async arquivosWiki() {
     const id = await this.idDriveWiki();
     if (!id) return null;
-    const itens = await this.graph.todos<{ id: string; name: string; size?: number; webUrl: string; lastModifiedDateTime: string; file?: unknown }>(
-      `/drives/${id}/root/children?$select=id,name,size,webUrl,lastModifiedDateTime,file`);
-    return itens.filter(x => x.file).map(x => ({ id: x.id, nome: x.name, tamanho: x.size || 0, url: x.webUrl, modificado: x.lastModifiedDateTime }))
+    const itens = await this.graph.todos<{ id: string; name: string; size?: number; webUrl: string; lastModifiedDateTime: string; file?: unknown; listItem?: { fields?: { Descricao?: string } } }>(
+      `/drives/${id}/root/children?$expand=listItem($expand=fields($select=Descricao))`);
+    return itens.filter(x => x.file).map(x => ({ id: x.id, nome: x.name, tamanho: x.size || 0, url: x.webUrl, modificado: x.lastModifiedDateTime, descricao: x.listItem?.fields?.Descricao || undefined }))
       .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+  }
+  async enviarArquivoWiki(arquivo: File, descricao: string) {
+    const id = await this.idDriveWiki();
+    if (!id) throw new Error('A biblioteca "Wiki Tecnicos" não existe. Rode o script provisionar-portal.ps1 (sem -Piloto).');
+    // substitui o arquivo de mesmo nome (a tela pergunta antes)
+    const item = await this.graph.enviar(`/drives/${id}/root:/${encodeURIComponent(arquivo.name)}`, arquivo, 'replace');
+    if (descricao.trim() && item) {
+      try { await this.graph.pedir(`/drives/${id}/items/${item}/listItem/fields`, { method: 'PATCH', json: { Descricao: descricao.trim() } }); }
+      catch { /* sem a coluna Descricao (script antigo): o arquivo fica sem descrição */ }
+    }
   }
   async baixarArquivoWiki(item: string) {
     const id = await this.idDriveWiki();

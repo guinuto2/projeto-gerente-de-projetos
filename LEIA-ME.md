@@ -1,4 +1,17 @@
-# Central Systech — v3.92 (React)
+# Central Systech — v3.94 (React)
+
+**v3.94:** projetos anteriores a hoje — o cadastro aceita início, término e atividades no passado (dados gerais, cronograma e
+rascunho), e o painel da atividade e a criação rápida de tarefas aceitam datas passadas. Continuam bloqueadas: reunião do Teams
+no passado e reprogramar uma tarefa aberta para uma data que já passou (no Atualizar status).
+
+
+**v3.93 — Wiki**
+- Links reais (oficiais) para Dell, VMware by Broadcom, Lenovo, Omnissa, processadores (Intel/AMD) e servidores; novo item
+  "Comprovações para editais" (TSAnet, FIRST, TCG, CVE, UEFI, DMTF, Windows Server Catalog, Red Hat, Ubuntu, NVIDIA).
+- Botão "+ Adicionar à Wiki": o técnico escolhe Documento (texto, abre o editor) ou Arquivo (envia para a biblioteca
+  "Wiki Tecnicos" do SharePoint, com descrição; mesmo nome pede confirmação para substituir; até 250 MB).
+- Script: coluna Descricao na biblioteca Wiki Tecnicos.
+
 
 **v3.92 — e-mails para o papel certo**
 - Pedido de aprovação dos gates G2–G4: patrocinador da equipe do projeto (senão, os patrocinadores da lista Portal Tecnicos).

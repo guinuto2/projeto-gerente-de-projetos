@@ -69,13 +69,17 @@ export class GraphClient {
   excluir(c: string) { return this.pedir<null>(c, { method: 'DELETE' }); }
 
   /** Upload em blocos (sessão de upload) — aceita arquivos grandes. */
-  async enviar(caminhoDrive: string, arquivo: File): Promise<void> {
-    const sessao = await this.post<{ uploadUrl: string }>(`${caminhoDrive}:/createUploadSession`, { item: { '@microsoft.graph.conflictBehavior': 'rename' } });
+  /** Envia em partes; devolve o id do arquivo criado. conflito: 'rename' (padrão, cria "nome 1") ou 'replace' (substitui). */
+  async enviar(caminhoDrive: string, arquivo: File, conflito: 'rename' | 'replace' = 'rename'): Promise<string> {
+    const sessao = await this.post<{ uploadUrl: string }>(`${caminhoDrive}:/createUploadSession`, { item: { '@microsoft.graph.conflictBehavior': conflito } });
     const bloco = 327680 * 20; // múltiplo de 320 KiB
-    for (let ini = 0; ini < arquivo.size; ini += bloco) {
+    let id = '';
+    for (let ini = 0; ini < Math.max(arquivo.size, 1); ini += bloco) {
       const fim = Math.min(ini + bloco, arquivo.size);
-      const r = await fetchGraph(sessao.uploadUrl, { method: 'PUT', headers: { 'Content-Range': `bytes ${ini}-${fim - 1}/${arquivo.size}` }, body: arquivo.slice(ini, fim) });
+      const r = await fetchGraph(sessao.uploadUrl, { method: 'PUT', headers: { 'Content-Range': `bytes ${ini}-${Math.max(fim - 1, 0)}/${arquivo.size}` }, body: arquivo.slice(ini, fim) });
       if (!r.ok && r.status !== 202) throw new Error(`Falha no envio do arquivo (${r.status}).`);
+      if (r.status === 200 || r.status === 201) { try { id = ((await r.json()) as { id?: string }).id || ''; } catch { /* */ } }
     }
+    return id;
   }
 }

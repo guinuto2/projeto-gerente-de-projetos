@@ -130,8 +130,6 @@ export function EditarAtividade({ projeto, codigo, faseInicial, aoFechar, aoCria
     if (f.termino < f.inicio) { setErro('O término não pode ser antes do início.'); return; }
     // datas novas ou alteradas não podem ficar no passado (datas antigas que não mudaram continuam valendo)
     const br = (s: string) => s.split('-').reverse().join('/');
-    if ((nova || f.inicio !== existente?.inicio) && f.inicio < hoje) { setErro(`O início não pode ser antes de hoje (${br(hoje)}).`); return; }
-    if ((nova || f.termino !== existente?.termino) && f.termino < hoje) { setErro(`O término não pode ser antes de hoje (${br(hoje)}).`); return; }
     if (reuniao.ativa && (reuniao.data || f.inicio) < hoje) { setErro(`A reunião não pode ser marcada antes de hoje (${br(hoje)}).`); return; }
     setSalvando(true); setErro('');
     const pct = f.status === 'Concluído' ? 100 : Math.max(0, Math.min(100, Number(f.percentual) || 0));

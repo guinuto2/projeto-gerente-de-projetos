@@ -867,3 +867,13 @@ textarea.ctl { height: auto; min-height: 96px; padding: 10px; resize: vertical; 
 .pendVencida td { background: #FDECEA; }
 :root[data-theme="dark"] .pendVencida td { background: #3A2321; }
 .tagVencida { display: inline-block; margin-left: 6px; font-size: 11px; font-weight: 700; color: #fff; background: #C0392B; border-radius: 99px; padding: 1px 8px; white-space: nowrap; }
+
+/* v3.93: adicionar à Wiki */
+.wikiAdicionar { width: 100%; margin-top: 8px; }
+.wikiEscolha { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 640px) { .wikiEscolha { grid-template-columns: 1fr; } }
+.wikiOpcao { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; text-align: left; padding: 16px; border: 1px solid var(--borda); border-radius: 12px; background: var(--superficie); cursor: pointer; font: inherit; color: var(--texto); }
+.wikiOpcao:hover { border-color: var(--vinhoBorda); background: var(--vinhoClaro); }
+.wikiOpcao b { font-size: 15px; }
+.wikiOpcao .sub { font-size: 12.5px; line-height: 1.45; }
+.wikiOpcaoIco { font-size: 24px; }

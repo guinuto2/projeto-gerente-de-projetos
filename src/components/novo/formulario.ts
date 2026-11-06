@@ -38,9 +38,8 @@ export const formVazio = (): FormProjeto => ({
 });
 
 /** Lista do que falta para enviar (vazia = pode enviar). */
-export function validar(f: FormProjeto, d: Dados, hoje: string): string[] {
+export function validar(f: FormProjeto, d: Dados, _hoje: string): string[] {   // datas passadas são permitidas (projetos anteriores)
   const e: string[] = [];
-  const br = (s: string) => s.split('-').reverse().join('/');
   if (!f.codigo.trim()) e.push('informe o código');
   else if (d.projetos.some(p => p.codigo.toLowerCase() === f.codigo.trim().toLowerCase())) e.push('esse código já existe');
   else if (!/^[A-Z0-9]+(?:-[A-Z0-9]+)+$/.test(f.codigo.trim())) e.push('o código deve seguir o padrão CLIENTE-SIGLA (ex.: TRF1-VCF)');
@@ -50,14 +49,12 @@ export function validar(f: FormProjeto, d: Dados, hoje: string): string[] {
   e.push(...faltasFaturamento(f));
   if (!f.gerente.trim()) e.push('informe o GP');
   if (!f.inicio || !f.termino) e.push('informe início e término');
-  else if (f.inicio < hoje) e.push(`o início do projeto não pode ser antes de hoje (${br(hoje)})`);
   else if (f.termino < f.inicio) e.push('o término do projeto é antes do início');
   if (!f.objetivo.trim()) e.push('descreva o objetivo');
   const at = f.atividades.filter(a => a.nome.trim());
   if (!at.length) e.push('inclua ao menos uma atividade');
   if (f.equipe.some(m => /^fiscal$/i.test(m.funcao.trim()) && !(m.telefone || '').trim())) e.push('informe o telefone do fiscal');
   if (at.some(a => !a.inicio || !a.termino || a.termino < a.inicio)) e.push('confira as datas das atividades');
-  else if (at.some(a => a.inicio < hoje)) e.push(`há atividades começando antes de hoje (${br(hoje)})`);
   return e;
 }
 

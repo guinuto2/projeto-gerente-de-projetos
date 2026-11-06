@@ -23,6 +23,7 @@
   v3.82: lista Portal Wiki (documentos da Wiki editados pelos técnicos).
   v3.85: coluna Função de Portal Tecnicos aceita PMO e Patrocinador (e preenchimento livre).
   v3.88: coluna Prazo em Portal Pendencias.
+  v3.93: coluna Descricao na biblioteca Wiki Tecnicos.
 
 .EXEMPLOS
   # só a estrutura (listas vazias)
@@ -349,6 +350,8 @@ Campo $L 'Conteudo' 'Conteúdo (JSON)' 'Note'
 Campo $L 'Excluido' 'Excluído' 'Boolean'
 Campo $L 'AtualizadoPor' 'Atualizado por' 'Text'
 Lista 'Wiki Tecnicos' 'WikiTecnicos' 'DocumentLibrary'
+# v3.93: descrição dos arquivos enviados pelos técnicos no portal
+Campo 'Wiki Tecnicos' 'Descricao' 'Descrição' 'Note'
 $pastaWiki = Join-Path $PSScriptRoot 'wiki-arquivos'
 # os arquivos ficam no disco sem acento (o zip extraído no Windows quebrava os nomes) e sobem com o nome certo
 $nomesWiki = [ordered]@{

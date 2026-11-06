@@ -85,14 +85,17 @@ export function WikiPage() {
   const { fonte } = usePortal();
   const [arquivos, setArquivos] = useState<ArquivoWiki[]>(ARQUIVOS_LOCAIS);
   const [noSharePoint, setNoSharePoint] = useState(false);
-  useEffect(() => {
-    if (!fonte.arquivosWiki) return;
-    fonte.arquivosWiki().then(l => {
+  const carregarArquivos = () => {
+    if (!fonte.arquivosWiki) return Promise.resolve();
+    return fonte.arquivosWiki().then(l => {
       if (!l) return;   // biblioteca ainda não criada: ficam os arquivos que vêm com o portal
       setNoSharePoint(true);
-      setArquivos(l.map(a => { const nome = nomeCorreto(a.nome); return { ...a, nome, descricao: DESCRICAO_ARQUIVO[nome] || 'Arquivo da pasta da equipe técnica.', local: false }; }));
+      // a descrição digitada por quem enviou tem prioridade sobre a descrição padrão
+      setArquivos(l.map(a => { const nome = nomeCorreto(a.nome); return { ...a, nome, descricao: a.descricao || DESCRICAO_ARQUIVO[nome] || 'Arquivo da pasta da equipe técnica.', local: false }; }));
     }).catch(() => undefined);
-  }, [fonte]);
+  };
+  useEffect(() => { carregarArquivos(); }, [fonte]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [adicionando, setAdicionando] = useState(false);
   const [salvos, setSalvos] = useState<ModeloSalvo[] | null | undefined>(undefined);
   const carregarDocs = () => { (fonte.wikiDocs ? fonte.wikiDocs() : Promise.resolve(null)).then(setSalvos).catch(() => setSalvos(null)); };
   useEffect(carregarDocs, [fonte]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -128,9 +131,8 @@ export function WikiPage() {
       <div className="wiki">
         <aside className="card wikiLado" aria-label="Conteúdo da Wiki">
           <input className="ctl" type="search" placeholder="Buscar na Wiki" value={busca} onChange={e => { setBusca(e.target.value); setEmResultado(false); }} aria-label="Buscar na Wiki" />
-          <div className="wikiGrupo wikiGrupoAcao">Documentos
-            {podeEditar && <button type="button" className="linkBtn" onClick={() => { setEditando('novo'); setEmResultado(true); }} title="Criar um documento">+ Novo</button>}
-          </div>
+          {podeEditar && <button type="button" className="btn pri pq wikiAdicionar" onClick={() => setAdicionando(true)}>+ Adicionar à Wiki</button>}
+          <div className="wikiGrupo">Documentos</div>
           {modelos.map(m => (
             <button key={m.id} type="button" className={`wikiItem ${sel === `modelo:${m.id}` ? 'on' : ''}`} onClick={() => { setEmResultado(true); abrir(`modelo:${m.id}`); }}>
               <span className="wikiDoc" aria-hidden="true">
@@ -160,6 +162,17 @@ export function WikiPage() {
           {!arquivosFiltrados.length && <p className="sub" style={{ padding: '2px 8px' }}>Nenhum arquivo encontrado.</p>}
         </aside>
 
+        {adicionando && (
+          <AdicionarWiki arquivos={arquivos} podeEnviar={noSharePoint && !!fonte.enviarArquivoWiki} piloto={fonte.modo === 'piloto'}
+            aoFechar={() => setAdicionando(false)}
+            aoDocumento={() => { setAdicionando(false); setEditando('novo'); setEmResultado(true); }}
+            aoEnviar={async (arq, descricao) => {
+              await fonte.enviarArquivoWiki!(arq, descricao);
+              await carregarArquivos();
+              setAdicionando(false); setEmResultado(true); abrir(`arq:${encodeURIComponent(arq.name)}`);
+              toast(`“${arq.name}” enviado para a biblioteca Wiki Tecnicos.`);
+            }} />
+        )}
         <section className="card wikiConteudo">
           {q && !emResultado ? (
             <div>
@@ -254,7 +267,7 @@ function VerFabricante({ f }: { f: Fabricante }) {
         <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
           <span className="wikiSigla grande" style={{ background: f.cor }} aria-hidden="true">{f.sigla}</span>
           <div>
-            <div className="wikiTipo">Fabricante</div>
+            <div className="wikiTipo">{f.id === 'editais' ? 'Referências' : 'Fabricante'}</div>
             <h2 className="h2" style={{ fontSize: 24, fontWeight: 700 }}>{f.nome}</h2>
           </div>
         </div>
@@ -276,7 +289,7 @@ function VerFabricante({ f }: { f: Fabricante }) {
           <ul className="ul">{f.dicas.map(d => <li key={d}>{d}</li>)}</ul>
         </div>
       )}
-      <p className="sub" style={{ fontSize: 12 }}>Os links desta página são fictícios (exemplo) e serão trocados pelos endereços oficiais.</p>
+      <p className="sub" style={{ fontSize: 12 }}>Links oficiais dos fabricantes. Alguns portais (Broadcom, Dell TechDirect, Omnissa Customer Connect) pedem login.</p>
     </>
   );
 }
@@ -384,5 +397,76 @@ function EditorDoc({ inicial, gravavel, piloto, aoSalvar, aoCancelar }: { inicia
         </Mensagem>
       )}
     </div>
+  );
+}
+
+/** Janela "+ Adicionar à Wiki": o técnico escolhe entre um documento (texto) e um arquivo (enviado ao SharePoint). */
+function AdicionarWiki({ arquivos, podeEnviar, piloto, aoFechar, aoDocumento, aoEnviar }: {
+  arquivos: ArquivoWiki[]; podeEnviar: boolean; piloto: boolean; aoFechar: () => void; aoDocumento: () => void; aoEnviar: (a: File, descricao: string) => Promise<void>;
+}) {
+  const [modo, setModo] = useState<'escolha' | 'arquivo'>('escolha');
+  const [arq, setArq] = useState<File | null>(null);
+  const [descricao, setDescricao] = useState('');
+  const [substituir, setSubstituir] = useState(false);
+  const [enviando, setEnviando] = useState(false); const [erro, setErro] = useState('');
+  const existe = !!arq && arquivos.some(a => a.nome.toLowerCase() === arq.name.toLowerCase());
+  const LIMITE = 250 * 1024 * 1024;
+  const enviar = async () => {
+    if (!arq) { setErro('Escolha o arquivo.'); return; }
+    if (arq.size > LIMITE) { setErro('O arquivo passa de 250 MB. Envie direto pela biblioteca no SharePoint.'); return; }
+    if (existe && !substituir) { setErro('Já existe um arquivo com esse nome: marque “Substituir o arquivo existente” ou renomeie o arquivo antes.'); return; }
+    setEnviando(true); setErro('');
+    try { await aoEnviar(arq, descricao); } catch (e) { setErro((e as Error).message); setEnviando(false); }
+  };
+  return (
+    <>
+      <div className="fundoDr" onClick={() => !enviando && aoFechar()} />
+      <div className="modal" role="dialog" aria-modal="true" aria-label="Adicionar à Wiki" style={{ width: 'min(620px, 94vw)' }}>
+        <h2 className="h3">Adicionar à Wiki</h2>
+        {modo === 'escolha' ? (
+          <>
+            <p className="sub" style={{ margin: '4px 0 14px' }}>O que você vai adicionar?</p>
+            <div className="wikiEscolha">
+              <button type="button" className="wikiOpcao" onClick={aoDocumento}>
+                <span className="wikiOpcaoIco" aria-hidden="true">📝</span>
+                <b>Documento</b>
+                <span className="sub">Texto escrito aqui na Wiki: procedimentos, questionamentos, requisitos. Abre o editor, com prévia ao vivo; aparece em “Documentos”.</span>
+              </button>
+              <button type="button" className="wikiOpcao" onClick={() => setModo('arquivo')}>
+                <span className="wikiOpcaoIco" aria-hidden="true">📎</span>
+                <b>Arquivo</b>
+                <span className="sub">Word, Excel, PDF, PowerPoint… Vai para a biblioteca “Wiki Tecnicos” do SharePoint; aparece em “Arquivos”.</span>
+              </button>
+            </div>
+            <div className="linha" style={{ justifyContent: 'flex-end', marginTop: 14 }}><button type="button" className="btn" onClick={aoFechar}>Cancelar</button></div>
+          </>
+        ) : (
+          <>
+            {!podeEnviar && <Mensagem tipo="info">{piloto ? 'No modo piloto não há SharePoint: o envio de arquivos funciona com o portal conectado.' : 'A biblioteca “Wiki Tecnicos” ainda não existe: rode o script provisionar-portal.ps1 (sem -Piloto).'}</Mensagem>}
+            <label className="campo" style={{ marginTop: 10 }}>Arquivo *
+              <input className="ctl" type="file" disabled={!podeEnviar || enviando} onChange={e => { setArq(e.target.files?.[0] || null); setSubstituir(false); setErro(''); }} />
+              {arq && <span className="dica">{arq.name} · {arq.size < 1048576 ? `${Math.max(1, Math.round(arq.size / 1024))} KB` : `${(arq.size / 1048576).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} MB`}</span>}
+            </label>
+            {existe && (
+              <label className="chk" style={{ marginTop: 6 }}>
+                <input type="checkbox" checked={substituir} onChange={e => setSubstituir(e.target.checked)} />
+                <span>Já existe “{arq!.name}” na Wiki. <b>Substituir o arquivo existente</b></span>
+              </label>
+            )}
+            <label className="campo" style={{ marginTop: 10 }}>Descrição
+              <textarea className="ctl" rows={3} value={descricao} onChange={e => setDescricao(e.target.value)} placeholder="Para que serve o arquivo (aparece na Wiki e na busca)." disabled={!podeEnviar || enviando} />
+            </label>
+            {erro && <Mensagem tipo="erro">{erro}</Mensagem>}
+            <div className="linha" style={{ justifyContent: 'space-between', marginTop: 14 }}>
+              <button type="button" className="linkBtn" disabled={enviando} onClick={() => setModo('escolha')}>← Voltar</button>
+              <span className="linha">
+                <button type="button" className="btn" disabled={enviando} onClick={aoFechar}>Cancelar</button>
+                <button type="button" className="btn pri" disabled={!podeEnviar || !arq || enviando} onClick={enviar}>{enviando ? 'Enviando…' : 'Enviar para o SharePoint'}</button>
+              </span>
+            </div>
+          </>
+        )}
+      </div>
+    </>
   );
 }

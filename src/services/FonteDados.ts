@@ -36,7 +36,9 @@ export interface FonteDados {
   /** grava (cria ou substitui) um documento da Wiki */
   salvarWikiDoc?(d: import('../lib/wiki').ModeloSalvo): Promise<void>;
   /** arquivos da biblioteca "Wiki Tecnicos" (null se a biblioteca ainda não existe) */
-  arquivosWiki?(): Promise<{ id: string; nome: string; tamanho: number; url: string; modificado: string }[] | null>;
+  arquivosWiki?(): Promise<{ id: string; nome: string; tamanho: number; url: string; modificado: string; descricao?: string }[] | null>;
+  /** envia (ou substitui) um arquivo na biblioteca "Wiki Tecnicos", com uma descrição opcional */
+  enviarArquivoWiki?(arquivo: File, descricao: string): Promise<void>;
   /** conteúdo de um arquivo da biblioteca da Wiki, para baixar */
   baixarArquivoWiki?(id: string): Promise<Blob>;
   /** exclui um arquivo da biblioteca (vai para a lixeira) */

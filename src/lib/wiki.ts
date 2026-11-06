@@ -1,6 +1,5 @@
 /**
  * Conteúdo da Wiki do técnico: documentos (qualificação técnica e modelos de questionamento) e fabricantes.
- * Os links dos fabricantes são FICTÍCIOS (domínio reservado example.com) — troque pelos endereços oficiais quando quiser.
  */
 export interface Modelo { id: string; titulo: string; descricao: string; secoes: { titulo: string; itens: string[] }[] }
 export interface Site { titulo: string; descricao: string; url: string }
@@ -147,61 +146,78 @@ export const MODELOS: Modelo[] = [
     ] }
 ];
 
-const ex = (fab: string, caminho: string) => `https://example.com/${fab}/${caminho}`;
-
 export const FABRICANTES: Fabricante[] = [
-  { id: 'dell', nome: 'Dell Technologies', sigla: 'DELL', cor: '#0076CE', descricao: 'Servidores PowerEdge, storage PowerStore/PowerVault/Unity e switches. Suporte por Service Tag.',
+  { id: 'dell', nome: 'Dell Technologies', sigla: 'DELL', cor: '#0076CE', descricao: 'Servidores PowerEdge, storage PowerStore/PowerVault/Unity e switches. O suporte é pela Service Tag do equipamento.',
     sites: [
-      { titulo: 'Suporte por Service Tag', descricao: 'Garantia, drivers e chamados a partir da etiqueta do equipamento.', url: ex('dell', 'suporte/service-tag') },
-      { titulo: 'Drivers e downloads', descricao: 'Firmware, BIOS, iDRAC e pacotes de atualização.', url: ex('dell', 'drivers') },
-      { titulo: 'Base de conhecimento', descricao: 'Artigos de solução de problemas e notas técnicas.', url: ex('dell', 'kb') },
-      { titulo: 'Documentação PowerEdge', descricao: 'Manuais de instalação, guias de iDRAC e especificações.', url: ex('dell', 'docs/poweredge') },
-      { titulo: 'Abertura de chamado', descricao: 'Portal de casos e envio de logs (SupportAssist).', url: ex('dell', 'chamados') }
+      { titulo: 'Suporte por Service Tag', descricao: 'Garantia, drivers, documentação e chamados a partir da etiqueta do equipamento.', url: 'https://www.dell.com/support/home/pt-br' },
+      { titulo: 'Drivers e downloads', descricao: 'Firmware, BIOS, iDRAC e pacotes de atualização por modelo.', url: 'https://www.dell.com/support/home/pt-br?app=drivers' },
+      { titulo: 'Pesquisa no suporte (artigos e manuais)', descricao: 'Base de conhecimento, manuais de instalação e notas técnicas.', url: 'https://www.dell.com/support/search/pt-br' },
+      { titulo: 'Guia de atualização de BIOS/UEFI', descricao: 'Como baixar e aplicar atualizações de BIOS e UEFI da Dell.', url: 'https://www.dell.com/support/kbdoc/pt-br/000124211' },
+      { titulo: 'TechDirect (chamados e peças)', descricao: 'Portal de parceiros para abrir chamados, despachar peças e acompanhar casos.', url: 'https://techdirect.dell.com/' },
+      { titulo: 'Linha PowerEdge', descricao: 'Modelos de servidores, configurações e comparativos.', url: 'https://www.dell.com/pt-br/dt/servers/index.htm' }
     ],
     dicas: ['Antes de abrir chamado, colete o log do SupportAssist/TSR pelo iDRAC.', 'Atualize firmware em pacote (catálogo) para manter as versões compatíveis entre si.'] },
-  { id: 'vmware', nome: 'VMware by Broadcom', sigla: 'VMW', cor: '#717074', descricao: 'vSphere, vCenter, VCF, NSX e vSAN. Licenças e downloads pelo portal do fabricante.',
+  { id: 'vmware', nome: 'VMware by Broadcom', sigla: 'VMW', cor: '#717074', descricao: 'vSphere, vCenter, VCF, NSX e vSAN. Downloads, licenças e chamados pelo portal da Broadcom (exige login).',
     sites: [
-      { titulo: 'Portal de suporte e downloads', descricao: 'Downloads de binários, patches e gerenciamento de licenças.', url: ex('vmware', 'portal') },
-      { titulo: 'Guia de compatibilidade (HCL)', descricao: 'Hardware, drivers e firmware certificados por versão.', url: ex('vmware', 'compatibilidade') },
-      { titulo: 'Matriz de interoperabilidade', descricao: 'Versões suportadas entre vCenter, ESXi, NSX, vSAN e VCF.', url: ex('vmware', 'interoperabilidade') },
-      { titulo: 'Documentação técnica', descricao: 'Guias de instalação, upgrade e notas de versão.', url: ex('vmware', 'docs') },
-      { titulo: 'Base de conhecimento (KB)', descricao: 'Artigos de erros conhecidos e soluções.', url: ex('vmware', 'kb') },
-      { titulo: 'Ciclo de vida dos produtos', descricao: 'Datas de fim de suporte de cada versão.', url: ex('vmware', 'ciclo-de-vida') }
+      { titulo: 'Portal de suporte Broadcom', descricao: 'Downloads, patches, licenças e abertura de chamados (login da Broadcom).', url: 'https://support.broadcom.com/' },
+      { titulo: 'Broadcom Compatibility Guide (HCL)', descricao: 'Hardware, drivers e firmware certificados por versão do ESXi/vSAN.', url: 'https://compatibilityguide.broadcom.com/' },
+      { titulo: 'Matriz de interoperabilidade', descricao: 'Versões suportadas entre vCenter, ESXi, NSX, vSAN e VCF.', url: 'https://interopmatrix.broadcom.com/Interoperability' },
+      { titulo: 'Documentação técnica (TechDocs)', descricao: 'Guias de instalação, upgrade e notas de versão do VCF e do vSphere.', url: 'https://techdocs.broadcom.com/us/en/vmware-cis/vcf.html' },
+      { titulo: 'Ciclo de vida dos produtos', descricao: 'Datas de fim de suporte de cada versão (login da Broadcom).', url: 'https://support.broadcom.com/group/ecx/productlifecycle' },
+      { titulo: 'Política de suporte e manutenção', descricao: 'Maintenance Policy Handbook: níveis de severidade, idioma e SLA do suporte.', url: 'https://docs.broadcom.com/doc/broadcom-maintenance-policy-handbook' },
+      { titulo: 'Broadcom Expert (parceiros)', descricao: 'Consulta dos parceiros credenciados e das competências de cada um.', url: 'https://expert.broadcom.com/' }
     ],
     dicas: ['Confira a matriz de interoperabilidade antes de qualquer upgrade de vCenter/ESXi.', 'Faça backup em arquivo do vCenter (VAMI) antes de patches.'] },
-  { id: 'lenovo', nome: 'Lenovo Data Center', sigla: 'LNV', cor: '#E2231A', descricao: 'Servidores ThinkSystem e ThinkAgile, gerenciamento por XClarity.',
+  { id: 'lenovo', nome: 'Lenovo Data Center', sigla: 'LNV', cor: '#E2231A', descricao: 'Servidores ThinkSystem e ThinkAgile, gerenciados pelo XClarity.',
     sites: [
-      { titulo: 'Suporte do data center', descricao: 'Garantia e chamados pelo número de série.', url: ex('lenovo', 'suporte') },
-      { titulo: 'Drivers e firmware (UpdateXpress)', descricao: 'Pacotes de atualização e Best Recipes.', url: ex('lenovo', 'drivers') },
-      { titulo: 'XClarity — documentação', descricao: 'Administrator, Controller (XCC) e Orchestrator.', url: ex('lenovo', 'xclarity') },
-      { titulo: 'Lenovo Press', descricao: 'Guias de produto, especificações e referências.', url: ex('lenovo', 'press') }
+      { titulo: 'Suporte do data center', descricao: 'Drivers, firmware, documentação e chamados pelo número de série.', url: 'https://datacentersupport.lenovo.com/' },
+      { titulo: 'Consulta de garantia', descricao: 'Situação da garantia pelo número de série ou tipo de máquina.', url: 'https://datacentersupport.lenovo.com/warrantylookup' },
+      { titulo: 'XClarity Administrator — documentação', descricao: 'Gerenciamento centralizado, atualização de firmware e implantação.', url: 'https://pubs.lenovo.com/lxca/' },
+      { titulo: 'XClarity Controller 2 (XCC2) — documentação', descricao: 'Controladora de gerenciamento dos servidores ThinkSystem (BMC).', url: 'https://pubs.lenovo.com/xcc2/' },
+      { titulo: 'Lenovo Press', descricao: 'Guias de produto (especificações de cada ThinkSystem) e arquiteturas de referência.', url: 'https://lenovopress.lenovo.com/' },
+      { titulo: 'Lenovo Capacity Planner (LCP)', descricao: 'Cálculo de consumo de energia e dissipação de calor dos servidores.', url: 'https://datacentersupport.lenovo.com/solutions/lnvo-lcp' }
     ],
     dicas: ['Use as "Best Recipes" para combinar firmware, drivers e versões de VMware.', 'Colete o FFDC pelo XCC antes de abrir chamado.'] },
-  { id: 'omnissa', nome: 'Omnissa', sigla: 'OMN', cor: '#1F6FEB', descricao: 'Horizon (VDI), Workspace ONE e App Volumes — antiga divisão de End-User Computing.',
+  { id: 'omnissa', nome: 'Omnissa', sigla: 'OMN', cor: '#1F6FEB', descricao: 'Horizon (VDI), Workspace ONE e App Volumes — antiga divisão de End-User Computing da VMware.',
     sites: [
-      { titulo: 'Portal do cliente', descricao: 'Downloads, licenças e chamados.', url: ex('omnissa', 'portal') },
-      { titulo: 'Documentação Horizon', descricao: 'Instalação, arquitetura e upgrades.', url: ex('omnissa', 'docs/horizon') },
-      { titulo: 'Matriz de interoperabilidade', descricao: 'Compatibilidade entre Horizon, agentes e vSphere.', url: ex('omnissa', 'interoperabilidade') },
-      { titulo: 'Base de conhecimento', descricao: 'Artigos de solução de problemas.', url: ex('omnissa', 'kb') }
+      { titulo: 'Customer Connect', descricao: 'Downloads, licenças e chamados.', url: 'https://customerconnect.omnissa.com/' },
+      { titulo: 'Documentação', descricao: 'Horizon, Workspace ONE e App Volumes: instalação, arquitetura e upgrades.', url: 'https://docs.omnissa.com/' },
+      { titulo: 'Matriz de interoperabilidade', descricao: 'Compatibilidade entre Horizon, agentes e vSphere.', url: 'https://interopmatrix.omnissa.com/' },
+      { titulo: 'Base de conhecimento', descricao: 'Artigos de solução de problemas.', url: 'https://kb.omnissa.com/' },
+      { titulo: 'Tech Zone', descricao: 'Guias de referência, arquiteturas e boas práticas.', url: 'https://techzone.omnissa.com/' }
     ],
     dicas: ['Atualize Connection Server antes dos agentes nas VMs.', 'Teste a imagem dourada em pool de homologação antes de publicar.'] },
-  { id: 'processadores', nome: 'Processadores', sigla: 'CPU', cor: '#6B4FBB', descricao: 'Intel Xeon e AMD EPYC: especificações, compatibilidade de gerações e microcódigo.',
+  { id: 'processadores', nome: 'Processadores', sigla: 'CPU', cor: '#6B4FBB', descricao: 'Intel Xeon e AMD EPYC: especificações, segurança (microcódigo) e compatibilidade de gerações no vSphere.',
     sites: [
-      { titulo: 'Intel — especificações (ARK)', descricao: 'Núcleos, frequências, TDP e recursos de cada modelo.', url: ex('intel', 'ark') },
-      { titulo: 'Intel — avisos de segurança', descricao: 'Vulnerabilidades e atualizações de microcódigo.', url: ex('intel', 'seguranca') },
-      { titulo: 'AMD EPYC — especificações', descricao: 'Modelos, núcleos e plataformas suportadas.', url: ex('amd', 'epyc') },
-      { titulo: 'AMD — avisos de segurança', descricao: 'Boletins e correções de firmware.', url: ex('amd', 'seguranca') },
-      { titulo: 'Compatibilidade de EVC', descricao: 'Modos EVC por geração de CPU para migração de VMs.', url: ex('vmware', 'evc') }
+      { titulo: 'Intel — especificações (ARK)', descricao: 'Núcleos, frequências, TDP e recursos de cada processador; permite comparar modelos.', url: 'https://www.intel.com/content/www/us/en/ark.html' },
+      { titulo: 'Intel — central de segurança', descricao: 'Avisos de vulnerabilidades e atualizações de microcódigo.', url: 'https://www.intel.com/content/www/us/en/security-center/default.html' },
+      { titulo: 'AMD EPYC — linha de servidores', descricao: 'Gerações, modelos e especificações dos processadores EPYC.', url: 'https://www.amd.com/en/products/processors/server/epyc.html' },
+      { titulo: 'AMD — segurança de produtos', descricao: 'Boletins de segurança e correções de firmware.', url: 'https://www.amd.com/en/resources/product-security.html' },
+      { titulo: 'Compatibilidade de EVC (VMware)', descricao: 'Modos EVC suportados por geração de CPU, para vMotion entre gerações.', url: 'https://knowledge.broadcom.com/external/article?legacyId=1003212' }
     ],
     dicas: ['Misturar gerações no mesmo cluster exige ajustar o modo EVC.', 'Microcódigo vem no BIOS do servidor — atualize pelo pacote do fabricante.'] },
-  { id: 'servidores', nome: 'Servidores', sigla: 'SRV', cor: '#2F855A', descricao: 'Referências gerais de hardware de servidor: compatibilidade, garantia e boas práticas.',
+  { id: 'servidores', nome: 'Servidores', sigla: 'SRV', cor: '#2F855A', descricao: 'Referências gerais de hardware de servidor: linhas de produto, suporte e catálogos de compatibilidade.',
     sites: [
-      { titulo: 'Dell PowerEdge — linha atual', descricao: 'Modelos, configurações e comparativos.', url: ex('dell', 'poweredge') },
-      { titulo: 'Lenovo ThinkSystem — linha atual', descricao: 'Modelos e guias de produto.', url: ex('lenovo', 'thinksystem') },
-      { titulo: 'HPE ProLiant — linha atual', descricao: 'Modelos, iLO e Service Pack for ProLiant.', url: ex('hpe', 'proliant') },
-      { titulo: 'Calculadora de consumo e energia', descricao: 'Estimativa de potência e dissipação de calor.', url: ex('servidores', 'energia') }
+      { titulo: 'Dell PowerEdge', descricao: 'Modelos, configurações e comparativos.', url: 'https://www.dell.com/pt-br/dt/servers/index.htm' },
+      { titulo: 'Lenovo ThinkSystem (Lenovo Press)', descricao: 'Guias de produto com as especificações de cada modelo.', url: 'https://lenovopress.lenovo.com/' },
+      { titulo: 'HPE — suporte (ProLiant)', descricao: 'Drivers, firmware (SPP), documentação e QuickSpecs dos ProLiant.', url: 'https://support.hpe.com/' },
+      { titulo: 'Broadcom Compatibility Guide', descricao: 'Confira se o modelo, a controladora e a placa de rede são certificados para o ESXi.', url: 'https://compatibilityguide.broadcom.com/' }
     ],
-    dicas: ['Registre número de série e garantia de cada servidor na documentação do projeto.', 'Valide a placa de rede e a controladora no guia de compatibilidade do VMware.'] }
+    dicas: ['Registre número de série e garantia de cada servidor na documentação do projeto.', 'Valide a placa de rede e a controladora no guia de compatibilidade antes de fechar a configuração.'] },
+  { id: 'editais', nome: 'Comprovações para editais', sigla: 'EDT', cor: '#7E181C', descricao: 'Sites oficiais usados para comprovar requisitos de editais (associações, certificações de sistema operacional e de GPU).',
+    sites: [
+      { titulo: 'TSAnet — membros', descricao: 'Lista pública de membros do TSAnet (nível Elite).', url: 'https://tsanet.org/members/' },
+      { titulo: 'FIRST — membros', descricao: 'Mapa de membros do Forum of Incident Response and Security Teams.', url: 'https://www.first.org/members/map' },
+      { titulo: 'Trusted Computing Group (TCG) — membros', descricao: 'Empresas membros do TCG.', url: 'https://trustedcomputinggroup.org/membership/member-companies/' },
+      { titulo: 'CVE Program — parceiros', descricao: 'Lista de CNAs (fabricantes parceiros do programa CVE).', url: 'https://www.cve.org/PartnerInformation/ListofPartners' },
+      { titulo: 'UEFI Forum — membros', descricao: 'Membros por categoria (ex.: Promoters).', url: 'https://uefi.org/members' },
+      { titulo: 'DMTF — membros e Board', descricao: 'Membros da Distributed Management Task Force (Redfish).', url: 'https://www.dmtf.org/about/list' },
+      { titulo: 'Windows Server Catalog', descricao: 'Servidores certificados para o Windows Server.', url: 'https://www.windowsservercatalog.com/' },
+      { titulo: 'Red Hat — catálogo de hardware', descricao: 'Servidores certificados para o RHEL.', url: 'https://catalog.redhat.com/hardware/search?p=1' },
+      { titulo: 'Ubuntu — servidores certificados', descricao: 'Servidores certificados para o Ubuntu Server.', url: 'https://ubuntu.com/certified/servers' },
+      { titulo: 'NVIDIA Qualified System Catalog', descricao: 'Servidores "NVIDIA-Certified" ou "Qualified" para GPUs.', url: 'https://marketplace.nvidia.com/en-us/enterprise/qualified-system-catalog/' }
+    ],
+    dicas: ['Guarde um print (com data) de cada página consultada para anexar à proposta.', 'Algumas listas mudam com frequência: confira de novo perto da data da sessão.'] }
 ];
 
 /** Arquivos da pasta da equipe técnica (biblioteca "Wiki Tecnicos" no SharePoint; cópia junto do portal em /wiki/arquivos). */

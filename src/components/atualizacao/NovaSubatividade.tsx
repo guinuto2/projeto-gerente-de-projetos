@@ -41,11 +41,9 @@ export function NovaSubatividade({ projetos, pai: paiFixo, meuEmail, aoCriada, a
   const termino = f.termino || (pai && pai.termino >= inicio ? pai.termino : inicio);
   const sobrecarga = avisoSobrecarga(tarefasNoPeriodo(dados, f.responsavel, inicio, termino));
   const [erro, setErro] = useState(''); const [salvando, setSalvando] = useState(false);
-  const br = (s: string) => s.split('-').reverse().join('/');
   const incluir = async () => {
     if (!projeto || !pai) { setErro('Escolha o projeto e a atividade principal.'); return; }
     if (!f.nome.trim()) { setErro(`Informe o nome da ${termo}.`); return; }
-    if (inicio < hoje) { setErro(`O início não pode ser antes de hoje (${br(hoje)}).`); return; }
     if (termino < inicio) { setErro('O término não pode ser antes do início.'); return; }
     if (!f.responsavel) { setErro('Escolha o técnico responsável.'); return; }
     setSalvando(true); setErro('');
@@ -86,7 +84,7 @@ export function NovaSubatividade({ projetos, pai: paiFixo, meuEmail, aoCriada, a
       <div className="fg3">
         <label className="campo">Horas planejadas<input className="ctl" type="number" min={0} step={0.5} placeholder="0" value={f.horas} onChange={e => setF(s => ({ ...s, horas: e.target.value }))} />
           {avisoHorasPlanejadas(Number(f.horas), diasUteis(inicio, termino)) && <span className="dica fds">Atenção: {avisoHorasPlanejadas(Number(f.horas), diasUteis(inicio, termino))}.</span>}</label>
-        <label className="campo">Início *<input className="ctl" type="date" min={hoje} value={inicio} onChange={e => setF(s => ({ ...s, inicio: e.target.value }))} />{avisoFimDeSemana(inicio) && <span className="dica fds">Atenção: {avisoFimDeSemana(inicio)}.</span>}</label>
+        <label className="campo">Início *<input className="ctl" type="date" value={inicio} onChange={e => setF(s => ({ ...s, inicio: e.target.value }))} />{avisoFimDeSemana(inicio) && <span className="dica fds">Atenção: {avisoFimDeSemana(inicio)}.</span>}</label>
         <label className="campo">Término *<input className="ctl" type="date" min={inicio} value={termino} onChange={e => setF(s => ({ ...s, termino: e.target.value }))} />{avisoFimDeSemana(termino) && <span className="dica fds">Atenção: {avisoFimDeSemana(termino)}.</span>}</label>
       </div>
       <label className="campo">Técnico responsável *
