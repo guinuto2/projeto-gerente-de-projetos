@@ -2,8 +2,10 @@
  * Conteúdo da Wiki do técnico: documentos (qualificação técnica e modelos de questionamento) e fabricantes.
  */
 export interface Modelo { id: string; titulo: string; descricao: string; secoes: { titulo: string; itens: string[] }[] }
-export interface Site { titulo: string; descricao: string; url: string }
-export interface Fabricante { id: string; nome: string; sigla: string; cor: string; descricao: string; sites: Site[]; dicas: string[] }
+export interface Site { titulo: string; descricao: string; url: string; grupo?: string }
+/** Documento de comprovação para editais, específico de um fabricante (link ou arquivo). */
+export interface Comprovacao { titulo: string; descricao?: string; url?: string }
+export interface Fabricante { id: string; nome: string; sigla: string; cor: string; descricao: string; sites: Site[]; dicas: string[]; comprovacoes?: Comprovacao[] }
 
 export const MODELOS: Modelo[] = [
   { id: 'qualificacao-vmware', titulo: 'VMware - qualificações e questionamentos',
@@ -149,44 +151,72 @@ export const MODELOS: Modelo[] = [
 export const FABRICANTES: Fabricante[] = [
   { id: 'dell', nome: 'Dell Technologies', sigla: 'DELL', cor: '#0076CE', descricao: 'Servidores PowerEdge, storage PowerStore/PowerVault/Unity e switches. O suporte é pela Service Tag do equipamento.',
     sites: [
-      { titulo: 'Suporte por Service Tag', descricao: 'Garantia, drivers, documentação e chamados a partir da etiqueta do equipamento.', url: 'https://www.dell.com/support/home/pt-br' },
-      { titulo: 'Drivers e downloads', descricao: 'Firmware, BIOS, iDRAC e pacotes de atualização por modelo.', url: 'https://www.dell.com/support/home/pt-br?app=drivers' },
-      { titulo: 'Pesquisa no suporte (artigos e manuais)', descricao: 'Base de conhecimento, manuais de instalação e notas técnicas.', url: 'https://www.dell.com/support/search/pt-br' },
-      { titulo: 'Guia de atualização de BIOS/UEFI', descricao: 'Como baixar e aplicar atualizações de BIOS e UEFI da Dell.', url: 'https://www.dell.com/support/kbdoc/pt-br/000124211' },
-      { titulo: 'TechDirect (chamados e peças)', descricao: 'Portal de parceiros para abrir chamados, despachar peças e acompanhar casos.', url: 'https://techdirect.dell.com/' },
-      { titulo: 'Linha PowerEdge', descricao: 'Modelos de servidores, configurações e comparativos.', url: 'https://www.dell.com/pt-br/dt/servers/index.htm' }
+      { titulo: 'Dell Technologies Partner Portal', descricao: 'Portal do parceiro: negócios, incentivos, materiais e acessos do programa.', url: 'https://www.delltechnologies.com/partner/pt-br/auth/partner-portal.htm', grupo: 'Portal do parceiro' },
+      { titulo: 'Configurador de soluções', descricao: 'Solution Configurator para montar e cotar configurações (login de parceiro).', url: 'https://www.delltechnologies.com/partner/pt-br/auth/sales/solution-configurator.htm', grupo: 'Portal do parceiro' },
+      { titulo: 'Program Tracker', descricao: 'Acompanhamento de programas e metas do parceiro.', url: 'https://programtracker.delltechnologies.com/holding-page', grupo: 'Portal do parceiro' },
+      { titulo: 'Dell Learning', descricao: 'Treinamentos e trilhas de capacitação da Dell.', url: 'https://learning.dell.com/content/dell/en-us/home.html', grupo: 'Certificações e treinamentos' },
+      { titulo: 'Provas de certificação (Pearson VUE)', descricao: 'Agendamento das provas de certificação Dell (cliente EMC).', url: 'https://wsr.pearsonvue.com/testtaker/signin/SignInPage.htm?clientCode=EMC', grupo: 'Certificações e treinamentos' },
+      { titulo: 'CertMetrics Dell', descricao: 'Histórico e comprovantes das certificações Dell (login).', url: 'https://cp.certmetrics.com/dell/en/login', grupo: 'Certificações e treinamentos' },
+      { titulo: 'Dell PowerSizer', descricao: 'Dimensionamento de soluções Dell (login).', url: 'https://powersizer.dell.com/ui/index.html#/home', grupo: 'Ferramentas' },
+      { titulo: 'Guia do usuário — SSD NVMe PCIe Express Flash (PowerEdge) · versão 6', descricao: 'Manual em PDF dos SSDs NVMe PCIe Express Flash dos PowerEdge.', url: 'https://dl.dell.com/manuals/all-products/esuprt_data_center_infra_int/esuprt_data_center_infra_storage_adapters/dell-poweredge-exp-fsh-nvme-pcie-ssd_users-guide6_en-us.pdf', grupo: 'Suporte e documentação' },
+      { titulo: 'Guia do usuário — SSD NVMe PCIe Express Flash (PowerEdge) · versão 7', descricao: 'Versão mais recente do manual em PDF dos SSDs NVMe PCIe Express Flash.', url: 'https://dl.dell.com/manuals/all-products/esuprt_data_center_infra_int/esuprt_data_center_infra_storage_adapters/dell-poweredge-exp-fsh-nvme-pcie-ssd_users-guide7_en-us.pdf', grupo: 'Suporte e documentação' }
     ],
-    dicas: ['Antes de abrir chamado, colete o log do SupportAssist/TSR pelo iDRAC.', 'Atualize firmware em pacote (catálogo) para manter as versões compatíveis entre si.'] },
+    dicas: ['Antes de abrir chamado, colete o log do SupportAssist/TSR pelo iDRAC.', 'Atualize firmware em pacote (catálogo) para manter as versões compatíveis entre si.'],
+    comprovacoes: [] },
   { id: 'vmware', nome: 'VMware by Broadcom', sigla: 'VMW', cor: '#717074', descricao: 'vSphere, vCenter, VCF, NSX e vSAN. Downloads, licenças e chamados pelo portal da Broadcom (exige login).',
     sites: [
-      { titulo: 'Portal de suporte Broadcom', descricao: 'Downloads, patches, licenças e abertura de chamados (login da Broadcom).', url: 'https://support.broadcom.com/' },
-      { titulo: 'Broadcom Compatibility Guide (HCL)', descricao: 'Hardware, drivers e firmware certificados por versão do ESXi/vSAN.', url: 'https://compatibilityguide.broadcom.com/' },
-      { titulo: 'Matriz de interoperabilidade', descricao: 'Versões suportadas entre vCenter, ESXi, NSX, vSAN e VCF.', url: 'https://interopmatrix.broadcom.com/Interoperability' },
-      { titulo: 'Documentação técnica (TechDocs)', descricao: 'Guias de instalação, upgrade e notas de versão do VCF e do vSphere.', url: 'https://techdocs.broadcom.com/us/en/vmware-cis/vcf.html' },
-      { titulo: 'Ciclo de vida dos produtos', descricao: 'Datas de fim de suporte de cada versão (login da Broadcom).', url: 'https://support.broadcom.com/group/ecx/productlifecycle' },
-      { titulo: 'Política de suporte e manutenção', descricao: 'Maintenance Policy Handbook: níveis de severidade, idioma e SLA do suporte.', url: 'https://docs.broadcom.com/doc/broadcom-maintenance-policy-handbook' },
-      { titulo: 'Broadcom Expert (parceiros)', descricao: 'Consulta dos parceiros credenciados e das competências de cada um.', url: 'https://expert.broadcom.com/' }
+      { titulo: 'Broadcom Partner Portal (VMware)', descricao: 'Portal do parceiro Broadcom para VMware.', url: 'https://partnerportal.broadcom.com/group/partner-portal/vmware', grupo: 'Portal do parceiro' },
+      { titulo: 'Broadcom Expert — parceiros', descricao: 'Consulta dos parceiros credenciados e das competências de cada um.', url: 'https://expert.broadcom.com/pt/partners', grupo: 'Portal do parceiro' },
+      { titulo: 'Broadcom Rewards', descricao: 'Programa de recompensas para parceiros Broadcom (login).', url: 'https://broadcomrewards.customershome.com/', grupo: 'Portal do parceiro' },
+      { titulo: 'Clarity PPM (Broadcom)', descricao: 'Acesso ao Clarity PPM da Broadcom.', url: 'https://cppm10032.clarityppm.saas.broadcom.com/pm/#/menuLinks', grupo: 'Portal do parceiro' },
+      { titulo: 'CertMetrics VMware', descricao: 'Painel das certificações VMware (login).', url: 'https://cp.certmetrics.com/vmware/en/home/dashboard', grupo: 'Certificações e treinamentos' },
+      { titulo: 'Credly — badges conquistadas', descricao: 'Badges digitais das certificações (comprovação).', url: 'https://www.credly.com/earner/earned', grupo: 'Certificações e treinamentos' },
+      { titulo: 'Hands-on Labs (HOL)', descricao: 'Catálogo de laboratórios práticos VMware.', url: 'https://labs.hol.vmware.com/HOL/catalog', grupo: 'Certificações e treinamentos' },
+      { titulo: 'vSAN Sizer', descricao: 'Dimensionamento de clusters vSAN.', url: 'https://vcf.broadcom.com/tools/vsansizer/', grupo: 'Ferramentas' },
+      { titulo: 'Calculadora de licenças do VCF', descricao: 'Artigo da Broadcom com a calculadora de licenças do VMware Cloud Foundation.', url: 'https://knowledge.broadcom.com/external/article/312202/license-calculator-for-vmware-cloud-foun.html', grupo: 'Ferramentas' },
+      { titulo: 'Broadcom Compatibility Guide (HCL)', descricao: 'Hardware, drivers e firmware certificados por versão do ESXi/vSAN.', url: 'https://compatibilityguide.broadcom.com/', grupo: 'Ferramentas' },
+      { titulo: 'Portal de suporte Broadcom', descricao: 'Downloads, licenças e abertura de chamados (login).', url: 'https://support.broadcom.com/', grupo: 'Suporte e documentação' },
+      { titulo: 'Política de suporte e manutenção', descricao: 'Maintenance Policy Handbook: níveis de severidade, idioma e SLA do suporte.', url: 'https://docs.broadcom.com/doc/broadcom-maintenance-policy-handbook', grupo: 'Suporte e documentação' }
     ],
-    dicas: ['Confira a matriz de interoperabilidade antes de qualquer upgrade de vCenter/ESXi.', 'Faça backup em arquivo do vCenter (VAMI) antes de patches.'] },
+    dicas: ['Confira a matriz de interoperabilidade antes de qualquer upgrade de vCenter/ESXi.', 'Faça backup em arquivo do vCenter (VAMI) antes de patches.'],
+    comprovacoes: [] },
   { id: 'lenovo', nome: 'Lenovo Data Center', sigla: 'LNV', cor: '#E2231A', descricao: 'Servidores ThinkSystem e ThinkAgile, gerenciados pelo XClarity.',
     sites: [
-      { titulo: 'Suporte do data center', descricao: 'Drivers, firmware, documentação e chamados pelo número de série.', url: 'https://datacentersupport.lenovo.com/' },
-      { titulo: 'Consulta de garantia', descricao: 'Situação da garantia pelo número de série ou tipo de máquina.', url: 'https://datacentersupport.lenovo.com/warrantylookup' },
-      { titulo: 'XClarity Administrator — documentação', descricao: 'Gerenciamento centralizado, atualização de firmware e implantação.', url: 'https://pubs.lenovo.com/lxca/' },
-      { titulo: 'XClarity Controller 2 (XCC2) — documentação', descricao: 'Controladora de gerenciamento dos servidores ThinkSystem (BMC).', url: 'https://pubs.lenovo.com/xcc2/' },
-      { titulo: 'Lenovo Press', descricao: 'Guias de produto (especificações de cada ThinkSystem) e arquiteturas de referência.', url: 'https://lenovopress.lenovo.com/' },
-      { titulo: 'Lenovo Capacity Planner (LCP)', descricao: 'Cálculo de consumo de energia e dissipação de calor dos servidores.', url: 'https://datacentersupport.lenovo.com/solutions/lnvo-lcp' }
+      { titulo: 'Lenovo Partner Hub — Brasil', descricao: 'Portal do parceiro Lenovo no Brasil.', url: 'https://www.lenovopartnerhub.com/group/brazil-site', grupo: 'Portal do parceiro' },
+      { titulo: 'Treinamentos Lenovo (Adobe Learning Manager)', descricao: 'Plataforma de treinamentos da Lenovo para parceiros (cada um entra com o próprio login).', url: 'https://cpcontents.adobe.com/eu/public/newlearner/newlearner_ebbb6c88.html?accountId=2665&hostName=learningmanagereu.adobe.com#/newLearnerExperience', grupo: 'Certificações e treinamentos' }
     ],
-    dicas: ['Use as "Best Recipes" para combinar firmware, drivers e versões de VMware.', 'Colete o FFDC pelo XCC antes de abrir chamado.'] },
+    dicas: ['Use as "Best Recipes" para combinar firmware, drivers e versões de VMware.', 'Colete o FFDC pelo XCC antes de abrir chamado.'],
+    comprovacoes: [] },
+  { id: 'hpe', nome: 'HPE', sigla: 'HPE', cor: '#01A982', descricao: 'Hewlett Packard Enterprise: servidores ProLiant, storage e gerenciamento por iLO.',
+    sites: [
+      { titulo: 'HPE Partner Portal', descricao: 'Portal do parceiro HPE (login).', url: 'https://partner.hpe.com/', grupo: 'Portal do parceiro' },
+      { titulo: 'HPE Certification and Learning', descricao: 'Certificações e treinamentos HPE para parceiros e técnicos.', url: 'https://certification-learning.hpe.com/', grupo: 'Certificações e treinamentos' },
+      { titulo: 'HPE Support Center', descricao: 'Drivers, firmware, documentação, garantia e abertura de chamados.', url: 'https://support.hpe.com/', grupo: 'Suporte e documentação' },
+      { titulo: 'Service Pack for ProLiant (SPP)', descricao: 'Pacote de firmware e drivers dos ProLiant. Exige garantia ou contrato de suporte ativo.', url: 'https://www.hpe.com/servers/spp/download', grupo: 'Suporte e documentação' },
+      { titulo: 'QuickSpecs (HPE PSNow)', descricao: 'Especificações técnicas oficiais (QuickSpecs) de cada modelo.', url: 'https://www.hpe.com/psnow/', grupo: 'Suporte e documentação' },
+      { titulo: 'Servidores HPE ProLiant', descricao: 'Linha de servidores ProLiant: modelos e gerações.', url: 'https://www.hpe.com/br/pt/compute/proliant-servers.html', grupo: 'Produtos e serviços' }
+    ],
+    dicas: ['Antes de abrir chamado, colete o log AHS (Active Health System) pelo iLO.', 'O download do SPP exige garantia ou contrato de suporte ativo vinculado à conta HPE.'],
+    comprovacoes: [] },
+  { id: 'xfusion', nome: 'xFusion', sigla: 'XFS', cor: '#1B4F9C', descricao: 'Servidores FusionServer (antiga linha de servidores x86 da Huawei). Concorrente frequente em editais de servidores.',
+    sites: [
+      { titulo: 'Site oficial xFusion', descricao: 'Produtos, soluções e notícias da xFusion (FusionServer).', url: 'https://www.xfusion.com/en/', grupo: 'Produtos e serviços' },
+      { titulo: 'Servidores rack FusionServer', descricao: 'Linha de servidores rack de uso geral (V5, V6, V7 e V8).', url: 'https://www.xfusion.com/en/product/rack-server', grupo: 'Produtos e serviços' },
+      { titulo: 'Serviço de instalação de servidores', descricao: 'Escopo do serviço de instalação da xFusion (todas as séries FusionServer).', url: 'https://www.xfusion.com/en/service/server-installation', grupo: 'Produtos e serviços' },
+      { titulo: 'Serviço de health check', descricao: 'Verificação de saúde dos equipamentos: configuração, compatibilidade de firmware e logs.', url: 'https://www.xfusion.com/en/service/equipment-health-check', grupo: 'Produtos e serviços' },
+      { titulo: 'FusionServer Tools', descricao: 'Ferramentas de implantação, monitoração e diagnóstico (in-band e out-of-band).', url: 'https://www.xfusion.com/en/product/intelligent-management/fusionserver-tools', grupo: 'Ferramentas' },
+      { titulo: 'Suporte xFusion', descricao: 'Portal de suporte: documentação, downloads e white papers técnicos.', url: 'https://support.xfusion.com/', grupo: 'Suporte e documentação' }
+    ],
+    dicas: ['Os white papers técnicos de cada modelo (especificações e compatibilidade) ficam no portal de suporte.', 'Em editais, veja o documento “Qualificações servidores Dell + HPE + Lenovo” na aba Documentos (itens que desfavorecem a xFusion).'],
+    comprovacoes: [] },
   { id: 'omnissa', nome: 'Omnissa', sigla: 'OMN', cor: '#1F6FEB', descricao: 'Horizon (VDI), Workspace ONE e App Volumes — antiga divisão de End-User Computing da VMware.',
     sites: [
-      { titulo: 'Customer Connect', descricao: 'Downloads, licenças e chamados.', url: 'https://customerconnect.omnissa.com/' },
-      { titulo: 'Documentação', descricao: 'Horizon, Workspace ONE e App Volumes: instalação, arquitetura e upgrades.', url: 'https://docs.omnissa.com/' },
-      { titulo: 'Matriz de interoperabilidade', descricao: 'Compatibilidade entre Horizon, agentes e vSphere.', url: 'https://interopmatrix.omnissa.com/' },
-      { titulo: 'Base de conhecimento', descricao: 'Artigos de solução de problemas.', url: 'https://kb.omnissa.com/' },
-      { titulo: 'Tech Zone', descricao: 'Guias de referência, arquiteturas e boas práticas.', url: 'https://techzone.omnissa.com/' }
+      { titulo: 'Omnissa Partner Connect', descricao: 'Portal do parceiro Omnissa (login).', url: 'https://omnissa.my.site.com/partnerconnect/PC_Login?ec=302&startURL=/partnerconnect/s/', grupo: 'Portal do parceiro' },
+      { titulo: 'Partner Connect — gestão da conta', descricao: 'Gestão da conta do parceiro no Partner Connect.', url: 'https://omnissa.my.site.com/partnerconnect/s/account-management?component=c:PC_AdPlus', grupo: 'Portal do parceiro' },
+      { titulo: 'Provas de certificação (Pearson VUE)', descricao: 'Agendamento das provas de certificação Omnissa.', url: 'https://www.pearsonvue.com/us/en/omnissa.html', grupo: 'Certificações e treinamentos' }
     ],
-    dicas: ['Atualize Connection Server antes dos agentes nas VMs.', 'Teste a imagem dourada em pool de homologação antes de publicar.'] },
+    dicas: ['Atualize Connection Server antes dos agentes nas VMs.', 'Teste a imagem dourada em pool de homologação antes de publicar.'],
+    comprovacoes: [] },
   { id: 'processadores', nome: 'Processadores', sigla: 'CPU', cor: '#6B4FBB', descricao: 'Intel Xeon e AMD EPYC: especificações, segurança (microcódigo) e compatibilidade de gerações no vSphere.',
     sites: [
       { titulo: 'Intel — especificações (ARK)', descricao: 'Núcleos, frequências, TDP e recursos de cada processador; permite comparar modelos.', url: 'https://www.intel.com/content/www/us/en/ark.html' },
@@ -221,7 +251,9 @@ export const FABRICANTES: Fabricante[] = [
 ];
 
 /** Arquivos da pasta da equipe técnica (biblioteca "Wiki Tecnicos" no SharePoint; cópia junto do portal em /wiki/arquivos). */
-export interface ArquivoWiki { nome: string; arquivo?: string; descricao: string; tamanho?: number; id?: string; url?: string; modificado?: string; local: boolean }
+export interface ArquivoWiki { nome: string; arquivo?: string; descricao: string; tamanho?: number; id?: string; url?: string; modificado?: string; local: boolean;
+  /** comprovações: subpasta dentro do fabricante ('' = raiz), se é arquivo ou pasta e quantos itens a pasta tem */
+  pasta?: string; tipo?: 'arquivo' | 'pasta'; qtd?: number }
 export const BIBLIOTECA_WIKI = 'Wiki Tecnicos';
 export const DESCRICAO_ARQUIVO: Record<string, string> = {
   'Instruções TRELLO.pdf': 'Guia de uso do Trello pela área técnica: como registrar e acompanhar as análises.',

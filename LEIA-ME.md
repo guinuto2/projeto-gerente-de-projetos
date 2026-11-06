@@ -1,4 +1,38 @@
-# Central Systech — v3.94 (React)
+# Central Systech — v4.2 (React)
+
+**v4.2:** Wiki — novos fabricantes HPE (Partner Portal, Certification and Learning, Support Center, SPP, QuickSpecs, ProLiant) e xFusion (site, servidores rack FusionServer, serviços, FusionServer Tools, suporte), com as abas Links e Comprovação para editais.
+
+**v4.1:** Wiki — o "Excluir" da comprovação para editais fica dentro da janela "Editar" (documento ou pasta), e não mais nas linhas da tabela.
+
+**v4.0:** Wiki — "Excluir" em cada documento e pasta da comprovação para editais (com confirmação; a pasta avisa quantos itens
+vão junto; tudo vai para a lixeira do site no SharePoint). A área de comprovação passa a ter fundo neutro.
+
+
+**v3.99:** Wiki — na aba "Comprovação para editais" do fabricante: pastas (criar com "+ Nova pasta", entrar e voltar pelo
+caminho, até 4 níveis), "Editar" em cada linha para trocar o nome e a descrição do documento (a extensão é mantida) ou o nome
+da pasta, envio direto para a pasta aberta e busca que acha os documentos dentro das pastas (abrindo na pasta certa).
+
+
+**v3.98:** Wiki — cada fabricante tem as abas "Links" e "Comprovação para editais". Os documentos de comprovação são
+adicionados pelo portal ("+ Adicionar documento" na aba, ou "+ Adicionar à Wiki" → Arquivo → Onde guardar) e ficam na
+biblioteca Wiki Tecnicos, na pasta Comprovacoes/<fabricante> (criada na hora). A busca da Wiki encontra esses documentos pelo
+nome, pela descrição e pelo fabricante, e abre o fabricante já na aba de comprovação.
+
+
+**v3.97:** Wiki — Dell, VMware, Lenovo e Omnissa com os links informados pela equipe, agrupados em Portal do parceiro,
+Certificações e treinamentos, Ferramentas e Suporte e documentação (links com código de login ou dados pessoais trocados pela
+página de entrada). Cada fabricante ganha a seção "Comprovação para editais" (a preencher; campo comprovacoes em src/lib/wiki.ts).
+
+
+**v3.96:** Wiki segmentada em Fabricantes, Documentos e Arquivos (abas na barra lateral, com contagem; durante a busca, a
+contagem mostra quantos resultados há em cada seção). Cada seção tem uma página de abertura: cartões dos fabricantes, cartões
+dos documentos e tabela dos arquivos com "Baixar". A busca continua procurando em tudo.
+
+
+**v3.95:** painel da atividade com "Data real de conclusão" e "Horas realizadas" (antes só existiam no Atualizar status, e
+concluir pelo painel era barrado pela validação). Ao escolher "Concluído", a data real vem preenchida (término previsto, se já
+passou; senão hoje). O calendário do painel deixa de bloquear datas passadas.
+
 
 **v3.94:** projetos anteriores a hoje — o cadastro aceita início, término e atividades no passado (dados gerais, cronograma e
 rascunho), e o painel da atividade e a criação rápida de tarefas aceitam datas passadas. Continuam bloqueadas: reunião do Teams

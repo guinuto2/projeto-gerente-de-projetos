@@ -69,6 +69,8 @@ export function EditarAtividade({ projeto, codigo, faseInicial, aoFechar, aoCria
     responsavel: existente?.responsavel || '',
     predecessoras: existente?.predecessoras || ([] as string[]),
     horasPlanejadas: existente?.horasPlanejadas === undefined ? '' : String(existente.horasPlanejadas),
+    dataReal: existente?.dataReal || '',
+    horas: existente?.horasRealizadas === undefined ? '' : String(existente.horasRealizadas),
     /** nova subatividade: já lançar para o técnico? (padrão: não — o PMO lança depois) */
     lancar: false
   });
@@ -137,7 +139,10 @@ export function EditarAtividade({ projeto, codigo, faseInicial, aoFechar, aoCria
       nome: f.nome.trim(), fase: f.fase, equipe: f.equipe.trim() || 'Systech', status: f.status, percentual: pct,
       inicio: f.inicio, termino: f.termino, marco: f.marco, descricao: f.descricao.trim(), observacao: f.observacao.trim(),
       responsavel: f.responsavel, predecessoras: f.predecessoras,
-      horasPlanejadas: f.horasPlanejadas === '' ? undefined : Math.max(0, Number(f.horasPlanejadas) || 0)
+      horasPlanejadas: f.horasPlanejadas === '' ? undefined : Math.max(0, Number(f.horasPlanejadas) || 0),
+      // conclusão: data real e horas realizadas (exigidas para "Concluído")
+      ...(f.dataReal ? { dataReal: f.dataReal } : {}),
+      ...(f.horas !== '' ? { horasRealizadas: Math.max(0, Number(f.horas) || 0) } : {})
     };
     if (nova && f.pai && f.lancar && !f.responsavel) { setErro('Escolha o técnico responsável para lançar a tarefa.'); setSalvando(false); return; }
     // validação da reunião antes de gravar qualquer coisa
@@ -294,10 +299,11 @@ export function EditarAtividade({ projeto, codigo, faseInicial, aoFechar, aoCria
               </select>
             </label>
           : <label className="campo">Status
-              <select className="ctl" value={f.status} onChange={e => setF(s => ({ ...s, status: e.target.value as StatusAtividade }))}>{STATUS_ATIVIDADE.map(s => <option key={s}>{s}</option>)}</select>
+              <select className="ctl" value={f.status} onChange={e => { const st = e.target.value as StatusAtividade;
+                setF(s => ({ ...s, status: st, dataReal: st === 'Concluído' && !s.dataReal ? (s.termino && s.termino < hoje ? s.termino : hoje) : s.dataReal })); }}>{STATUS_ATIVIDADE.map(s => <option key={s}>{s}</option>)}</select>
             </label>}
-        <label className="campo">Início previsto *<input className="ctl" type="date" min={nova || f.inicio !== existente?.inicio ? hoje : undefined} value={f.inicio} onChange={muda('inicio')} disabled={!estrutura} />{estrutura && avisoFimDeSemana(f.inicio) && <span className="dica fds">Atenção: {avisoFimDeSemana(f.inicio)}.</span>}</label>
-        <label className="campo">Término previsto *<input className="ctl" type="date" min={nova || f.termino !== existente?.termino ? (f.inicio > hoje ? f.inicio : hoje) : undefined} value={f.termino} onChange={muda('termino')} disabled={!estrutura} />{estrutura && avisoFimDeSemana(f.termino) && <span className="dica fds">Atenção: {avisoFimDeSemana(f.termino)}.</span>}</label>
+        <label className="campo">Início previsto *<input className="ctl" type="date" value={f.inicio} onChange={muda('inicio')} disabled={!estrutura} />{estrutura && avisoFimDeSemana(f.inicio) && <span className="dica fds">Atenção: {avisoFimDeSemana(f.inicio)}.</span>}</label>
+        <label className="campo">Término previsto *<input className="ctl" type="date" min={f.inicio || undefined} value={f.termino} onChange={muda('termino')} disabled={!estrutura} />{estrutura && avisoFimDeSemana(f.termino) && <span className="dica fds">Atenção: {avisoFimDeSemana(f.termino)}.</span>}</label>
         {!nova && (existente?.pai
           ? <label className="campo">% concluído<input className="ctl" type="number" min={0} max={100} value={f.percentual} onChange={muda('percentual')} /></label>
           : <label className="campo">% concluído
@@ -306,6 +312,16 @@ export function EditarAtividade({ projeto, codigo, faseInicial, aoFechar, aoCria
                 ? `Calculado: ${filhos.filter(x => x.status === 'Concluído').length} de ${filhos.filter(x => x.status !== 'Cancelado').length} subatividades concluídas`
                 : 'Sem subatividades: 0% até concluir a atividade'}</span>
             </label>)}
+        {!nova && pode('atualizarAtividade') && !encerrado && <>
+          <label className="campo">Data real de conclusão{f.status === 'Concluído' ? ' *' : ''}
+            <input className={`ctl ${f.status === 'Concluído' && !f.dataReal ? 'vazioObrig' : ''}`} type="date" max={hoje} value={f.dataReal} onChange={e => setF(s => ({ ...s, dataReal: e.target.value }))} />
+            {f.status !== 'Concluído' && <span className="dica">Preencha quando a atividade for concluída.</span>}
+          </label>
+          <label className="campo">Horas realizadas{f.status === 'Concluído' && !filhos.some(x => x.status !== 'Cancelado') ? ' *' : ''}
+            <input className={`ctl ${f.status === 'Concluído' && !filhos.some(x => x.status !== 'Cancelado') && !(Number(f.horas) > 0) ? 'vazioObrig' : ''}`} type="number" min={0} step={0.5} placeholder="0" value={f.horas} onChange={e => setF(s => ({ ...s, horas: e.target.value }))} />
+            {Number(f.horasPlanejadas) > 0 && <span className="dica">Planejadas: {f.horasPlanejadas} h.</span>}
+          </label>
+        </>}
       </div>
       <label className="checar"><input type="checkbox" disabled={!estrutura} checked={f.marco} onChange={e => setF(s => ({ ...s, marco: e.target.checked }))} />
         <span>É um marco<br /><span className="sub">Entrega que exige aceite do cliente; aparece com losango no Gantt e em “Próximos marcos”.</span></span></label>
