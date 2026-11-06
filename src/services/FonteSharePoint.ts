@@ -423,11 +423,70 @@ export class FonteSharePoint implements FonteDados {
     return itens.filter(x => x.file).map(x => ({ id: x.id, nome: x.name, tamanho: x.size || 0, url: x.webUrl, modificado: x.lastModifiedDateTime, descricao: x.listItem?.fields?.Descricao || undefined }))
       .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
   }
-  async enviarArquivoWiki(arquivo: File, descricao: string) {
+  /** cria as pastas do caminho (ex.: Comprovacoes/dell), se ainda não existirem */
+  private async garantirPastaWiki(drive: string, pasta: string) {
+    let pai = '';
+    for (const parte of pasta.split('/').filter(Boolean)) {
+      const onde = pai ? `/drives/${drive}/root:/${pai.split('/').map(encodeURIComponent).join('/')}:/children` : `/drives/${drive}/root/children`;
+      try { await this.graph.post(onde, { name: parte, folder: {}, '@microsoft.graph.conflictBehavior': 'fail' }); }
+      catch { /* já existe */ }
+      pai = pai ? `${pai}/${parte}` : parte;
+    }
+  }
+  async comprovacoesWiki(ids: string[]) {
+    const drive = await this.idDriveWiki();
+    if (!drive) return null;
+    type Item = { id: string; nome: string; tamanho: number; url: string; modificado: string; descricao?: string; pasta: string; tipo: 'arquivo' | 'pasta'; qtd?: number };
+    type Bruto = { id: string; name: string; size?: number; webUrl: string; lastModifiedDateTime: string; file?: unknown; folder?: { childCount?: number }; listItem?: { fields?: { Descricao?: string } } };
+    const out: Record<string, Item[]> = {};
+    // lê a pasta do fabricante e as subpastas (até 4 níveis)
+    const listar = async (fid: string, rel: string, nivel: number, l: Item[]) => {
+      const caminho = ['Comprovacoes', fid, ...rel.split('/').filter(Boolean)].map(encodeURIComponent).join('/');
+      const itens = await this.graph.todos<Bruto>(`/drives/${drive}/root:/${caminho}:/children?$expand=listItem($expand=fields($select=Descricao))`);
+      for (const x of itens) {
+        if (x.folder) {
+          l.push({ id: x.id, nome: x.name, tamanho: 0, url: x.webUrl, modificado: x.lastModifiedDateTime, pasta: rel, tipo: 'pasta', qtd: x.folder.childCount || 0 });
+          if (nivel < 4) await listar(fid, rel ? `${rel}/${x.name}` : x.name, nivel + 1, l);
+        } else if (x.file) {
+          l.push({ id: x.id, nome: x.name, tamanho: x.size || 0, url: x.webUrl, modificado: x.lastModifiedDateTime, descricao: x.listItem?.fields?.Descricao || undefined, pasta: rel, tipo: 'arquivo' });
+        }
+      }
+    };
+    await Promise.all(ids.map(async fid => {
+      const l: Item[] = [];
+      try { await listar(fid, '', 1, l); } catch { /* pasta do fabricante ainda não criada */ }
+      out[fid] = l.sort((a, b) => (a.tipo === b.tipo ? a.nome.localeCompare(b.nome, 'pt-BR') : a.tipo === 'pasta' ? -1 : 1));
+    }));
+    return out;
+  }
+  async criarPastaWiki(caminho: string) {
+    const drive = await this.idDriveWiki();
+    if (!drive) throw new Error('A biblioteca "Wiki Tecnicos" não existe. Rode o script provisionar-portal.ps1 (sem -Piloto).');
+    await this.garantirPastaWiki(drive, caminho);
+  }
+  async renomearItemWiki(id: string, novoNome: string) {
+    const drive = await this.idDriveWiki();
+    if (!drive) throw new Error('A biblioteca "Wiki Tecnicos" não existe.');
+    try { await this.graph.pedir(`/drives/${drive}/items/${id}`, { method: 'PATCH', json: { name: novoNome, '@microsoft.graph.conflictBehavior': 'fail' } }); }
+    catch (e) { throw new Error(/409|nameAlreadyExists|conflict/i.test((e as Error).message) ? `Já existe um item chamado “${novoNome}” nesta pasta.` : (e as Error).message); }
+  }
+  async excluirItemWiki(id: string) {
+    const drive = await this.idDriveWiki();
+    if (!drive) throw new Error('A biblioteca "Wiki Tecnicos" não existe.');
+    await this.graph.pedir(`/drives/${drive}/items/${id}`, { method: 'DELETE' });   // vai para a lixeira do site
+  }
+  async descreverItemWiki(id: string, descricao: string) {
+    const drive = await this.idDriveWiki();
+    if (!drive) throw new Error('A biblioteca "Wiki Tecnicos" não existe.');
+    await this.graph.pedir(`/drives/${drive}/items/${id}/listItem/fields`, { method: 'PATCH', json: { Descricao: descricao.trim() } });
+  }
+  async enviarArquivoWiki(arquivo: File, descricao: string, pasta = '') {
     const id = await this.idDriveWiki();
     if (!id) throw new Error('A biblioteca "Wiki Tecnicos" não existe. Rode o script provisionar-portal.ps1 (sem -Piloto).');
+    if (pasta) await this.garantirPastaWiki(id, pasta);
+    const caminho = [...pasta.split('/').filter(Boolean), arquivo.name].map(encodeURIComponent).join('/');
     // substitui o arquivo de mesmo nome (a tela pergunta antes)
-    const item = await this.graph.enviar(`/drives/${id}/root:/${encodeURIComponent(arquivo.name)}`, arquivo, 'replace');
+    const item = await this.graph.enviar(`/drives/${id}/root:/${caminho}`, arquivo, 'replace');
     if (descricao.trim() && item) {
       try { await this.graph.pedir(`/drives/${id}/items/${item}/listItem/fields`, { method: 'PATCH', json: { Descricao: descricao.trim() } }); }
       catch { /* sem a coluna Descricao (script antigo): o arquivo fica sem descrição */ }

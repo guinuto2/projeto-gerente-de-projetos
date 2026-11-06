@@ -38,7 +38,17 @@ export interface FonteDados {
   /** arquivos da biblioteca "Wiki Tecnicos" (null se a biblioteca ainda não existe) */
   arquivosWiki?(): Promise<{ id: string; nome: string; tamanho: number; url: string; modificado: string; descricao?: string }[] | null>;
   /** envia (ou substitui) um arquivo na biblioteca "Wiki Tecnicos", com uma descrição opcional */
-  enviarArquivoWiki?(arquivo: File, descricao: string): Promise<void>;
+  enviarArquivoWiki?(arquivo: File, descricao: string, pasta?: string): Promise<void>;
+  /** documentos de comprovação para editais de cada fabricante (pasta Comprovacoes/<id> da biblioteca Wiki Tecnicos) */
+  comprovacoesWiki?(ids: string[]): Promise<Record<string, { id: string; nome: string; tamanho: number; url: string; modificado: string; descricao?: string; pasta: string; tipo: 'arquivo' | 'pasta'; qtd?: number }[]> | null>;
+  /** cria uma pasta (e as anteriores do caminho) na biblioteca Wiki Tecnicos */
+  criarPastaWiki?(caminho: string): Promise<void>;
+  /** renomeia um arquivo ou pasta da biblioteca Wiki Tecnicos */
+  renomearItemWiki?(id: string, novoNome: string): Promise<void>;
+  /** exclui um arquivo ou pasta da biblioteca Wiki Tecnicos (vai para a lixeira do SharePoint) */
+  excluirItemWiki?(id: string): Promise<void>;
+  /** altera a descrição de um arquivo da biblioteca Wiki Tecnicos */
+  descreverItemWiki?(id: string, descricao: string): Promise<void>;
   /** conteúdo de um arquivo da biblioteca da Wiki, para baixar */
   baixarArquivoWiki?(id: string): Promise<Blob>;
   /** exclui um arquivo da biblioteca (vai para a lixeira) */
