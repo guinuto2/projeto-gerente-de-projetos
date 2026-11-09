@@ -380,7 +380,8 @@ function VerFabricante({ f, aba, termo, documentos, podeAdicionar, noSharePoint,
     setCriando(true); setErroPasta('');
     try { await aoCriarPasta(nome); setNovaPasta(null); } catch (e) { setErroPasta((e as Error).message); } finally { setCriando(false); }
   };
-  const comAbas = f.id !== 'editais';   // "Comprovações para editais" já é, ela mesma, uma página de referências
+  const comAbas = true;
+  const ehGeral = f.id === 'editais';   // "Comprovações para editais": documentos gerais, de mais de um fabricante
   return (
     <>
       <div className="wikiTopo">
@@ -396,7 +397,7 @@ function VerFabricante({ f, aba, termo, documentos, podeAdicionar, noSharePoint,
       {comAbas && (
         <div className="fabAbas" role="tablist" aria-label={`Seções de ${f.nome}`}>
           <button type="button" role="tab" aria-selected={aba === 'links'} className={`fabAba ${aba === 'links' ? 'on' : ''}`} onClick={() => aoTrocarAba('links')}>Links <span className="wikiAbaN">{f.sites.length}</span></button>
-          <button type="button" role="tab" aria-selected={aba === 'comp'} className={`fabAba ${aba === 'comp' ? 'on' : ''}`} onClick={() => aoTrocarAba('comp')}>Comprovação para editais <span className="wikiAbaN">{totalDocs}</span></button>
+          <button type="button" role="tab" aria-selected={aba === 'comp'} className={`fabAba ${aba === 'comp' ? 'on' : ''}`} onClick={() => aoTrocarAba('comp')}>{ehGeral ? 'Arquivos' : 'Comprovação para editais'} <span className="wikiAbaN">{totalDocs}</span></button>
         </div>
       )}
       {(!comAbas || aba === 'links') && <>
@@ -427,8 +428,8 @@ function VerFabricante({ f, aba, termo, documentos, podeAdicionar, noSharePoint,
         <div className="wikiComprovacao">
           <div className="linha" style={{ justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
             <div>
-              <h3 className="h3" style={{ fontSize: 15 }}>Documentos de comprovação para editais</h3>
-              <span className="sub" style={{ fontSize: 12.5 }}>Declarações, certificados e comprovantes da {f.nome} para anexar às propostas.</span>
+              <h3 className="h3" style={{ fontSize: 15 }}>{ehGeral ? 'Arquivos de comprovação (gerais)' : 'Documentos de comprovação para editais'}</h3>
+              <span className="sub" style={{ fontSize: 12.5 }}>{ehGeral ? 'Prints, declarações e comprovantes que valem para mais de um fabricante (associações, catálogos de compatibilidade).' : `Declarações, certificados e comprovantes da ${f.nome} para anexar às propostas.`}</span>
             </div>
             {podeAdicionar && noSharePoint && <span className="linha" style={{ gap: 6 }}>
               <button type="button" className="btn pq" onClick={() => { setNovaPasta(''); setErroPasta(''); }}>+ Nova pasta</button>
@@ -491,7 +492,7 @@ function VerFabricante({ f, aba, termo, documentos, podeAdicionar, noSharePoint,
                 </tbody>
               </table>
             </div>
-          ) : <p className="sub">{pasta ? 'Esta pasta está vazia.' : `Nenhum documento de comprovação da ${f.nome} ainda.`}{podeAdicionar && noSharePoint ? ' Use “+ Adicionar documento”.' : ''}</p>}
+          ) : <p className="sub">{pasta ? 'Esta pasta está vazia.' : ehGeral ? 'Nenhum arquivo ainda.' : `Nenhum documento de comprovação da ${f.nome} ainda.`}{podeAdicionar && noSharePoint ? ' Use “+ Adicionar documento”.' : ''}</p>}
         </div>
       )}
     </>
@@ -545,6 +546,7 @@ function VerArquivo({ a, noSharePoint }: { a: ArquivoWiki; noSharePoint: boolean
 function EditorDoc({ inicial, gravavel, piloto, aoSalvar, aoCancelar }: { inicial: ModeloSalvo | null; gravavel: boolean; piloto: boolean; aoSalvar: (d: ModeloSalvo) => Promise<void>; aoCancelar: () => void }) {
   const [titulo, setTitulo] = useState(inicial?.titulo || '');
   const [descricao, setDescricao] = useState(inicial?.descricao || '');
+  const [previa, setPrevia] = useState(false);   // alterna entre editar e ver a prévia (o texto ocupa a largura toda)
   const [texto, setTexto] = useState(inicial ? docParaTexto(inicial) : '# Primeira seção\nEscreva aqui o conteúdo.');
   const [erro, setErro] = useState(''); const [salvando, setSalvando] = useState(false); const [excluir, setExcluir] = useState(false);
   const secoes = textoParaSecoes(texto);
@@ -575,16 +577,19 @@ function EditorDoc({ inicial, gravavel, piloto, aoSalvar, aoCancelar }: { inicia
         <label className="campo">Título *<input className="ctl" value={titulo} onChange={e => setTitulo(e.target.value)} /></label>
         <label className="campo">Descrição<input className="ctl" value={descricao} onChange={e => setDescricao(e.target.value)} placeholder="Resumo de uma linha" /></label>
       </div>
-      <div className="wikiEditor">
-        <label className="campo">Conteúdo
-          <textarea className="ctl wikiTextarea" value={texto} onChange={e => setTexto(e.target.value)} spellCheck />
-          <span className="dica"><b># Seção</b> · <b>• tópico</b> (ou - tópico) · <b>1. passo</b> · <b>## subtítulo</b> · <b>Obs.:</b> observação · <b>NOTA:</b> nota · linha comum = parágrafo</span>
-        </label>
+      <div className="wikiEditorTopo">
+        <span className="dica">{previa ? 'Assim o documento vai aparecer na Wiki.' : <><b># Seção</b> · <b>• tópico</b> (ou - tópico) · <b>1. passo</b> · <b>## subtítulo</b> · <b>Obs.:</b> observação · <b>NOTA:</b> nota · linha comum = parágrafo</>}</span>
+        <button type="button" className="btn pq" onClick={() => setPrevia(v => !v)}>{previa ? '✎ Voltar a editar' : '👁 Ver prévia'}</button>
+      </div>
+      {previa ? (
         <div className="wikiPrevia">
-          <div className="wikiTipo" style={{ marginBottom: 8 }}>Prévia</div>
           <VerModelo m={{ id, titulo: titulo || 'Sem título', descricao, secoes }} aoCopiar={() => undefined} previa />
         </div>
-      </div>
+      ) : (
+        <label className="campo">Conteúdo
+          <textarea className="ctl wikiTextarea" value={texto} onChange={e => setTexto(e.target.value)} spellCheck />
+        </label>
+      )}
       {erro && <Mensagem tipo="erro">{erro}</Mensagem>}
       {excluir && (
         <Mensagem tipo="erro">
@@ -649,9 +654,9 @@ function AdicionarWiki({ arquivos, comprovacoes, destinoInicial = '', podeEnviar
               <select className="ctl" value={destino} disabled={enviando} onChange={e => { setDestino(e.target.value); setSubstituir(false); }}>
                 <option value="">Arquivos da Wiki</option>
                 <optgroup label="Comprovação para editais">
-                  {FABRICANTES.filter(f => f.id !== 'editais').map(f => <option key={f.id} value={`Comprovacoes/${f.id}`}>{f.nome}</option>)}
+                  {FABRICANTES.map(f => <option key={f.id} value={`Comprovacoes/${f.id}`}>{f.nome}</option>)}
                   {/* subpastas do fabricante */}
-                  {FABRICANTES.filter(f => f.id !== 'editais').flatMap(f => (comprovacoes[f.id] || []).filter(a => a.tipo === 'pasta').map(a => {
+                  {FABRICANTES.flatMap(f => (comprovacoes[f.id] || []).filter(a => a.tipo === 'pasta').map(a => {
                     const rel = a.pasta ? `${a.pasta}/${a.nome}` : a.nome;
                     return <option key={f.id + rel} value={`Comprovacoes/${f.id}/${rel}`}>{[f.nome, ...rel.split('/')].join(' › ')}</option>;
                   }))}

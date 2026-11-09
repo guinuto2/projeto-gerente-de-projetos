@@ -15,6 +15,9 @@ export function AtividadesAtrasadas() {
   const { dados, hoje } = usePortal();
   const { projetos } = useProjetosVisiveis();
   const { papel } = usePapel();
+  const { identidade } = useProjetosVisiveis();
+  // técnico: é dele se ele é o responsável (pelo e-mail ou, no piloto, pelo nome)
+  const minha = (a: { responsavel?: string }) => !!a.responsavel && (a.responsavel.toLowerCase() === (identidade.email || '').toLowerCase() || (!identidade.email && !!identidade.nome));
   const aberta = (a: Atividade) => a.status !== 'Concluído' && a.status !== 'Cancelado';
   // dias úteis depois do término previsto até hoje
   const atraso = (a: Atividade) => Math.max(1, diasUteis(a.termino, hoje) - 1);
@@ -22,7 +25,7 @@ export function AtividadesAtrasadas() {
     const lista = dados.atividades[p.codigo] || [];
     return lista.filter(a => {
       if (!aberta(a) || !a.termino || a.termino >= hoje) return false;
-      if (papel === 'Técnico' && (!a.pai || !lancadaParaTecnico(a))) return false;   // técnico: só tarefas lançadas
+      if (papel === 'Técnico' && (!a.pai || !lancadaParaTecnico(a) || !minha(a))) return false;   // técnico: só as tarefas dele
       if (a.pai) {
         const pai = lista.find(x => x.codigo === a.pai);
         if (pai && pai.inicio === a.inicio && pai.termino === a.termino) return false;   // repetiria a principal

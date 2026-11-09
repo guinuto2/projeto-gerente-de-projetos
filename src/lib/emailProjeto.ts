@@ -273,16 +273,16 @@ export function emailStatusSubatividade(p: Projeto, a: Atividade, novo: Partial<
 }
 
 /** Atividades/subatividades que passaram a estar atrasadas no projeto: um e-mail ao PMO com a lista. */
-export function emailAtrasos(p: Projeto, itens: { a: Atividade; dias: number; responsavel: string }[]) {
+export function emailAtrasos(p: Projeto, itens: { a: Atividade; dias: number; responsavel: string }[], paraTecnico = false) {
   const linhas = itens.map(({ a, dias, responsavel }) =>
     `<tr><td style="${BORDA};padding:6px 10px">${esc(a.codigo)}</td><td style="${BORDA};padding:6px 10px">${esc(a.nome)}${a.pai ? `<br><span style="color:#555555;font-size:12px">subatividade de ${esc(a.pai)}</span>` : ''}</td>` +
     `<td style="${BORDA};padding:6px 10px">${esc(responsavel || '—')}</td><td style="${BORDA};padding:6px 10px">${esc(dma(a.termino))}</td>` +
     `<td style="${BORDA};padding:6px 10px;color:#9A2E12;font-weight:bold">${dias} dia${dias > 1 ? 's' : ''} úte${dias > 1 ? 'is' : 'il'}</td><td style="${BORDA};padding:6px 10px">${esc(a.status)} · ${a.percentual}%</td></tr>`).join('');
   return {
-    assunto: `[Central Systech] ${itens.length} atividade(s) atrasada(s) · ${p.codigo} · ${p.cliente}`,
+    assunto: paraTecnico ? `[Central Systech] Você tem ${itens.length} tarefa(s) atrasada(s) · ${p.codigo}` : `[Central Systech] ${itens.length} atividade(s) atrasada(s) · ${p.codigo} · ${p.cliente}`,
     html: `<!doctype html><html lang="pt-BR"><body style="margin:0;padding:12px;${FONTE}">
-<p style="margin:0 0 4px;font-size:18px"><b>Atividades atrasadas</b></p>
-<p style="margin:0 0 14px;line-height:1.5">O projeto <b>${esc(p.codigo)} · ${esc(p.nome)}</b> tem ${itens.length} atividade(s) que passaram da data de término prevista.</p>
+<p style="margin:0 0 4px;font-size:18px"><b>${paraTecnico ? 'Suas tarefas atrasadas' : 'Atividades atrasadas'}</b></p>
+<p style="margin:0 0 14px;line-height:1.5">${paraTecnico ? `No projeto <b>${esc(p.codigo)} · ${esc(p.nome)}</b>, ${itens.length} tarefa(s) sob sua responsabilidade passaram da data de término prevista. Atualize o status (com a causa do atraso) ou combine uma nova data com o PMO.` : `O projeto <b>${esc(p.codigo)} · ${esc(p.nome)}</b> tem ${itens.length} atividade(s) que passaram da data de término prevista.`}</p>
 <table cellpadding="0" cellspacing="0" style="border-collapse:collapse;width:100%;max-width:760px;${FONTE}">
 <tr style="background:#F3F3F3"><th align="left" style="${BORDA};padding:6px 10px">Código</th><th align="left" style="${BORDA};padding:6px 10px">Atividade</th><th align="left" style="${BORDA};padding:6px 10px">Responsável</th><th align="left" style="${BORDA};padding:6px 10px">Previsto</th><th align="left" style="${BORDA};padding:6px 10px">Atraso</th><th align="left" style="${BORDA};padding:6px 10px">Situação</th></tr>
 ${linhas}

@@ -226,14 +226,6 @@ export const FABRICANTES: Fabricante[] = [
       { titulo: 'Compatibilidade de EVC (VMware)', descricao: 'Modos EVC suportados por geração de CPU, para vMotion entre gerações.', url: 'https://knowledge.broadcom.com/external/article?legacyId=1003212' }
     ],
     dicas: ['Misturar gerações no mesmo cluster exige ajustar o modo EVC.', 'Microcódigo vem no BIOS do servidor — atualize pelo pacote do fabricante.'] },
-  { id: 'servidores', nome: 'Servidores', sigla: 'SRV', cor: '#2F855A', descricao: 'Referências gerais de hardware de servidor: linhas de produto, suporte e catálogos de compatibilidade.',
-    sites: [
-      { titulo: 'Dell PowerEdge', descricao: 'Modelos, configurações e comparativos.', url: 'https://www.dell.com/pt-br/dt/servers/index.htm' },
-      { titulo: 'Lenovo ThinkSystem (Lenovo Press)', descricao: 'Guias de produto com as especificações de cada modelo.', url: 'https://lenovopress.lenovo.com/' },
-      { titulo: 'HPE — suporte (ProLiant)', descricao: 'Drivers, firmware (SPP), documentação e QuickSpecs dos ProLiant.', url: 'https://support.hpe.com/' },
-      { titulo: 'Broadcom Compatibility Guide', descricao: 'Confira se o modelo, a controladora e a placa de rede são certificados para o ESXi.', url: 'https://compatibilityguide.broadcom.com/' }
-    ],
-    dicas: ['Registre número de série e garantia de cada servidor na documentação do projeto.', 'Valide a placa de rede e a controladora no guia de compatibilidade antes de fechar a configuração.'] },
   { id: 'editais', nome: 'Comprovações para editais', sigla: 'EDT', cor: '#7E181C', descricao: 'Sites oficiais usados para comprovar requisitos de editais (associações, certificações de sistema operacional e de GPU).',
     sites: [
       { titulo: 'TSAnet — membros', descricao: 'Lista pública de membros do TSAnet (nível Elite).', url: 'https://tsanet.org/members/' },
@@ -247,7 +239,8 @@ export const FABRICANTES: Fabricante[] = [
       { titulo: 'Ubuntu — servidores certificados', descricao: 'Servidores certificados para o Ubuntu Server.', url: 'https://ubuntu.com/certified/servers' },
       { titulo: 'NVIDIA Qualified System Catalog', descricao: 'Servidores "NVIDIA-Certified" ou "Qualified" para GPUs.', url: 'https://marketplace.nvidia.com/en-us/enterprise/qualified-system-catalog/' }
     ],
-    dicas: ['Guarde um print (com data) de cada página consultada para anexar à proposta.', 'Algumas listas mudam com frequência: confira de novo perto da data da sessão.'] }
+    dicas: ['Guarde um print (com data) de cada página consultada para anexar à proposta.', 'Algumas listas mudam com frequência: confira de novo perto da data da sessão.'],
+    comprovacoes: [] }
 ];
 
 /** Arquivos da pasta da equipe técnica (biblioteca "Wiki Tecnicos" no SharePoint; cópia junto do portal em /wiki/arquivos). */

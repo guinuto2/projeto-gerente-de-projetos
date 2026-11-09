@@ -1,4 +1,14 @@
-# Central Systech — v4.2 (React)
+# Central Systech — v4.4 (React)
+
+**v4.4:** Wiki — a caixa de texto do documento já abre grande (quase a altura da tela, mínimo de 640 px; 60% da tela no celular).
+
+**v4.3**
+- Wiki: sai o item "Servidores"; "Comprovações para editais" ganha a aba "Arquivos" (documentos gerais, com pastas, editar e
+  excluir) e aparece no "Onde guardar". No editor de documentos, a prévia sai da lateral: o texto ocupa a largura toda e o botão
+  "Ver prévia" alterna entre editar e ver.
+- Atrasos: o e-mail diário vai para o PMO (lista completa) e para cada técnico (só as tarefas dele); a mensagem na tela aparece
+  só para o PMO; o painel "Atividades atrasadas" do portfólio some para o patrocinador e mostra ao técnico só as tarefas dele.
+
 
 **v4.2:** Wiki — novos fabricantes HPE (Partner Portal, Certification and Learning, Support Center, SPP, QuickSpecs, ProLiant) e xFusion (site, servidores rack FusionServer, serviços, FusionServer Tools, suporte), com as abas Links e Comprovação para editais.
 

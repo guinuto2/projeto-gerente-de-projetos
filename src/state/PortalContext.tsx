@@ -12,6 +12,7 @@ import { gatesFaltantes } from '../lib/gates';
 import { descrever } from '../lib/historico';
 import { iniciaria, pendentes } from '../lib/dependencias';
 import { usePapel } from './PapelContext';
+import { lancadaParaTecnico } from '../lib/dependencias';
 import { ConflitoEdicao } from '../services/FonteSharePoint';
 import { CAMPOS_STATUS, checklistGate, conferirDatas, conferirStatus, riscoAltoSemMitigacao } from '../lib/validacoes';
 import { pessoasDaLista, type PessoaApp } from '../lib/pessoas';
@@ -236,6 +237,14 @@ async function verificarAtrasos(fonte: FonteDados, d: Dados): Promise<{ cod: str
     try {
       const { assunto, html } = emailAtrasos(p, itens);
       await fonte.enviarEmail(assunto, html, para);
+      // cada técnico recebe só as tarefas atrasadas dele
+      const porTecnico = new Map<string, typeof itens>();
+      for (const it of itens) if (it.a.responsavel && lancadaParaTecnico(it.a)) porTecnico.set(it.a.responsavel.toLowerCase(), [...(porTecnico.get(it.a.responsavel.toLowerCase()) || []), it]);
+      for (const [email, dele] of porTecnico) {
+        const paraTec = destinatarios(email);
+        if (!paraTec || para.toLowerCase().split(/[,;]\s*/).includes(email)) continue;   // o PMO já recebeu a lista completa
+        try { const m = emailAtrasos(p, dele, true); await fonte.enviarEmail(m.assunto, m.html, paraTec); } catch { /* o aviso do técnico falhou: o do PMO foi */ }
+      }
       for (const a of novos) {
         try { await fonte.salvarAtividade(p.codigo, a, { avisoAtraso: a.termino }); marcados.push({ cod: p.codigo, codigo: a.codigo, campos: { avisoAtraso: a.termino } }); }
         catch { /* sem permissão de gravar: o aviso pode repetir amanhã */ }
@@ -393,7 +402,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
         verificarAtrasos(f, d).then(m => {
           if (!m.length) return;
           setDados(prev => { if (!prev) return prev; let n = prev; for (const x of m) n = comItem<Atividade>(n, 'atividades', x.cod, x.codigo, x.campos); assinatura.current = assinar(n); return n; });
-          toast(`PMO avisado por e-mail de ${m.length} atividade(s) atrasada(s).`);
+          if (meus.includes('PMO')) toast(`PMO e técnicos avisados por e-mail de ${m.length} atividade(s) atrasada(s).`);
         });
       } catch (e) {
         if (vivo) setErro((e as Error).message);

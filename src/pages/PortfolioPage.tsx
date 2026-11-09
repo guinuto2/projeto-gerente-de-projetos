@@ -59,7 +59,7 @@ export function PortfolioPage() {
           <aside className="aside">
               {papel !== 'Técnico' && <ProximosMarcos />}
               <EmAndamento />
-              <AtividadesAtrasadas />
+              {papel !== 'Patrocinador' && <AtividadesAtrasadas />}   {/* atrasos: só PMO e técnicos (cada técnico vê os dele) */}
             </aside>
           )}
         </div>
