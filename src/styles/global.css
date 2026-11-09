@@ -912,3 +912,12 @@ textarea.ctl { height: auto; min-height: 96px; padding: 10px; resize: vertical; 
 .wikiPastaIco { background: transparent !important; font-size: 18px; }
 .wikiNomeExt { display: flex; align-items: center; gap: 6px; }
 .wikiNomeExt .ctl { flex: 1; }
+
+/* v4.3: editor de documentos com a prévia num botão */
+.wikiEditorTopo { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.wikiPrevia { max-height: none; }
+
+/* v4.4: caixa de texto do documento maior desde o início (quase a altura da tela) */
+textarea.ctl.wikiTextarea { min-height: max(640px, calc(100vh - 300px)); height: auto; font-size: 13.5px; }
+.wikiConteudo .wikiPrevia { min-height: max(640px, calc(100vh - 300px)); }
+@media (max-width: 760px) { textarea.ctl.wikiTextarea, .wikiConteudo .wikiPrevia { min-height: 60vh; } }
