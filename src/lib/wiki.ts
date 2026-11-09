@@ -239,7 +239,7 @@ export const FABRICANTES: Fabricante[] = [
       { titulo: 'SPEC INT 2017 FusionServer 1288 V8', descricao: 'Tabela com spec rate integer do servidor FusionServer 1288 V8', url: 'https://www.spec.org/cgi-bin/osgresults?conf=rint2017&op=fetch&field=SYSTEM&pattern=FusionServer+1288+V8', grupo: 'SPEC RATE 2017' },
       { titulo: 'SPEC INT 2017 FusionServer 2158H V8', descricao: 'Tabela com spec rate integer do servidor FusionServer 2158H V8', url: 'https://www.spec.org/cgi-bin/osgresults?conf=rint2017&op=fetch&field=SYSTEM&pattern=FusionServer+2158H+V8', grupo: 'SPEC RATE 2017' },
       { titulo: 'SPEC INT 2017 FusionServer 2258H V8', descricao: 'Tabela com spec rate integer do servidor FusionServer 2258H V8', url: 'https://www.spec.org/cgi-bin/osgresults?conf=rint2017&op=fetch&field=SYSTEM&pattern=FusionServer+2258H+V8', grupo: 'SPEC RATE 2017' },
-      { titulo: 'SPEC INT 2017 FusionServer 2288 V8', descricao: 'Tabela com spec rate integer do servidor FusionServer 2288 V8', url: 'https://www.spec.org/cgi-bin/osgresults?conf=rint2017&op=fetch&field=SYSTEM&pattern=FusionServer+2258H+V8', grupo: 'SPEC RATE 2017' },
+      { titulo: 'SPEC INT 2017 FusionServer 2288 V8', descricao: 'Tabela com spec rate integer do servidor FusionServer 2288 V8', url: 'https://www.spec.org/cgi-bin/osgresults?conf=rint2017&op=fetch&field=SYSTEM&pattern=FusionServer+2288+V8', grupo: 'SPEC RATE 2017' },
 
 
     ],
@@ -247,19 +247,36 @@ export const FABRICANTES: Fabricante[] = [
     comprovacoes: [] },
   { id: 'omnissa', nome: 'Omnissa', sigla: 'OMN', cor: '#1F6FEB', descricao: 'Horizon (VDI), Workspace ONE e App Volumes — antiga divisão de End-User Computing da VMware.',
     sites: [
-      { titulo: 'Omnissa Partner Connect', descricao: 'Portal do parceiro Omnissa (login).', url: 'https://omnissa.my.site.com/partnerconnect/PC_Login?ec=302&startURL=/partnerconnect/s/', grupo: 'Portal do parceiro' },
-      { titulo: 'Partner Connect — gestão da conta', descricao: 'Gestão da conta do parceiro no Partner Connect.', url: 'https://omnissa.my.site.com/partnerconnect/s/account-management?component=c:PC_AdPlus', grupo: 'Portal do parceiro' },
-      { titulo: 'Provas de certificação (Pearson VUE)', descricao: 'Agendamento das provas de certificação Omnissa.', url: 'https://www.pearsonvue.com/us/en/omnissa.html', grupo: 'Certificações e treinamentos' }
+      
+      // PORTAIS OMNISSA
+      { titulo: 'Omnissa Partner Connect', descricao: 'Portal do parceiro Omnissa (login).', url: 'https://omnissa.my.site.com/partnerconnect/PC_Login?ec=302&startURL=/partnerconnect/s/', grupo: 'Portais Omnissa' },
+      { titulo: 'Partner Connect — gestão da conta', descricao: 'Gestão da conta do parceiro no Partner Connect.', url: 'https://omnissa.my.site.com/partnerconnect/s/account-management?component=c:PC_AdPlus', grupo: 'Portais Omnissa' },
+      { titulo: 'Omnissa Customer Connect', descricao: 'Portal de suporte, gerenciamento de licenças e abertura de chamados técnicos.', url: 'https://customerconnect.omnissa.com/home', grupo: 'Portais Omnissa' },
+      { titulo: 'Omnissa Connect', descricao: 'Portal centralizado de acesso aos serviços, organizações e assinaturas Omnissa.', url: 'https://connect.omnissa.com/', grupo: 'Portais Omnissa' },
+
+      // SUPORTE E FERRAMENTAS
+      { titulo: 'Omnissa Product Downloads', descricao: 'Portal para download de produtos, versões e atualizações Omnissa.', url: 'https://customerconnect.omnissa.com/downloads/#all_products', grupo: 'Suporte e ferramentas' },
+      { titulo: 'Omnissa Knowledge Base', descricao: 'Base oficial de conhecimento, soluções de problemas e artigos de suporte.', url: 'https://kb.omnissa.com/s/', grupo: 'Suporte e ferramentas' },
+      { titulo: 'Omnissa Interoperability Matrix', descricao: 'Ferramenta oficial de consulta de compatibilidade entre produtos, plataformas e versões.', url: 'https://interopmatrix.omnissa.com/', grupo: 'Suporte e ferramentas' },
+      { titulo: 'Omnissa Trust Center', descricao: 'Portal de segurança, privacidade, conformidade e certificações da Omnissa.', url: 'https://www.omnissa.com/trust-center/', grupo: 'Suporte e ferramentas' },
+
+      // CERTIFICAÇÕES E TREINAMENTOS
+      { titulo: 'Omnissa Learning', descricao: 'Portal de treinamentos, cursos e preparação para certificações Omnissa.', url: 'https://learning.omnissa.com/learn/', grupo: 'Certificações e treinamentos' },
+      { titulo: 'Provas de certificação (Pearson VUE)', descricao: 'Agendamento das provas de certificação Omnissa.', url: 'https://www.pearsonvue.com/us/en/omnissa.html', grupo: 'Certificações e treinamentos' },
+
+
     ],
     dicas: ['Atualize Connection Server antes dos agentes nas VMs.', 'Teste a imagem dourada em pool de homologação antes de publicar.'],
     comprovacoes: [] },
   { id: 'processadores', nome: 'Processadores', sigla: 'CPU', cor: '#6B4FBB', descricao: 'Intel Xeon e AMD EPYC: especificações, segurança (microcódigo) e compatibilidade de gerações no vSphere.',
     sites: [
-      { titulo: 'Intel — especificações (ARK)', descricao: 'Núcleos, frequências, TDP e recursos de cada processador; permite comparar modelos.', url: 'https://www.intel.com/content/www/us/en/ark.html' },
+      { titulo: 'Intel — especificações (ARK)', descricao: 'Núcleos, frequências, TDP, memória, PCIe e recursos de cada processador.', url: 'https://www.intel.com/content/www/us/en/ark.html' },
       { titulo: 'Intel — central de segurança', descricao: 'Avisos de vulnerabilidades e atualizações de microcódigo.', url: 'https://www.intel.com/content/www/us/en/security-center/default.html' },
       { titulo: 'AMD EPYC — linha de servidores', descricao: 'Gerações, modelos e especificações dos processadores EPYC.', url: 'https://www.amd.com/en/products/processors/server/epyc.html' },
       { titulo: 'AMD — segurança de produtos', descricao: 'Boletins de segurança e correções de firmware.', url: 'https://www.amd.com/en/resources/product-security.html' },
-      { titulo: 'Compatibilidade de EVC (VMware)', descricao: 'Modos EVC suportados por geração de CPU, para vMotion entre gerações.', url: 'https://knowledge.broadcom.com/external/article?legacyId=1003212' }
+      { titulo: 'VMware — compatibilidade EVC', descricao: 'Compatibilidade de CPU e modos EVC para migração vMotion entre gerações.', url: 'https://knowledge.broadcom.com/external/article/313545/vmware-evc-and-cpu-compatibility-faq.html' },
+      { titulo: 'Intel Xeon 6 — catálogo completo', descricao: 'Lista oficial de processadores Intel Xeon 6 com especificações individuais.', url: 'https://www.intel.com/content/www/us/en/ark/products/series/240357/intel-xeon-6-processors.html' },
+      { titulo: 'AMD EPYC — catálogo completo', descricao: 'Tabela oficial para pesquisar e comparar processadores EPYC 9004, 9005, 9006 e outras famílias.', url: 'https://www.amd.com/en/products/specifications/server-processor.html' },
     ],
     dicas: ['Misturar gerações no mesmo cluster exige ajustar o modo EVC.', 'Microcódigo vem no BIOS do servidor — atualize pelo pacote do fabricante.'] },
   { id: 'editais', nome: 'Comprovações para editais', sigla: 'EDT', cor: '#7E181C', descricao: 'Sites oficiais usados para comprovar requisitos de editais (associações, certificações de sistema operacional e de GPU).',
