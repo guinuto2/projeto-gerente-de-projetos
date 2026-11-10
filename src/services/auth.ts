@@ -120,7 +120,7 @@ export class AutenticadorTeste implements Autenticador {
   async entrar() { return 'Usuário de teste'; }
   async token() { return 'token-de-teste'; }
   async tokenPara() { return 'token-de-teste'; }
-  email() { return 'teste@gruposystech.onmicrosoft.com'; }
+  email() { try { return localStorage.getItem('portal-pmo-email-teste') || 'teste@gruposystech.onmicrosoft.com'; } catch { return 'teste@gruposystech.onmicrosoft.com'; } }
   /** testes automatizados: as funções vêm de localStorage (portal-pmo-roles-teste), padrão PMO */
   papeis() { try { return JSON.parse(localStorage.getItem('portal-pmo-roles-teste') || '["PMO"]'); } catch { return ['PMO']; } }
   async tokenSilencioso() { return 'token-de-teste'; }

@@ -5,7 +5,7 @@ import { usePortal } from '../../../state/PortalContext';
 import { useToast } from '../../../state/ToastContext';
 import { usePapel } from '../../../state/PapelContext';
 import { macro } from '../../../lib/calculos';
-import { codigoDaFase, codigoSubatividade, FASES, STATUS_ATIVIDADE } from '../../../lib/constantes';
+import { CAUSAS_ATRASO, codigoDaFase, codigoSubatividade, FASES, STATUS_ATIVIDADE } from '../../../lib/constantes';
 import { dma } from '../../../lib/datas';
 import { Drawer } from '../../ui/Drawer';
 import { convidados, formReuniaoInicial, ReuniaoTeams, type FormReuniao } from './ReuniaoTeams';
@@ -66,6 +66,7 @@ export function EditarAtividade({ projeto, codigo, faseInicial, aoFechar, aoCria
     pai: existente?.pai || principalInicial?.codigo || '',
     descricao: existente?.descricao || '',
     observacao: existente?.observacao || '',
+    causaAtraso: existente?.causaAtraso || '',
     responsavel: existente?.responsavel || '',
     predecessoras: existente?.predecessoras || ([] as string[]),
     horasPlanejadas: existente?.horasPlanejadas === undefined ? '' : String(existente.horasPlanejadas),
@@ -74,6 +75,8 @@ export function EditarAtividade({ projeto, codigo, faseInicial, aoFechar, aoCria
     /** nova subatividade: já lançar para o técnico? (padrão: não — o PMO lança depois) */
     lancar: false
   });
+  // A mesma condição utilizada pela validação de status para exigir a causa do atraso.
+  const exigeCausaAtraso = !nova && f.status !== 'Concluído' && f.status !== 'Cancelado' && !!f.termino && f.termino < hoje;
   // outras tarefas abertas do mesmo técnico no período (todos os projetos)
   const sobrecarga = avisoSobrecarga(tarefasNoPeriodo(dados, f.responsavel, f.inicio, f.termino, existente ? { projeto: projeto.codigo, codigo: existente.codigo } : undefined));
   const [salvando, setSalvando] = useState(false);
@@ -137,7 +140,7 @@ export function EditarAtividade({ projeto, codigo, faseInicial, aoFechar, aoCria
     const pct = f.status === 'Concluído' ? 100 : Math.max(0, Math.min(100, Number(f.percentual) || 0));
     const campos = {
       nome: f.nome.trim(), fase: f.fase, equipe: f.equipe.trim() || 'Systech', status: f.status, percentual: pct,
-      inicio: f.inicio, termino: f.termino, marco: f.marco, descricao: f.descricao.trim(), observacao: f.observacao.trim(),
+      inicio: f.inicio, termino: f.termino, marco: f.marco, descricao: f.descricao.trim(), observacao: f.observacao.trim(), causaAtraso: f.causaAtraso.trim(),
       responsavel: f.responsavel, predecessoras: f.predecessoras,
       horasPlanejadas: f.horasPlanejadas === '' ? undefined : Math.max(0, Number(f.horasPlanejadas) || 0),
       // conclusão: data real e horas realizadas (exigidas para "Concluído")
@@ -304,6 +307,16 @@ export function EditarAtividade({ projeto, codigo, faseInicial, aoFechar, aoCria
             </label>}
         <label className="campo">Início previsto *<input className="ctl" type="date" value={f.inicio} onChange={muda('inicio')} disabled={!estrutura} />{estrutura && avisoFimDeSemana(f.inicio) && <span className="dica fds">Atenção: {avisoFimDeSemana(f.inicio)}.</span>}</label>
         <label className="campo">Término previsto *<input className="ctl" type="date" min={f.inicio || undefined} value={f.termino} onChange={muda('termino')} disabled={!estrutura} />{estrutura && avisoFimDeSemana(f.termino) && <span className="dica fds">Atenção: {avisoFimDeSemana(f.termino)}.</span>}</label>
+        {!nova && (exigeCausaAtraso || !!f.causaAtraso) && (
+          <label className="campo">Causa do atraso{exigeCausaAtraso ? ' *' : ''}
+            <select className="ctl" value={f.causaAtraso} onChange={muda('causaAtraso')}>
+              <option value="">Selecione</option>
+              {f.causaAtraso && !CAUSAS_ATRASO.includes(f.causaAtraso) && <option value={f.causaAtraso}>{f.causaAtraso}</option>}
+              {CAUSAS_ATRASO.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+            {exigeCausaAtraso && <span className="dica">Obrigatória para atividades atrasadas que ainda não foram concluídas ou canceladas.</span>}
+          </label>
+        )}
         {!nova && (existente?.pai
           ? <label className="campo">% concluído<input className="ctl" type="number" min={0} max={100} value={f.percentual} onChange={muda('percentual')} /></label>
           : <label className="campo">% concluído

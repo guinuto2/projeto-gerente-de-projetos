@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import type { SituacaoCadastro } from '../types/models';
 import { usePortal, useBloqueioSincronizacao } from '../state/PortalContext';
@@ -9,11 +9,12 @@ import { Mensagem } from '../components/ui/Mensagem';
 import { Confirmacao } from '../components/ui/Confirmacao';
 import { PassoDadosGerais } from '../components/novo/PassoDadosGerais';
 import { PassoEscopo } from '../components/novo/PassoEscopo';
+import { datasDoItem, modeloPadrao, type ItemModelo, type ModeloProjeto } from '../lib/modelos';
 import { PassoCronograma } from '../components/novo/PassoCronograma';
 import { PassoRiscos } from '../components/novo/PassoRiscos';
 import { EditorEquipe } from '../components/novo/EditorEquipe';
 import { ConferenciaEquipe, useConferencia } from '../components/novo/ConferenciaEquipe';
-import { cronogramaModelo, formVazio, montarEquipe, montarProjeto, riscosModelo, validar, type FormProjeto, colocarNaEquipe } from '../components/novo/formulario';
+import { formVazio, montarEquipe, montarProjeto, riscosModelo, validar, type FormProjeto, colocarNaEquipe } from '../components/novo/formulario';
 
 const PASSOS = ['Dados gerais e termo de abertura', 'Escopo, premissas e restrições', 'Cronograma e marcos', 'Riscos'];
 
@@ -33,11 +34,20 @@ export function NovoProjetoPage() {
   const hoje = fonte.hoje();
   const pendencias = validar(form, dados, hoje);
 
-  const usarCronogramaModelo = () => {
-    const l = cronogramaModelo(form.inicio);
-    if (!l.length) { toast('Modelo indisponível.'); return; }
-    setForm(f => ({ ...f, atividades: l }));
-    toast('Cronograma padrão Systech aplicado a partir do início informado. Ajuste o que for preciso.');
+  // modelos de projeto: o padrão Systech + os salvos (lista Portal Modelos)
+  const [modelos, setModelos] = useState<ModeloProjeto[]>([modeloPadrao()]);
+  useEffect(() => { fonte.modelos?.().then(l => { if (l?.length) setModelos([modeloPadrao(), ...l]); }).catch(() => undefined); }, [fonte]);
+  const aplicarModelo = (m: ModeloProjeto) => {
+    if (!form.inicio) { toast('Informe o início previsto do projeto (etapa 1) antes de aplicar o modelo.'); return; }
+    const preenchidas = form.atividades.filter(a => a.nome.trim()).length;
+    if (preenchidas && !window.confirm(`Aplicar o modelo “${m.nome}” substitui as ${preenchidas} atividade(s) já preenchidas. Continuar?`)) return;
+    const linha = (it: ItemModelo) => ({ codigo: it.codigo, nome: it.nome, fase: it.fase, equipe: it.equipe, ...datasDoItem(it, form.inicio), marco: !!it.marco,
+      horasPlanejadas: it.horasPlanejadas, predecessoras: it.predecessoras, descricao: it.descricao });
+    const principais = m.itens.filter(i => !i.pai).map(linha);
+    const tarefas = m.itens.filter(i => i.pai).map(i => ({ ...linha(i), pai: i.pai! }));
+    const fim = [...principais, ...tarefas].map(x => x.termino).sort().pop() || form.termino;
+    setForm(f => ({ ...f, atividades: principais, tarefasModelo: tarefas, termino: !f.termino || f.termino < fim ? fim : f.termino }));
+    toast(`Modelo “${m.nome}” aplicado: ${principais.length} atividade(s)${tarefas.length ? ` e ${tarefas.length} tarefa(s)` : ''} a partir de ${form.inicio.split('-').reverse().join('/')}.`);
   };
 
   // quem cria o projeto (PMO) já o cria aprovado: não precisa do patrocinador
@@ -99,7 +109,7 @@ export function NovoProjetoPage() {
           <EditorEquipe equipe={form.equipe} aoMudar={e => setForm(f => ({ ...f, equipe: e }))} />
         </>}
         {passo === 1 && <PassoEscopo form={form} mudar={mudar} />}
-        {passo === 2 && <PassoCronograma linhas={form.atividades} aoMudar={l => setForm(f => ({ ...f, atividades: l }))} aoUsarModelo={usarCronogramaModelo} />}
+        {passo === 2 && <PassoCronograma linhas={form.atividades} aoMudar={l => setForm(f => ({ ...f, atividades: l }))} modelos={modelos} tipo={form.tipo} tarefasDoModelo={(form.tarefasModelo || []).filter(t => form.atividades.some(a => a.codigo === t.pai)).length} aoAplicarModelo={aplicarModelo} />}
         {passo === 3 && <PassoRiscos linhas={form.riscos} aoMudar={l => setForm(f => ({ ...f, riscos: l }))} aoUsarModelo={() => setForm(f => ({ ...f, riscos: riscosModelo() }))} />}
         {erro && <Mensagem tipo="erro">{erro}</Mensagem>}
         <div className="linha" style={{ borderTop: '1px solid var(--borda2)', paddingTop: 16 }}>

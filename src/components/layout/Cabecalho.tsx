@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
+import { Sino } from './Sino';
 import { usePortal } from '../../state/PortalContext';
 import { useToast } from '../../state/ToastContext';
 import { config } from '../../config/config';
@@ -39,6 +40,7 @@ export function Cabecalho() {
           {(papel === 'PMO' || papel === 'Patrocinador') && <NavLink to="/financeiro" className={classe}>Financeiro</NavLink>}
         </nav>
         {config.dataSimulada && <span className="dataSimulada" title="config.js: dataSimulada">Data simulada · {config.dataSimulada.split('-').reverse().join('/')}</span>}
+        {papel !== 'Cliente' && <Sino />}
         <MenuUsuario nome={piloto ? 'Modo piloto' : usuario} piloto={piloto} papel={papel} disponiveis={disponiveis}
           status={piloto ? 'Modo piloto · sem conexão' : sincronizando ? 'SharePoint · atualizando…' : `SharePoint · atualizado às ${atualizadoEm}`}
           sincronizando={sincronizando}

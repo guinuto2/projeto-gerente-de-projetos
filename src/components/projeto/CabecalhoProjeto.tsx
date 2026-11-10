@@ -1,14 +1,21 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ExcluirProjeto } from './ExcluirProjeto';
+import { StatusReport } from './StatusReport';
+import { SalvarModelo } from './SalvarModelo';
 import type { Projeto } from '../../types/models';
 import { usePapel } from '../../state/PapelContext';
+import { usePortal } from '../../state/PortalContext';
 import { desvio } from '../../lib/calculos';
 import { SELO_FAROL, REGRA_FATURAMENTO } from '../../lib/constantes';
 import { dma } from '../../lib/datas';
 
 export function CabecalhoProjeto({ projeto: p }: { projeto: Projeto }) {
   const { pode, papel } = usePapel();
+  const { dados } = usePortal();
+  const [statusReport, setStatusReport] = useState(false);
+  const [salvandoModelo, setSalvandoModelo] = useState(false);
+  const podeSalvarModelo = pode('gerenciarAtividades') && (dados.atividades[p.codigo] || []).some(a => a.inicio && a.termino);
   const [excluir, setExcluir] = useState(false);
   const [fundo, texto] = SELO_FAROL[p.farol] || SELO_FAROL.Verde;
   const dv = desvio(p);
@@ -29,10 +36,12 @@ export function CabecalhoProjeto({ projeto: p }: { projeto: Projeto }) {
         </div>
         <h1 className="ptit">{p.codigo} · {p.nome}</h1>
         {p.objetivo && <p className="pdesc">{p.objetivo}</p>}
-        {(pode('editarProjeto') || pode('excluirProjeto')) && (
+        {(pode('editarProjeto') || pode('excluirProjeto') || papel === 'Patrocinador' || podeSalvarModelo) && (
           <div className="cabAcoes">
             {pode('editarProjeto') && <Link className="btn pq" to={`/editar/${encodeURIComponent(p.codigo)}`}>Editar projeto</Link>}
             {pode('excluirProjeto') && <button type="button" className="btn pq perigo" onClick={() => setExcluir(true)}>Excluir projeto</button>}
+            {(papel === 'PMO' || papel === 'Patrocinador') && p.situacaoCadastro !== 'Rascunho' && <button type="button" className="btn pq" onClick={() => setStatusReport(true)}>Status report</button>}
+            {podeSalvarModelo && <button type="button" className="btn pq" onClick={() => setSalvandoModelo(true)} title="Guardar este cronograma para usar em novos projetos">Salvar modelo</button>}
           </div>
         )}
         {excluir && <ExcluirProjeto projeto={p} aoFechar={() => setExcluir(false)} />}
@@ -49,6 +58,8 @@ export function CabecalhoProjeto({ projeto: p }: { projeto: Projeto }) {
         {p.parceiro && <div className="fichaRegra"><div className="r">Parceiro (terceirização)</div><div className="v modeloFat">{p.parceiro}</div></div>}
         </>}
       </div>
+      {statusReport && <StatusReport projeto={p} aoFechar={() => setStatusReport(false)} />}
+      {salvandoModelo && <SalvarModelo projeto={p} aoFechar={() => setSalvandoModelo(false)} />}
     </section>
   );
 }

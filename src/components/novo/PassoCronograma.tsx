@@ -1,10 +1,17 @@
+import { useState } from 'react';
 import type { Fase } from '../../types/models';
+import type { ModeloProjeto } from '../../lib/modelos';
 import { FASES } from '../../lib/constantes';
 import { novaAtividade, renumerar, type LinhaAtividade } from './formulario';
 
-interface Props { linhas: LinhaAtividade[]; aoMudar: (l: LinhaAtividade[]) => void; aoUsarModelo: () => void; dataMinima?: string }
+interface Props { linhas: LinhaAtividade[]; aoMudar: (l: LinhaAtividade[]) => void; dataMinima?: string;
+  /** modelos disponíveis (os do tipo do projeto primeiro) e quantas tarefas do modelo aplicado serão criadas */
+  modelos: ModeloProjeto[]; tipo: string; tarefasDoModelo: number; aoAplicarModelo: (m: ModeloProjeto) => void }
 
-export function PassoCronograma({ linhas, aoMudar, aoUsarModelo, dataMinima }: Props) {
+export function PassoCronograma({ linhas, aoMudar, dataMinima, modelos, tipo, tarefasDoModelo, aoAplicarModelo }: Props) {
+  const ordenados = [...modelos].sort((a, b) => Number(b.tipo === tipo) - Number(a.tipo === tipo) || Number(!!b.padrao) - Number(!!a.padrao) || a.nome.localeCompare(b.nome, 'pt-BR'));
+  const [escolhido, setEscolhido] = useState('');
+  const atual = ordenados.find(m => m.id === (escolhido || ordenados[0]?.id));
   const mudar = <K extends keyof LinhaAtividade>(i: number, c: K, v: LinhaAtividade[K]) => {
     const novas = linhas.map((l, k) => (k === i ? { ...l, [c]: v } : l));
     aoMudar(c === 'fase' ? renumerar(novas) : novas);   // o código acompanha a fase
@@ -13,8 +20,17 @@ export function PassoCronograma({ linhas, aoMudar, aoUsarModelo, dataMinima }: P
     <>
       <div className="linha">
         <p className="sub">Liste as atividades macro. As datas informadas viram a baseline do projeto. Marque como marco as entregas que exigem aceite do cliente.</p>
-        <button type="button" className="btn pq" onClick={aoUsarModelo}>Usar cronograma padrão Systech</button>
       </div>
+      <div className="modeloEscolha">
+        <label className="campo">Modelo de cronograma
+          <select className="ctl" value={atual?.id || ''} onChange={e => setEscolhido(e.target.value)}>
+            {ordenados.map(m => <option key={m.id} value={m.id}>{m.nome}{m.tipo ? ` · ${m.tipo}` : ''}{m.tipo && m.tipo !== tipo ? ' (outro tipo)' : ''}</option>)}
+          </select>
+          {atual && <span className="dica">{atual.descricao || 'Sem descrição.'} · {atual.itens.filter(i => !i.pai).length} atividade(s){atual.itens.some(i => i.pai) ? ` e ${atual.itens.filter(i => i.pai).length} tarefa(s)` : ''}.</span>}
+        </label>
+        <button type="button" className="btn pq pri" disabled={!atual} onClick={() => atual && aoAplicarModelo(atual)}>Aplicar modelo</button>
+      </div>
+      {tarefasDoModelo > 0 && <p className="sub" style={{ fontSize: 12.5 }}>O modelo aplicado também traz <b>{tarefasDoModelo} tarefa(s)</b>, criadas junto com o projeto em preparação (lance para os técnicos depois).</p>}
       <div className="twrap">
         <table className="tbl ftbl">
           <thead><tr><th>Cód.</th><th>Atividade *</th><th>Fase</th><th>Equipe</th><th>Início *</th><th>Término *</th><th>Marco</th><th /></tr></thead>

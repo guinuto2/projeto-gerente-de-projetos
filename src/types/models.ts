@@ -50,6 +50,8 @@ export interface Projeto {
   modeloFaturamento?: string;
   /** empresa parceira, quando o trabalho é terceirizado (vazio = execução própria) */
   parceiro?: string;
+  /** data do último status report enviado (ISO) */
+  ultimoStatusReport?: string;
   /** quem cadastrou o projeto (e-mail ou nome) */
   criadoPor?: string;
   inicio: string;
@@ -194,3 +196,17 @@ export interface Dados {
 }
 
 export interface NovoProjeto { projeto: Projeto; atividades: Atividade[]; riscos: Risco[] }
+
+/** Aviso dentro do portal (sino no topo). */
+export interface Notificacao {
+  id: string;
+  /** e-mail de quem recebe */
+  para: string;
+  titulo: string;
+  texto: string;
+  /** rota do portal para abrir ao clicar (ex.: /projeto/TRF1-VCF) */
+  link: string;
+  tipo: string;
+  quando: string;
+  lida: boolean;
+}

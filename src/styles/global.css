@@ -294,7 +294,7 @@ textarea.ctl { height: auto; min-height: 96px; padding: 10px; resize: vertical; 
 .checklist li { padding: 6px 0; border-top: 1px solid var(--borda2); display: flex; gap: 8px; justify-content: space-between; }
 .checar { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; font-weight: 500; cursor: pointer; }
 .checar input { margin-top: 3px; }
-.cabAcoes { display: flex; gap: 8px; margin-top: 4px; }
+.cabAcoes { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
 .gbtn { background: none; border: 0; padding: 4px; cursor: pointer; display: flex; border-radius: 6px; }
 .gbtn:hover .los { filter: brightness(1.1); }
 
@@ -398,6 +398,8 @@ textarea.ctl { height: auto; min-height: 96px; padding: 10px; resize: vertical; 
 .atvNome { font-size: 14px; font-weight: 600; margin-top: 2px; }
 .atvNota { font-size: 12px; color: var(--suave); margin-top: 2px; }
 .formAtual { flex: 1 1 auto; min-width: 0; padding: 24px 28px; display: flex; flex-direction: column; gap: 20px; }
+/* Botão de atualização abaixo dos detalhes, no canto inferior direito (PMO e Técnico). */
+.atvAcaoStatus { display: flex; justify-content: flex-end; margin-top: auto; }
 .ctl.alertaData { border-color: #D69E2E; background: #FFFBF0; }
 @media (max-width: 1180px) { .atvLista { width: auto; } }
 
@@ -921,3 +923,33 @@ textarea.ctl { height: auto; min-height: 96px; padding: 10px; resize: vertical; 
 textarea.ctl.wikiTextarea { min-height: max(640px, calc(100vh - 300px)); height: auto; font-size: 13.5px; }
 .wikiConteudo .wikiPrevia { min-height: max(640px, calc(100vh - 300px)); }
 @media (max-width: 760px) { textarea.ctl.wikiTextarea, .wikiConteudo .wikiPrevia { min-height: 60vh; } }
+
+/* v4.5: sino de avisos */
+.sino { position: relative; flex-shrink: 0; order: 2; }
+.sinoBtn { position: relative; width: 38px; height: 38px; display: grid; place-items: center; border-radius: 50%; border: 1px solid rgba(255, 255, 255, .22); background: transparent; color: #fff; cursor: pointer; }
+.sinoBtn:hover { background: rgba(255, 255, 255, .08); }
+.sinoN { position: absolute; top: -4px; right: -4px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 99px; background: #D33A2C; color: #fff; font-size: 10.5px; font-weight: 800; display: grid; place-items: center; border: 2px solid #000; }
+.sinoCaixa { position: absolute; right: 0; top: calc(100% + 8px); width: min(380px, 92vw); max-height: 70vh; display: flex; flex-direction: column; background: var(--superficie); color: var(--texto); border: 1px solid var(--borda); border-radius: 12px; box-shadow: 0 16px 40px rgba(0, 0, 0, .22); z-index: 40; overflow: hidden; }
+.sinoTopo { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--borda); font-size: 14px; }
+.sinoTopo .linkBtn { font-size: 12px; }
+.sinoLista { overflow: auto; }
+.sinoItem { display: flex; gap: 10px; width: 100%; padding: 11px 16px; border: 0; border-bottom: 1px solid var(--borda2); background: none; text-align: left; font: inherit; color: var(--texto); cursor: pointer; }
+.sinoItem:hover { background: var(--cinza); }
+.sinoItem.nova { background: var(--vinhoClaro); }
+.sinoItem.nova:hover { background: #F3DFE0; }
+:root[data-theme="dark"] .sinoItem.nova:hover { background: #3A2326; }
+.sinoIco { font-size: 16px; line-height: 1.3; }
+.sinoTxt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.sinoTit { font-size: 13px; font-weight: 700; }
+.sinoDesc { font-size: 12.5px; color: var(--medio); line-height: 1.4; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.sinoQuando { font-size: 11px; color: var(--suave); }
+@media (max-width: 760px) { .sino { order: 2; } .menuBtn { order: 3; } .menuUsuario { order: 4; } }
+
+/* v4.5: modelos de projeto no cadastro */
+.modeloEscolha { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; margin: 6px 0 12px; }
+.modeloEscolha .campo { flex: 1 1 360px; }
+.modeloEscolha .btn { margin-bottom: 22px; }
+
+/* v4.5: status report */
+.statusReportModal { width: min(860px, 96vw); max-height: 92vh; display: flex; flex-direction: column; gap: 8px; }
+.statusReportPrevia { width: 100%; height: min(60vh, 640px); border: 1px solid var(--borda); border-radius: 10px; background: #fff; }

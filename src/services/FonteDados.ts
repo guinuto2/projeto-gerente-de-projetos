@@ -31,6 +31,24 @@ export interface FonteDados {
   historico(cod: string): Promise<RegistroHistorico[]>;
   /** e-mails das pessoas que já têm acesso ao site no SharePoint (lista oculta "User Information List"); null se não der para ler */
   usuariosDoSite?(): Promise<Set<string> | null>;
+  /** avisos do sino para um e-mail (mais recentes primeiro); null se a lista "Portal Notificacoes" não existe */
+  notificacoes?(email: string): Promise<import('../types/models').Notificacao[] | null>;
+  /** cria avisos (um por destinatário) */
+  criarNotificacoes?(itens: Omit<import('../types/models').Notificacao, 'id' | 'quando' | 'lida'>[]): Promise<void>;
+  /** marca avisos como lidos */
+  marcarNotificacoesLidas?(ids: string[]): Promise<void>;
+  /** modelos de projeto salvos (null se a lista "Portal Modelos" não existe) */
+  modelos?(): Promise<import('../lib/modelos').ModeloProjeto[] | null>;
+  /** grava (cria ou substitui) um modelo de projeto */
+  salvarModelo?(m: import('../lib/modelos').ModeloProjeto): Promise<void>;
+  /** exclui um modelo de projeto */
+  excluirModelo?(id: string): Promise<void>;
+  /** publica, na pasta de cada órgão da biblioteca "Portal Clientes", a cópia dos projetos que o cliente pode ver; devolve quantos mudaram */
+  publicarParaClientes?(d: import('../types/models').Dados): Promise<number>;
+  /** cliente: lê só a pasta do órgão dele na biblioteca "Portal Clientes" (sem acesso às listas do site) */
+  carregarCliente?(): Promise<import('../types/models').Dados>;
+  /** true quando quem está logado é um cliente (de fora da Systech) lendo só a pasta do órgão */
+  modoCliente?: boolean;
   /** documentos da Wiki editados pelos técnicos (null se a lista "Portal Wiki" ainda não existe) */
   wikiDocs?(): Promise<import('../lib/wiki').ModeloSalvo[] | null>;
   /** grava (cria ou substitui) um documento da Wiki */
