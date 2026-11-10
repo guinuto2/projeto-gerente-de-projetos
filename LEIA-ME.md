@@ -1,4 +1,24 @@
-# Central Systech — v4.4 (React)
+# Central Systech — v4.7 (React)
+
+**v4.7:** Wiki — wiki.ts da equipe: SPEC RATE 2017 nos servidores Dell, Lenovo, HPE e xFusion; Omnissa reorganizada (Portais Omnissa, Suporte e ferramentas, Certificações e treinamentos); Processadores sem links.
+
+**v4.6:** Wiki — HPE ganha o grupo "SPEC RATE 2017" (DL325); Processadores ganha o grupo "SPEC CPU 2017" (SPECrate e SPECspeed 2017 Integer e busca de resultados).
+
+**v4.5**
+- Notificações: sino no cabeçalho com os avisos de cada pessoa (tarefa lançada, gate e cadastro para aprovar, atrasos,
+  reprogramação, status de tarefa, gate aprovado, projeto criado). Lista "Portal Notificacoes".
+- Modelos de projeto: "Salvar como modelo" no cronograma (atividades e tarefas com datas relativas, horas, marcos e
+  pré-requisitos); no cadastro, "Modelo de cronograma" (os do mesmo tipo primeiro) + "Aplicar modelo"; as tarefas do modelo
+  nascem em preparação. Lista "Portal Modelos"; o padrão Systech continua disponível.
+- Status report: botão no cabeçalho do projeto (PMO e patrocinador) com prévia, versão interna × do cliente, imprimir/PDF e
+  "Enviar agora"; envio automático semanal (config.js: statusReportAutomatico, statusReportDia). Coluna UltimoStatusReport.
+- Dados por cliente: biblioteca "Portal Clientes" com uma pasta por órgão (domínio de e-mail) e permissão só para aquele órgão.
+  O portal da equipe publica nela uma cópia só com o que o cliente pode ver; o cliente (e-mail de fora da Systech) lê só a pasta
+  dele, sem acesso às listas. Liberar um órgão:
+  .\provisionar-portal.ps1 -SiteUrl ... -ClientId ... -Cliente trf1.jus.br -UsuariosCliente "fiscal@trf1.jus.br,gestor@trf1.jus.br"
+  e depois tirar as pessoas do cliente das permissões do site.
+- Corrigido: criar uma tarefa já lançada para o técnico agora avisa o técnico (sino e e-mail).
+
 
 **v4.4:** Wiki — a caixa de texto do documento já abre grande (quase a altura da tela, mínimo de 640 px; 60% da tela no celular).
 

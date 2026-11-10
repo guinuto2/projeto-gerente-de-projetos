@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import type { Arquivo, Atividade, Dados, Gate, NovaReuniao, NovoProjeto, Pendencia, Projeto, RegistroHistorico, Risco, Tecnico } from '../types/models';
+import type { Arquivo, Atividade, Dados, Gate, NovaReuniao, NovoProjeto, Notificacao, Pendencia, Projeto, RegistroHistorico, Risco, Tecnico } from '../types/models';
 import { PROXIMA_FASE } from '../lib/constantes';
 import { diasUteis } from '../lib/datas';
 import type { FonteDados } from '../services/FonteDados';
@@ -12,6 +12,8 @@ import { gatesFaltantes } from '../lib/gates';
 import { descrever } from '../lib/historico';
 import { iniciaria, pendentes } from '../lib/dependencias';
 import { usePapel } from './PapelContext';
+import { DOMINIOS_SYSTECH, dominioDe } from '../lib/publicacaoCliente';
+import { emailsDoCliente, inicioDaSemana, montarStatusReport } from '../lib/statusReport';
 import { lancadaParaTecnico } from '../lib/dependencias';
 import { ConflitoEdicao } from '../services/FonteSharePoint';
 import { CAMPOS_STATUS, checklistGate, conferirDatas, conferirStatus, riscoAltoSemMitigacao } from '../lib/validacoes';
@@ -59,6 +61,11 @@ interface PortalValor {
   lancarTarefas(cod: string, codigos: string[]): Promise<void>;
   /** pessoas para o cadastro (lista Portal Tecnicos), com o perfil de cada uma pela função */
   pessoasApp: PessoaApp[];
+  /** envia agora o status report do projeto (versão interna e versão do cliente); devolve os destinatários */
+  enviarStatusReport(cod: string): Promise<string[]>;
+  /** avisos do sino de quem está logado (mais recentes primeiro) */
+  notificacoes: Notificacao[];
+  marcarNotificacoesLidas(ids: string[]): Promise<void>;
   criarRisco(cod: string, r: Risco): Promise<void>;
   excluirRisco(cod: string, codigo: string): Promise<void>;
   criarPendencia(cod: string, x: Pendencia): Promise<void>;
@@ -205,9 +212,23 @@ async function reunioesRemarcadas(fonte: FonteDados, d: Dados): Promise<{ cod: s
   return mudancas;
 }
 
+/**
+ * Avisos do sino: um por destinatário (e-mails separados por vírgula), sem avisar quem fez a ação.
+ * Não usa o redirecionamento de teste dos e-mails: o aviso vai para quem deve recebê-lo.
+ */
+function notificar(fonte: FonteDados, para: string, n: { titulo: string; texto: string; link: string; tipo: string }) {
+  if (!fonte.criarNotificacoes) return;
+  const eu = (fonte.modo === 'sharepoint' ? fonte.email() : '').toLowerCase();
+  const emails = Array.from(new Set((para || '').split(/[,;]\s*/).map(e => e.trim().toLowerCase()).filter(e => e.includes('@') && e !== eu)));
+  if (fonte.modo === 'piloto') emails.splice(0, emails.length, '*');   // piloto: aparece para quem estiver testando
+  if (!emails.length) return;
+  fonte.criarNotificacoes(emails.map(e => ({ ...n, para: e }))).then(() => window.dispatchEvent(new Event('portal-notificacoes'))).catch(() => undefined);
+}
+
 /** Status de subatividade mudou: e-mail ao PMO (gerente do projeto), sem travar a gravação. */
 function avisarStatusSubatividade(fonte: FonteDados, p: Projeto | undefined, a: Atividade | undefined, campos: Partial<Atividade>, autor: string, aviso: (m: string) => void) {
   if (!p || !a || !a.pai || !campos.status || campos.status === a.status) return;
+  notificar(fonte, pmosDe(p), { titulo: `${a.codigo} · ${a.nome}: ${campos.status}`, texto: `${autor} mudou o status da tarefa de “${a.status}” para “${campos.status}” · ${p.codigo}.`, link: `/projeto/${encodeURIComponent(p.codigo)}`, tipo: 'status' });
   if (!config.emailAoMudarStatusSubatividade || !fonte.enviarEmail) return;
   const para = destinatarios(pmosDe(p));
   if (!para) return;
@@ -237,12 +258,14 @@ async function verificarAtrasos(fonte: FonteDados, d: Dados): Promise<{ cod: str
     try {
       const { assunto, html } = emailAtrasos(p, itens);
       await fonte.enviarEmail(assunto, html, para);
+      notificar(fonte, pmosDe(p), { titulo: `${itens.length} atividade(s) atrasada(s) · ${p.codigo}`, texto: itens.slice(0, 3).map(x => `${x.a.codigo} ${x.a.nome}`).join(' · ') + (itens.length > 3 ? ' …' : ''), link: `/projeto/${encodeURIComponent(p.codigo)}`, tipo: 'atraso' });
       // cada técnico recebe só as tarefas atrasadas dele
       const porTecnico = new Map<string, typeof itens>();
       for (const it of itens) if (it.a.responsavel && lancadaParaTecnico(it.a)) porTecnico.set(it.a.responsavel.toLowerCase(), [...(porTecnico.get(it.a.responsavel.toLowerCase()) || []), it]);
       for (const [email, dele] of porTecnico) {
         const paraTec = destinatarios(email);
         if (!paraTec || para.toLowerCase().split(/[,;]\s*/).includes(email)) continue;   // o PMO já recebeu a lista completa
+        notificar(fonte, email, { titulo: `Você tem ${dele.length} tarefa(s) atrasada(s) · ${p.codigo}`, texto: dele.map(x => x.a.nome).join(' · '), link: '/atualizar', tipo: 'atraso' });
         try { const m = emailAtrasos(p, dele, true); await fonte.enviarEmail(m.assunto, m.html, paraTec); } catch { /* o aviso do técnico falhou: o do PMO foi */ }
       }
       for (const a of novos) {
@@ -252,6 +275,33 @@ async function verificarAtrasos(fonte: FonteDados, d: Dados): Promise<{ cod: str
     } catch { /* e-mail falhou: tenta amanhã */ try { localStorage.removeItem(chave); } catch { /* */ } }
   }
   return marcados;
+}
+
+/**
+ * Status report: versão interna ao GP e ao patrocinador; versão do cliente às pessoas do cliente na equipe.
+ * Devolve quem recebeu. Grava no projeto a data do envio.
+ */
+async function enviarStatusReport(fonte: FonteDados, d: Dados, p: Projeto): Promise<string[]> {
+  if (!fonte.enviarEmail) throw new Error('no modo piloto o e-mail não é enviado');
+  const hoje = fonte.hoje(), enviados: string[] = [];
+  const interno = destinatarios(pmosDe(p), patrocinadoresDe(p));
+  if (interno) { const r = montarStatusReport(p, d, hoje, 'equipe'); await fonte.enviarEmail(r.assunto, r.html, interno); enviados.push(interno); }
+  const cliente = destinatarios(emailsDoCliente(p));
+  if (cliente) { const r = montarStatusReport(p, d, hoje, 'cliente'); await fonte.enviarEmail(r.assunto, r.html, cliente); enviados.push(cliente); }
+  if (!enviados.length) throw new Error('o projeto não tem gerente, patrocinador nem pessoas do cliente com e-mail');
+  await fonte.salvarProjeto(p, { ultimoStatusReport: hoje }).catch(() => undefined);
+  return enviados;
+}
+/** Envio semanal automático: no dia configurado (ou depois, na mesma semana), para os projetos que ainda não receberam. */
+async function statusReportsDaSemana(fonte: FonteDados, d: Dados): Promise<{ cod: string; data: string }[]> {
+  if (!config.statusReportAutomatico || !fonte.enviarEmail || fonte.modo !== 'sharepoint') return [];
+  const hoje = fonte.hoje(), dia = new Date(`${hoje}T12:00:00`).getDay();
+  if (dia === 0 || dia === 6 || dia < (config.statusReportDia || 5)) return [];
+  const segunda = inicioDaSemana(hoje), feitos: { cod: string; data: string }[] = [];
+  for (const p of d.projetos.filter(x => x.situacaoCadastro === 'Ativo' && (!x.ultimoStatusReport || x.ultimoStatusReport < segunda))) {
+    try { await enviarStatusReport(fonte, d, p); feitos.push({ cod: p.codigo, data: hoje }); } catch { /* sem destinatários ou falha: tenta no próximo acesso */ }
+  }
+  return feitos;
 }
 
 /** Recalcula o % da atividade principal (proporção das subatividades concluídas) e grava se mudou. */
@@ -334,6 +384,24 @@ export function PortalProvider({ children }: { children: ReactNode }) {
   useEffect(() => { pessoasAtuais = dados?.tecnicos || []; }, [dados?.tecnicos]);
   /** pessoas para o cadastro de projetos: lista Portal Tecnicos, pela função (Técnico/Arquiteto, PMO/Gerente de projeto, Patrocinador) */
   const pessoasApp = useMemo<PessoaApp[]>(() => pessoasDaLista(dados?.tecnicos || []), [dados?.tecnicos]);
+  /** cópia dos projetos para a pasta de cada órgão (biblioteca Portal Clientes): republica alguns segundos depois de cada mudança */
+  const interno = useRef(false);
+  useEffect(() => {
+    if (!fonte || !dados || fonte.modo !== 'sharepoint' || fonte.modoCliente || !interno.current || !fonte.publicarParaClientes) return;
+    const t = window.setTimeout(() => { fonte.publicarParaClientes!(dados).catch(() => undefined); }, 8000);
+    return () => window.clearTimeout(t);
+  }, [fonte, dados]);
+  /** avisos do sino: lidos ao abrir, a cada minuto e logo depois de um aviso criado neste navegador */
+  const [notificacoes, setNotificacoes] = useState<Notificacao[]>([]);
+  useEffect(() => {
+    if (!fonte || !dados || !fonte.notificacoes || fonte.modoCliente) return;   // cliente não tem sino nem acesso às listas
+    const ler = () => { fonte.notificacoes!(fonte.modo === 'sharepoint' ? fonte.email() : '').then(l => { if (l) setNotificacoes(l); }).catch(() => undefined); };
+    ler();
+    const t = window.setInterval(ler, 60000);
+    const ev = () => window.setTimeout(ler, 600);
+    window.addEventListener('portal-notificacoes', ev);
+    return () => { window.clearInterval(t); window.removeEventListener('portal-notificacoes', ev); };
+  }, [fonte, !!dados]); // eslint-disable-line react-hooks/exhaustive-deps
   /** situação da gravação do histórico */
   const [statusHistorico, setStatusHistorico] = useState<{ pendentes: number; erro: string }>({ pendentes: lerPendentes().length, erro: '' });
   const erroAvisado = useRef('');
@@ -389,6 +457,14 @@ export function PortalProvider({ children }: { children: ReactNode }) {
         definirDisponiveis(meus);
         // sem nenhuma função do portal: para aqui (não carrega dados nem roda avisos automáticos)
         if (!meus.length) { if (vivo) { setFonte(f); setUsuario(nome); } return; }
+        // cliente de fora da Systech: lê só a pasta do órgão dele (biblioteca Portal Clientes), sem acesso às listas
+        if (f.modo === 'sharepoint' && f.carregarCliente && meus.every(x => x === 'Cliente') && !DOMINIOS_SYSTECH.includes(dominioDe(f.email()))) {
+          const dc = await f.carregarCliente();
+          if (!vivo) return;
+          setFonte(f); setUsuario(nome); setDados(dc); assinatura.current = assinar(dc); ultimaSync.current = Date.now(); setAtualizadoEm(horaAgora());
+          return;
+        }
+        interno.current = meus.some(x => x === 'PMO' || x === 'Técnico');
         const d = await garantirGates(f, await f.carregar());
         if (!vivo) return;
         setFonte(f);
@@ -399,6 +475,11 @@ export function PortalProvider({ children }: { children: ReactNode }) {
         setAtualizadoEm(horaAgora());
         aplicarRemarcadas(f, d);
         if (f.modo === 'sharepoint') reenviarPendentes(f);
+        if (meus.includes('PMO')) statusReportsDaSemana(f, d).then(r => {
+          if (!r.length) return;
+          setDados(prev => (prev ? { ...prev, projetos: prev.projetos.map(x => { const e = r.find(y => y.cod === x.codigo); return e ? { ...x, ultimoStatusReport: e.data } : x; }) } : prev));
+          toast(`Status report semanal enviado de ${r.length} projeto(s).`);
+        });
         verificarAtrasos(f, d).then(m => {
           if (!m.length) return;
           setDados(prev => { if (!prev) return prev; let n = prev; for (const x of m) n = comItem<Atividade>(n, 'atividades', x.cod, x.codigo, x.campos); assinatura.current = assinar(n); return n; });
@@ -438,7 +519,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
     emSync.current = true;
     setSincronizando(true);
     try {
-      const novo = await garantirGates(fonte, await fonte.carregar());
+      const novo = fonte.modoCliente && fonte.carregarCliente ? await fonte.carregarCliente() : await garantirGates(fonte, await fonte.carregar());
       const nova = assinar(novo), mudou = nova !== assinatura.current;
       ultimaSync.current = Date.now();
       setAtualizadoEm(horaAgora());
@@ -603,6 +684,16 @@ export function PortalProvider({ children }: { children: ReactNode }) {
         if (dt.avisos.length) avisarDepois(dt.avisos);
         const criada = await fonte.criarAtividade(p, completa);
         const lista = [...(dados.atividades[cod] || []), criada];
+        // tarefa que já nasce lançada para o técnico (criada pelo PMO): avisa o técnico no sino e por e-mail
+        if (criada.pai && atv.lancada === true && atv.responsavel) {
+          notificar(fonte, atv.responsavel, { titulo: `1 tarefa nova para você · ${p.codigo}`, texto: criada.nome, link: '/atualizar', tipo: 'tarefa' });
+          const para = config.emailAoLancarTarefa && fonte.enviarEmail ? destinatarios(atv.responsavel) : '';
+          if (para && fonte.enviarEmail && atv.responsavel.toLowerCase() !== (fonte.modo === 'sharepoint' ? fonte.email().toLowerCase() : '')) {
+            const nome = p.equipe.find(m => m.email.toLowerCase() === atv.responsavel!.toLowerCase())?.nome || atv.responsavel;
+            const { assunto, html } = emailTarefasLancadas(p, nome, [criada], usuario);
+            fonte.enviarEmail(assunto, html, para).catch(() => undefined);
+          }
+        }
         let novo: Dados = { ...dados, atividades: { ...dados.atividades, [cod]: lista } };
         if (criada.pai) {
           const doPai = await recalcularPrincipal(fonte, lista, cod, criada.pai);
@@ -638,6 +729,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
           if (g1) await fonte.salvarGate(p, g1, { situacao: 'Aguardando aprovação' });
           aplicar({ ...dados, projetos: dados.projetos.map(x => x.codigo !== cod ? x : {
             ...x, situacaoCadastro: 'Em aprovação', fases: x.fases.map(g => (g.gate === 'G1' ? { ...g, situacao: 'Aguardando aprovação' } : g)) }) });
+          notificar(fonte, pmosDe(), { titulo: `Cadastro para aprovar · ${p.codigo}`, texto: `${usuario} enviou o projeto “${p.nome}” para aprovação (G1).`, link: `/projeto/${encodeURIComponent(cod)}`, tipo: 'aprovacao' });
           if (config.emailAoSolicitarAprovacao && fonte.enviarEmail && pmosDe()) {
             const { assunto, html } = emailSolicitacaoProjeto({ ...novoProj, projeto: { ...p, situacaoCadastro: 'Em aprovação' } }, usuario);
             fonte.enviarEmail(assunto, html, destinatarios(pmosDe())).catch(() => undefined);
@@ -649,6 +741,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
         if (g1) await fonte.salvarGate(p, g1, aprov);
         aplicar({ ...dados, projetos: dados.projetos.map(x => x.codigo !== cod ? x : {
           ...x, situacaoCadastro: 'Ativo', fase: 'Planejamento', fases: x.fases.map(g => (g.gate === 'G1' ? { ...g, ...aprov } : g)) }) });
+        notificar(fonte, [pmosDe(p), patrocinadoresDe(p), ...p.equipe.map(m => m.email)].filter(Boolean).join(', '), { titulo: `Projeto aprovado · ${p.codigo}`, texto: `${usuario} aprovou o cadastro de “${p.nome}”. O projeto está ativo, na fase Planejamento.`, link: `/projeto/${encodeURIComponent(cod)}`, tipo: 'aprovacao' });
         if (config.emailAoCriarProjeto && fonte.enviarEmail) {
           const { assunto, html } = emailProjetoCriadoPeloPmo({ ...novoProj, projeto: { ...p, situacaoCadastro: 'Ativo', fase: 'Planejamento' } }, usuario);
           fonte.enviarEmail(assunto, html, destinatarios(pmosDe(p), patrocinadoresDe(p)) || undefined).catch(() => undefined);
@@ -679,6 +772,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
         // reprogramação: nova data prevista depois da baseline (e diferente da que já estava)
         const nova = campos.termino;
         if (!nova || !a.baselineTermino || nova <= a.baselineTermino || nova === a.termino) return '';
+        notificar(fonte, pmosDe(projeto(cod)), { titulo: `Reprogramação · ${cod} · ${a.codigo}`, texto: `${usuario} mudou a data prevista de “${a.nome}” para ${nova.split('-').reverse().join('/')} (baseline ${a.baselineTermino.split('-').reverse().join('/')}).`, link: `/atualizar?item=${encodeURIComponent(`${cod}|${a.codigo}`)}`, tipo: 'reprogramacao' });
         if (!config.emailAoReprogramar || !fonte.enviarEmail) return '';
         const p = projeto(cod), para = destinatarios(pmosDe(p));
         if (!para) return '';
@@ -695,6 +789,12 @@ export function PortalProvider({ children }: { children: ReactNode }) {
         for (const a of alvo) { await fonte.salvarAtividade(cod, a, { lancada: true }); novo = comItem<Atividade>(novo, 'atividades', cod, a.codigo, { lancada: true }); }
         aplicar(novo);
         // um e-mail por técnico com as tarefas dele
+        {
+          const porTec = new Map<string, Atividade[]>();
+          for (const a of alvo) porTec.set(a.responsavel!.toLowerCase(), [...(porTec.get(a.responsavel!.toLowerCase()) || []), a]);
+          for (const [email, tarefas] of porTec)
+            notificar(fonte, email, { titulo: `${tarefas.length} tarefa(s) nova(s) para você · ${p.codigo}`, texto: tarefas.map(t => t.nome).join(' · '), link: '/atualizar', tipo: 'tarefa' });
+        }
         if (config.emailAoLancarTarefa && fonte.enviarEmail) {
           const porTecnico = new Map<string, Atividade[]>();
           for (const a of alvo) porTecnico.set(a.responsavel!.toLowerCase(), [...(porTecnico.get(a.responsavel!.toLowerCase()) || []), a]);
@@ -715,6 +815,12 @@ export function PortalProvider({ children }: { children: ReactNode }) {
       historico(cod) { return fonte.historico(cod); },
       statusHistorico,
       pessoasApp,
+      notificacoes,
+      async marcarNotificacoesLidas(ids) {
+        if (!ids.length) return;
+        setNotificacoes(l => l.map(n => (ids.includes(n.id) ? { ...n, lida: true } : n)));
+        await fonte.marcarNotificacoesLidas?.(ids);
+      },
       reenviarHistorico() { return reenviarPendentes(fonte); },
       async criarRisco(cod, r) {
         if (riscoAltoSemMitigacao(r)) throw new Error('Risco alto (impacto alto, probabilidade média ou alta): informe o plano de mitigação.');
@@ -820,7 +926,14 @@ export function PortalProvider({ children }: { children: ReactNode }) {
           documentos: { ...dados.documentos, [c]: [] }
         });
       },
+      async enviarStatusReport(cod) {
+        const p = projeto(cod);
+        const r = await enviarStatusReport(fonte, dados, p);
+        aplicar({ ...dados, projetos: dados.projetos.map(x => (x.codigo === cod ? { ...x, ultimoStatusReport: fonte.hoje() } : x)) });
+        return r;
+      },
       async avisarPmoProjeto(novoProjeto) {
+        notificar(fonte, pmosDe(), { titulo: `Cadastro para aprovar · ${novoProjeto.projeto.codigo}`, texto: `${usuario} cadastrou “${novoProjeto.projeto.nome}” e pediu a aprovação (G1).`, link: `/projeto/${encodeURIComponent(novoProjeto.projeto.codigo)}`, tipo: 'aprovacao' });
         if (!fonte.enviarEmail) throw new Error('no modo piloto o e-mail não é enviado');
         if (!pmosDe()) throw new Error('não há PMO com e-mail na lista Portal Tecnicos (nem emailPmo no config.js)');
         const { assunto, html } = emailSolicitacaoProjeto(novoProjeto, usuario);
@@ -828,6 +941,8 @@ export function PortalProvider({ children }: { children: ReactNode }) {
       },
       async avisarPmoGate(cod, gate) {
         if (!fonte.enviarEmail) throw new Error('no modo piloto o e-mail não é enviado');
+        { const p0 = projeto(cod), g0 = p0.fases.find(x => x.gate === gate);
+          notificar(fonte, patrocinadoresDe(p0), { titulo: `${gate} aguardando sua aprovação · ${p0.codigo}`, texto: `${usuario} pediu a aprovação do ${gate}${g0 ? ` (fim de ${g0.fase})` : ''} do projeto “${p0.nome}”.`, link: `/projeto/${encodeURIComponent(cod)}`, tipo: 'aprovacao' }); }
         const p = projeto(cod), g = p.fases.find(x => x.gate === gate)!;
         if (!patrocinadoresDe(p)) throw new Error('o projeto não tem patrocinador com e-mail na equipe nem na lista Portal Tecnicos');
         const fases = g.fase === 'Encerramento' ? ['Monitoramento', 'Encerramento'] as const : [g.fase];
@@ -841,11 +956,13 @@ export function PortalProvider({ children }: { children: ReactNode }) {
         const para = destinatarios(pmosDe(p), patrocinadoresDe(p), p.equipe.map(m => m.email).filter(Boolean).join(', '));
         if (!para) throw new Error('ninguém do projeto tem e-mail e não há PMO nem patrocinador na lista Portal Tecnicos');
         const proxima = gate === 'G4' ? 'Encerrado' : (PROXIMA_FASE[g.fase] || p.fase);
+        notificar(fonte, [pmosDe(p), patrocinadoresDe(p), ...p.equipe.map(m => m.email)].filter(Boolean).join(', '), { titulo: `${gate} aprovado · ${p.codigo}`, texto: gate === 'G4' ? `${usuario} aprovou o encerramento do projeto “${p.nome}”.` : `${usuario} aprovou o ${gate}. O projeto segue para ${proxima}.`, link: `/projeto/${encodeURIComponent(cod)}`, tipo: 'aprovacao' });
         const { assunto, html } = emailGateAprovado(p, g, { por: usuario, em: fonte.hoje(), parecer, proximaFase: proxima });
         return fonte.enviarEmail(assunto, html, para);
       },
       async enviarEmailCriacao(novoProjeto) {
         if (!fonte.enviarEmail) throw new Error('no modo piloto o e-mail não é enviado');
+        notificar(fonte, [patrocinadoresDe(novoProjeto.projeto), ...novoProjeto.projeto.equipe.map(m => m.email)].filter(Boolean).join(', '), { titulo: `Novo projeto · ${novoProjeto.projeto.codigo}`, texto: `${usuario} criou o projeto “${novoProjeto.projeto.nome}” (${novoProjeto.projeto.cliente}).`, link: `/projeto/${encodeURIComponent(novoProjeto.projeto.codigo)}`, tipo: 'projeto' });
         // projeto criado pelo PMO já nasce aprovado: avisa GP e PMO
         const para = destinatarios(pmosDe(novoProjeto.projeto), patrocinadoresDe(novoProjeto.projeto));
         const { assunto, html } = emailProjetoCriadoPeloPmo(novoProjeto, usuario);
@@ -862,7 +979,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
     const ACOES_BLOQUEADAS_ENCERRADO = new Set<string>(['salvarAtividade', 'criarAtividade', 'excluirAtividade', 'atualizarSemanal', 'lancarTarefas',
       'salvarRisco', 'criarRisco', 'excluirRisco', 'salvarPendencia', 'criarPendencia', 'excluirPendencia',
       'agendarReuniao', 'atualizarReuniao', 'cancelarReuniao', 'solicitarGate', 'decidirGate']);
-    const SEM_INDICADOR = new Set(['atualizar', 'bloquear', 'historico', 'lerReuniao', 'reenviarHistorico', 'carregarPessoasApp']);
+    const SEM_INDICADOR = new Set(['marcarNotificacoesLidas', 'atualizar', 'bloquear', 'historico', 'lerReuniao', 'reenviarHistorico', 'carregarPessoasApp']);
     const quem = `${usuario} (${papel})`;
     for (const k of Object.keys(v) as (keyof PortalValor)[]) {
       const fn = v[k];
@@ -892,7 +1009,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
       };
     }
     return v;
-  }, [dados, fonte, usuario, papel, hojeAtual, sincronizando, emAndamento, atualizadoEm, atualizar, aplicar, aplicarCom, bloquear, statusHistorico, pessoasApp]);
+  }, [dados, fonte, usuario, papel, hojeAtual, sincronizando, emAndamento, atualizadoEm, atualizar, aplicar, aplicarCom, bloquear, statusHistorico, pessoasApp, notificacoes]);
 
   if (erro) {
     return (

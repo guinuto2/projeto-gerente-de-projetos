@@ -29,6 +29,10 @@ export interface PortalConfig {
   emailAoAtrasar: boolean;
   /** avisa o técnico quando o PMO lança tarefas para ele */
   emailAoLancarTarefa: boolean;
+  /** status report semanal automático (versão interna ao GP e patrocinador; versão do cliente às pessoas do cliente) */
+  statusReportAutomatico: boolean;
+  /** dia da semana do envio: 1 = segunda … 5 = sexta */
+  statusReportDia: number;
   /** endereço do portal usado nos links dos e-mails; vazio = o endereço aberto no navegador */
   urlPortal: string;
   /** caixa compartilhada que envia os e-mails (ex.: pmo@empresa.com.br); vazio = a conta logada */
@@ -63,6 +67,8 @@ export const config: PortalConfig = {
   emailAoMudarStatusSubatividade: true,
   emailAoAtrasar: true,
   emailAoLancarTarefa: true,
+  statusReportAutomatico: true,
+  statusReportDia: 5,
   urlPortal: '',
   emailRemetente: '',
   emailPatrocinador: '',

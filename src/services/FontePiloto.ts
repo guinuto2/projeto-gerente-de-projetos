@@ -50,6 +50,28 @@ export class FontePiloto implements FonteDados {
   async excluirProjeto() { /* em memória */ }
   async criarAtividade(_p: unknown, atv: Atividade) { return atv; }
   async excluirAtividade() { /* em memória */ }
+  async modelos() {
+    try { return JSON.parse(localStorage.getItem('portal-pmo-modelos') || '[]'); } catch { return []; }
+  }
+  async salvarModelo(m: import('../lib/modelos').ModeloProjeto) {
+    const l = (await this.modelos()).filter((x: { id: string }) => x.id !== m.id);
+    localStorage.setItem('portal-pmo-modelos', JSON.stringify([...l, { ...m, atualizado: new Date().toISOString(), atualizadoPor: 'Modo piloto' }]));
+  }
+  async excluirModelo(id: string) {
+    localStorage.setItem('portal-pmo-modelos', JSON.stringify((await this.modelos()).filter((x: { id: string }) => x.id !== id)));
+  }
+  async notificacoes(email: string) {
+    try { return (JSON.parse(localStorage.getItem('portal-pmo-notificacoes') || '[]') as import('../types/models').Notificacao[]).filter(n => !email || n.para === email.toLowerCase() || n.para === '*'); } catch { return []; }
+  }
+  async criarNotificacoes(itens: { para: string; titulo: string; texto: string; link: string; tipo: string }[]) {
+    const l = await this.notificacoes('');
+    const novos = itens.map((n, i) => ({ ...n, para: '*', id: `n${Date.now()}${i}`, quando: new Date().toISOString(), lida: false }));   // piloto: todos veem
+    localStorage.setItem('portal-pmo-notificacoes', JSON.stringify([...novos, ...l].slice(0, 100)));
+  }
+  async marcarNotificacoesLidas(ids: string[]) {
+    const l = (await this.notificacoes('')).map(n => (ids.includes(n.id) ? { ...n, lida: true } : n));
+    localStorage.setItem('portal-pmo-notificacoes', JSON.stringify(l));
+  }
   async wikiDocs() {
     try { return JSON.parse(localStorage.getItem('portal-pmo-wiki-docs') || '[]'); } catch { return []; }
   }

@@ -24,6 +24,8 @@
   v3.85: coluna Função de Portal Tecnicos aceita PMO e Patrocinador (e preenchimento livre).
   v3.88: coluna Prazo em Portal Pendencias.
   v3.93: coluna Descricao na biblioteca Wiki Tecnicos.
+  v4.5: listas Portal Notificacoes e Portal Modelos, coluna UltimoStatusReport, biblioteca Portal Clientes
+        e liberação de um órgão:  -Cliente trf1.jus.br -UsuariosCliente 'fiscal@trf1.jus.br,gestor@trf1.jus.br'
 
 .EXEMPLOS
   # só a estrutura (listas vazias)
@@ -45,7 +47,11 @@ param(
   [switch] $Piloto,
   [string] $ArquivoDesignBuild = '',
   # remove itens repetidos em Portal Gates (mesmo projeto e mesmo gate), mantendo o mais avançado
-  [switch] $LimparGatesDuplicados
+  [switch] $LimparGatesDuplicados,
+  # v4.5: libera um órgão (domínio de e-mail, ex.: trf1.jus.br) na biblioteca Portal Clientes,
+  # com leitura só para as pessoas informadas (e-mails separados por vírgula)
+  [string] $Cliente = '',
+  [string] $UsuariosCliente = ''
 )
 $ErrorActionPreference = 'Stop'
 Import-Module PnP.PowerShell
@@ -119,6 +125,8 @@ Campo $L 'Arquiteto' 'Arquiteto' 'Text'
 Campo $L 'Patrocinador' 'Patrocinador' 'Text'
 Campo $L 'Contrato' 'Contrato / pedido' 'Text'
 CampoData $L 'DataAssinatura' 'Assinatura do contrato'
+# v4.5: data do último status report enviado (envio semanal automático)
+CampoData $L 'UltimoStatusReport' 'Último status report'
 # v3.61: modelo de faturamento
 Campo $L 'ModeloFaturamento' 'Modelo de faturamento' 'Choice' @('Edital', 'Service Entitlement', 'Sem receita')
 # v3.81: parceiro (terceirização)
@@ -382,6 +390,39 @@ if (Test-Path $pastaWiki) {
 }
 
 # ------------------------------------------------------------ biblioteca de documentos
+# ------------------------------------------------------------ v4.5: notificações, modelos e dados por cliente
+# avisos do sino (um item por destinatário)
+$L = 'Portal Notificacoes'; Lista $L 'Lists/PortalNotificacoes'; Titulo $L 'Título'
+Campo $L 'Para' 'Para (e-mail)' 'Text'
+Campo $L 'Texto' 'Texto' 'Note'
+Campo $L 'Link' 'Link no portal' 'Text'
+Campo $L 'Tipo' 'Tipo' 'Text'
+Campo $L 'Lida' 'Lida' 'Boolean'
+try { Set-PnPField -List $L -Identity 'Para' -Values @{ Indexed = $true } | Out-Null } catch { Write-Warning "Não foi possível indexar a coluna Para: $($_.Exception.Message)" }
+# modelos de projeto (cronograma com datas relativas, em JSON)
+$L = 'Portal Modelos'; Lista $L 'Lists/PortalModelos'; Titulo $L 'Nome do modelo'
+Campo $L 'ModeloId' 'Identificador' 'Text'
+Campo $L 'TipoProjeto' 'Tipo de projeto' 'Text'
+Campo $L 'Descricao' 'Descrição' 'Note'
+Campo $L 'Conteudo' 'Conteúdo (JSON)' 'Note'
+Campo $L 'AtualizadoPor' 'Atualizado por' 'Text'
+# dados separados por cliente: uma pasta por órgão, com permissão só para as pessoas daquele órgão
+Lista 'Portal Clientes' 'PortalClientes' 'DocumentLibrary'
+if ($Cliente) {
+  $dominio = $Cliente.Trim().ToLower()
+  $pasta = "PortalClientes/$dominio"
+  Resolve-PnPFolder -SiteRelativePath $pasta | Out-Null
+  Write-Host "Pasta do cliente: $pasta" -ForegroundColor Cyan
+  foreach ($u in ($UsuariosCliente -split '[,;]' | ForEach-Object { $_.Trim() } | Where-Object { $_ })) {
+    try {
+      # a primeira concessão quebra a herança (mantendo a equipe interna) e dá só leitura à pessoa do cliente
+      Set-PnPFolderPermission -List 'Portal Clientes' -Identity $pasta -User $u -AddRole 'Read' | Out-Null
+      Write-Host "  leitura liberada para $u" -ForegroundColor DarkGray
+    } catch { Write-Warning "Não foi possível dar acesso a $u (a pessoa precisa existir no Entra ID; convidados externos devem ser convidados antes): $($_.Exception.Message)" }
+  }
+  Write-Host "Lembrete: tire as pessoas do cliente das permissões do SITE (Visitantes/Membros) para que vejam só esta pasta." -ForegroundColor Yellow
+}
+
 Lista $BIB 'DocumentosProjetos' 'DocumentLibrary'
 Write-Host 'Estrutura pronta.' -ForegroundColor Green
 

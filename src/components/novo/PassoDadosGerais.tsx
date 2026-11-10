@@ -5,7 +5,7 @@ import { MODELOS_FATURAMENTO, REGRA_FATURAMENTO, TIPOS_PROJETO } from '../../lib
 import { ativos, pessoasComPapel, tecnicoPorNome, tecnicosParaCadastro } from '../../lib/pessoas';
 import { usePortal } from '../../state/PortalContext';
 
-type Campo = keyof Omit<FormProjeto, 'atividades' | 'riscos' | 'equipe'>;
+type Campo = keyof Omit<FormProjeto, 'atividades' | 'riscos' | 'equipe' | 'tarefasModelo'>;
 interface Props { form: FormProjeto; mudar: (c: Campo, v: string) => void; edicao?: boolean; aoEscolherArquiteto?: (nome: string, email: string) => void; dataMinima?: string;
   /** pessoa do app escolhida num campo (ex.: gerente): o cadastro a coloca na equipe com a função e o e-mail */
   aoEscolherPessoa?: (funcao: string, nome: string, email: string) => void }

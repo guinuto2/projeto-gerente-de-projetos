@@ -159,7 +159,17 @@ export const FABRICANTES: Fabricante[] = [
       { titulo: 'CertMetrics Dell', descricao: 'Histórico e comprovantes das certificações Dell (login).', url: 'https://cp.certmetrics.com/dell/en/login', grupo: 'Certificações e treinamentos' },
       { titulo: 'Dell PowerSizer', descricao: 'Dimensionamento de soluções Dell (login).', url: 'https://powersizer.dell.com/ui/index.html#/home', grupo: 'Ferramentas' },
       { titulo: 'Guia do usuário — SSD NVMe PCIe Express Flash (PowerEdge) · versão 6', descricao: 'Manual em PDF dos SSDs NVMe PCIe Express Flash dos PowerEdge.', url: 'https://dl.dell.com/manuals/all-products/esuprt_data_center_infra_int/esuprt_data_center_infra_storage_adapters/dell-poweredge-exp-fsh-nvme-pcie-ssd_users-guide6_en-us.pdf', grupo: 'Suporte e documentação' },
-      { titulo: 'Guia do usuário — SSD NVMe PCIe Express Flash (PowerEdge) · versão 7', descricao: 'Versão mais recente do manual em PDF dos SSDs NVMe PCIe Express Flash.', url: 'https://dl.dell.com/manuals/all-products/esuprt_data_center_infra_int/esuprt_data_center_infra_storage_adapters/dell-poweredge-exp-fsh-nvme-pcie-ssd_users-guide7_en-us.pdf', grupo: 'Suporte e documentação' }
+      { titulo: 'Guia do usuário — SSD NVMe PCIe Express Flash (PowerEdge) · versão 7', descricao: 'Versão mais recente do manual em PDF dos SSDs NVMe PCIe Express Flash.', url: 'https://dl.dell.com/manuals/all-products/esuprt_data_center_infra_int/esuprt_data_center_infra_storage_adapters/dell-poweredge-exp-fsh-nvme-pcie-ssd_users-guide7_en-us.pdf', grupo: 'Suporte e documentação' },
+      { titulo: 'Guia do usuário — SSD NVMe PCIe Express Flash (PowerEdge) · versão 7', descricao: 'Versão mais recente do manual em PDF dos SSDs NVMe PCIe Express Flash.', url: 'https://dl.dell.com/manuals/all-products/esuprt_data_center_infra_int/esuprt_data_center_infra_storage_adapters/dell-poweredge-exp-fsh-nvme-pcie-ssd_users-guide7_en-us.pdf', grupo: 'Suporte e documentação' },
+      { titulo: 'SPEC INT 2017 Dell PowerEdge R470', descricao: 'Tabela com spec rate integer do servidor Dell PowerEdge R470', url: 'https://www.spec.org/cgi-bin/osgresults?conf=rint2017&op=fetch&field=SYSTEM&pattern=PowerEdge+R470', grupo: 'SPEC RATE 2017' },
+      { titulo: 'SPEC INT 2017 Dell PowerEdge R570', descricao: 'Tabela com spec rate integer do servidor Dell PowerEdge R570', url: 'https://www.spec.org/cgi-bin/osgresults?conf=rint2017&op=fetch&field=SYSTEM&pattern=PowerEdge%20R570', grupo: 'SPEC RATE 2017' },
+      { titulo: 'SPEC INT 2017 Dell PowerEdge R670', descricao: 'Tabela com spec rate integer do servidor Dell PowerEdge R670', url: 'https://www.spec.org/cgi-bin/osgresults?conf=rint2017&op=fetch&field=SYSTEM&pattern=PowerEdge%20R670', grupo: 'SPEC RATE 2017' },
+      { titulo: 'SPEC INT 2017 Dell PowerEdge R6715', descricao: 'Tabela com spec rate integer do servidor Dell PowerEdge R6715', url: 'https://www.spec.org/cgi-bin/osgresults?conf=rint2017&op=fetch&field=SYSTEM&pattern=PowerEdge%20R6715', grupo: 'SPEC RATE 2017' },
+      { titulo: 'SPEC INT 2017 Dell PowerEdge R6725', descricao: 'Tabela com spec rate integer do servidor Dell PowerEdge R6725', url: 'https://www.spec.org/cgi-bin/osgresults?conf=rint2017&op=fetch&field=SYSTEM&pattern=PowerEdge%20R6725', grupo: 'SPEC RATE 2017' },
+      { titulo: 'SPEC INT 2017 Dell PowerEdge R7715', descricao: 'Tabela com spec rate integer do servidor Dell PowerEdge R7715', url: 'https://www.spec.org/cgi-bin/osgresults?conf=rint2017&op=fetch&field=SYSTEM&pattern=PowerEdge%20R7715', grupo: 'SPEC RATE 2017' },
+
+
+
     ],
     dicas: ['Antes de abrir chamado, colete o log do SupportAssist/TSR pelo iDRAC.', 'Atualize firmware em pacote (catálogo) para manter as versões compatíveis entre si.'],
     comprovacoes: [] },
@@ -183,7 +193,20 @@ export const FABRICANTES: Fabricante[] = [
   { id: 'lenovo', nome: 'Lenovo Data Center', sigla: 'LNV', cor: '#E2231A', descricao: 'Servidores ThinkSystem e ThinkAgile, gerenciados pelo XClarity.',
     sites: [
       { titulo: 'Lenovo Partner Hub — Brasil', descricao: 'Portal do parceiro Lenovo no Brasil.', url: 'https://www.lenovopartnerhub.com/group/brazil-site', grupo: 'Portal do parceiro' },
-      { titulo: 'Treinamentos Lenovo (Adobe Learning Manager)', descricao: 'Plataforma de treinamentos da Lenovo para parceiros (cada um entra com o próprio login).', url: 'https://cpcontents.adobe.com/eu/public/newlearner/newlearner_ebbb6c88.html?accountId=2665&hostName=learningmanagereu.adobe.com#/newLearnerExperience', grupo: 'Certificações e treinamentos' }
+      { titulo: 'Treinamentos Lenovo (Adobe Learning Manager)', descricao: 'Plataforma de treinamentos da Lenovo para parceiros (cada um entra com o próprio login).', url: 'https://cpcontents.adobe.com/eu/public/newlearner/newlearner_ebbb6c88.html?accountId=2665&hostName=learningmanagereu.adobe.com#/newLearnerExperience', grupo: 'Certificações e treinamentos' },
+      { titulo: 'SPEC INT 2017 SR630 V4', descricao: 'Tabela com spec rate integer do servidor SR630 V4', url: 'https://www.spec.org/cgi-bin/osgresults?conf=rint2017&op=fetch&field=SYSTEM&pattern=SR630+V4', grupo: 'SPEC RATE 2017' },
+      { titulo: 'SPEC INT 2017 SR635 V3', descricao: 'Tabela com spec rate integer do servidor SR635 V3', url: 'https://www.spec.org/cgi-bin/osgresults?conf=rint2017&op=fetch&field=SYSTEM&pattern=SR635+V3', grupo: 'SPEC RATE 2017' },
+      { titulo: 'SPEC INT 2017 SR645 V3', descricao: 'Tabela com spec rate integer do servidor SR645 V3', url: 'https://www.spec.org/cgi-bin/osgresults?conf=rint2017&op=fetch&field=SYSTEM&pattern=SR645+V3', grupo: 'SPEC RATE 2017' },
+      { titulo: 'SPEC INT 2017 SR650 V4', descricao: 'Tabela com spec rate integer do servidor SR650 V4', url: 'https://www.spec.org/cgi-bin/osgresults?conf=rint2017&op=fetch&field=SYSTEM&pattern=SR650+V4', grupo: 'SPEC RATE 2017' },
+      { titulo: 'SPEC INT 2017 SR650a V4', descricao: 'Tabela com spec rate integer do servidor SR650a V4', url: 'https://www.spec.org/cgi-bin/osgresults?conf=rint2017&op=fetch&field=SYSTEM&pattern=SR650a+V4', grupo: 'SPEC RATE 2017' },
+      { titulo: 'SPEC INT 2017 SR655 V3', descricao: 'Tabela com spec rate integer do servidor SR655 V3', url: 'https://www.spec.org/cgi-bin/osgresults?conf=rint2017&op=fetch&field=SYSTEM&pattern=SR655+V3', grupo: 'SPEC RATE 2017' },
+      { titulo: 'SPEC INT 2017 SR665 V3', descricao: 'Tabela com spec rate integer do servidor SR665 V3', url: 'https://www.spec.org/cgi-bin/osgresults?conf=rint2017&op=fetch&field=SYSTEM&pattern=SR665+V3', grupo: 'SPEC RATE 2017' },
+      { titulo: 'SPEC INT 2017 SR675 V3', descricao: 'Tabela com spec rate integer do servidor SR675 V3', url: 'https://www.spec.org/cgi-bin/osgresults?conf=rint2017&op=fetch&field=SYSTEM&pattern=SR675+V3', grupo: 'SPEC RATE 2017' },
+
+
+      
+
+
     ],
     dicas: ['Use as "Best Recipes" para combinar firmware, drivers e versões de VMware.', 'Colete o FFDC pelo XCC antes de abrir chamado.'],
     comprovacoes: [] },
@@ -194,7 +217,14 @@ export const FABRICANTES: Fabricante[] = [
       { titulo: 'HPE Support Center', descricao: 'Drivers, firmware, documentação, garantia e abertura de chamados.', url: 'https://support.hpe.com/', grupo: 'Suporte e documentação' },
       { titulo: 'Service Pack for ProLiant (SPP)', descricao: 'Pacote de firmware e drivers dos ProLiant. Exige garantia ou contrato de suporte ativo.', url: 'https://www.hpe.com/servers/spp/download', grupo: 'Suporte e documentação' },
       { titulo: 'QuickSpecs (HPE PSNow)', descricao: 'Especificações técnicas oficiais (QuickSpecs) de cada modelo.', url: 'https://www.hpe.com/psnow/', grupo: 'Suporte e documentação' },
-      { titulo: 'Servidores HPE ProLiant', descricao: 'Linha de servidores ProLiant: modelos e gerações.', url: 'https://www.hpe.com/br/pt/compute/proliant-servers.html', grupo: 'Produtos e serviços' }
+      { titulo: 'Servidores HPE ProLiant', descricao: 'Linha de servidores ProLiant: modelos e gerações.', url: 'https://www.hpe.com/br/pt/compute/proliant-servers.html', grupo: 'Produtos e serviços' },   
+      { titulo: 'SPEC INT 2017 HPE ProLiant Compute DL325', descricao: 'Tabela com spec rate integer do servidor HPE ProLiant Compute DL325', url: 'https://www.spec.org/cgi-bin/osgresults?conf=rint2017&op=fetch&field=SYSTEM&pattern=ProLiant+Compute+DL325', grupo: 'SPEC RATE 2017' },
+      { titulo: 'SPEC INT 2017 HPE ProLiant Compute DL345', descricao: 'Tabela com spec rate integer do servidor HPE ProLiant Compute DL345', url: 'https://www.spec.org/cgi-bin/osgresults?conf=rint2017&op=fetch&field=SYSTEM&pattern=ProLiant+Compute+DL345', grupo: 'SPEC RATE 2017' },
+      { titulo: 'SPEC INT 2017 HPE ProLiant Compute DL360', descricao: 'Tabela com spec rate integer do servidor HPE ProLiant Compute DL360', url: 'https://www.spec.org/cgi-bin/osgresults?conf=rint2017&op=fetch&field=SYSTEM&pattern=ProLiant+Compute+DL360', grupo: 'SPEC RATE 2017' },
+      { titulo: 'SPEC INT 2017 HPE ProLiant Compute DL365', descricao: 'Tabela com spec rate integer do servidor HPE ProLiant Compute DL365', url: 'https://www.spec.org/cgi-bin/osgresults?conf=rint2017&op=fetch&field=SYSTEM&pattern=ProLiant+DL365', grupo: 'SPEC RATE 2017' },
+      { titulo: 'SPEC INT 2017 HPE ProLiant Compute DL380', descricao: 'Tabela com spec rate integer do servidor HPE ProLiant Compute DL380', url: 'https://www.spec.org/cgi-bin/osgresults?conf=rint2017&op=fetch&field=SYSTEM&pattern=ProLiant+Compute+DL380', grupo: 'SPEC RATE 2017' },
+      { titulo: 'SPEC INT 2017 HPE ProLiant Compute DL385', descricao: 'Tabela com spec rate integer do servidor HPE ProLiant Compute DL385', url: 'https://www.spec.org/cgi-bin/osgresults?conf=rint2017&op=fetch&field=SYSTEM&pattern=ProLiant+DL385', grupo: 'SPEC RATE 2017' },
+
     ],
     dicas: ['Antes de abrir chamado, colete o log AHS (Active Health System) pelo iLO.', 'O download do SPP exige garantia ou contrato de suporte ativo vinculado à conta HPE.'],
     comprovacoes: [] },
@@ -205,25 +235,42 @@ export const FABRICANTES: Fabricante[] = [
       { titulo: 'Serviço de instalação de servidores', descricao: 'Escopo do serviço de instalação da xFusion (todas as séries FusionServer).', url: 'https://www.xfusion.com/en/service/server-installation', grupo: 'Produtos e serviços' },
       { titulo: 'Serviço de health check', descricao: 'Verificação de saúde dos equipamentos: configuração, compatibilidade de firmware e logs.', url: 'https://www.xfusion.com/en/service/equipment-health-check', grupo: 'Produtos e serviços' },
       { titulo: 'FusionServer Tools', descricao: 'Ferramentas de implantação, monitoração e diagnóstico (in-band e out-of-band).', url: 'https://www.xfusion.com/en/product/intelligent-management/fusionserver-tools', grupo: 'Ferramentas' },
-      { titulo: 'Suporte xFusion', descricao: 'Portal de suporte: documentação, downloads e white papers técnicos.', url: 'https://support.xfusion.com/', grupo: 'Suporte e documentação' }
+      { titulo: 'Suporte xFusion', descricao: 'Portal de suporte: documentação, downloads e white papers técnicos.', url: 'https://support.xfusion.com/', grupo: 'Suporte e documentação' },
+      { titulo: 'SPEC INT 2017 FusionServer 1288 V8', descricao: 'Tabela com spec rate integer do servidor FusionServer 1288 V8', url: 'https://www.spec.org/cgi-bin/osgresults?conf=rint2017&op=fetch&field=SYSTEM&pattern=FusionServer+1288+V8', grupo: 'SPEC RATE 2017' },
+      { titulo: 'SPEC INT 2017 FusionServer 2158H V8', descricao: 'Tabela com spec rate integer do servidor FusionServer 2158H V8', url: 'https://www.spec.org/cgi-bin/osgresults?conf=rint2017&op=fetch&field=SYSTEM&pattern=FusionServer+2158H+V8', grupo: 'SPEC RATE 2017' },
+      { titulo: 'SPEC INT 2017 FusionServer 2258H V8', descricao: 'Tabela com spec rate integer do servidor FusionServer 2258H V8', url: 'https://www.spec.org/cgi-bin/osgresults?conf=rint2017&op=fetch&field=SYSTEM&pattern=FusionServer+2258H+V8', grupo: 'SPEC RATE 2017' },
+      { titulo: 'SPEC INT 2017 FusionServer 2288 V8', descricao: 'Tabela com spec rate integer do servidor FusionServer 2288 V8', url: 'https://www.spec.org/cgi-bin/osgresults?conf=rint2017&op=fetch&field=SYSTEM&pattern=FusionServer+2288+V8', grupo: 'SPEC RATE 2017' },
+
+
     ],
     dicas: ['Os white papers técnicos de cada modelo (especificações e compatibilidade) ficam no portal de suporte.', 'Em editais, veja o documento “Qualificações servidores Dell + HPE + Lenovo” na aba Documentos (itens que desfavorecem a xFusion).'],
     comprovacoes: [] },
   { id: 'omnissa', nome: 'Omnissa', sigla: 'OMN', cor: '#1F6FEB', descricao: 'Horizon (VDI), Workspace ONE e App Volumes — antiga divisão de End-User Computing da VMware.',
     sites: [
-      { titulo: 'Omnissa Partner Connect', descricao: 'Portal do parceiro Omnissa (login).', url: 'https://omnissa.my.site.com/partnerconnect/PC_Login?ec=302&startURL=/partnerconnect/s/', grupo: 'Portal do parceiro' },
-      { titulo: 'Partner Connect — gestão da conta', descricao: 'Gestão da conta do parceiro no Partner Connect.', url: 'https://omnissa.my.site.com/partnerconnect/s/account-management?component=c:PC_AdPlus', grupo: 'Portal do parceiro' },
-      { titulo: 'Provas de certificação (Pearson VUE)', descricao: 'Agendamento das provas de certificação Omnissa.', url: 'https://www.pearsonvue.com/us/en/omnissa.html', grupo: 'Certificações e treinamentos' }
+      
+      // PORTAIS OMNISSA
+      { titulo: 'Omnissa Partner Connect', descricao: 'Portal do parceiro Omnissa (login).', url: 'https://omnissa.my.site.com/partnerconnect/PC_Login?ec=302&startURL=/partnerconnect/s/', grupo: 'Portais Omnissa' },
+      { titulo: 'Partner Connect — gestão da conta', descricao: 'Gestão da conta do parceiro no Partner Connect.', url: 'https://omnissa.my.site.com/partnerconnect/s/account-management?component=c:PC_AdPlus', grupo: 'Portais Omnissa' },
+      { titulo: 'Omnissa Customer Connect', descricao: 'Portal de suporte, gerenciamento de licenças e abertura de chamados técnicos.', url: 'https://customerconnect.omnissa.com/home', grupo: 'Portais Omnissa' },
+      { titulo: 'Omnissa Connect', descricao: 'Portal centralizado de acesso aos serviços, organizações e assinaturas Omnissa.', url: 'https://connect.omnissa.com/', grupo: 'Portais Omnissa' },
+
+      // SUPORTE E FERRAMENTAS
+      { titulo: 'Omnissa Product Downloads', descricao: 'Portal para download de produtos, versões e atualizações Omnissa.', url: 'https://customerconnect.omnissa.com/downloads/#all_products', grupo: 'Suporte e ferramentas' },
+      { titulo: 'Omnissa Knowledge Base', descricao: 'Base oficial de conhecimento, soluções de problemas e artigos de suporte.', url: 'https://kb.omnissa.com/s/', grupo: 'Suporte e ferramentas' },
+      { titulo: 'Omnissa Interoperability Matrix', descricao: 'Ferramenta oficial de consulta de compatibilidade entre produtos, plataformas e versões.', url: 'https://interopmatrix.omnissa.com/', grupo: 'Suporte e ferramentas' },
+      { titulo: 'Omnissa Trust Center', descricao: 'Portal de segurança, privacidade, conformidade e certificações da Omnissa.', url: 'https://www.omnissa.com/trust-center/', grupo: 'Suporte e ferramentas' },
+
+      // CERTIFICAÇÕES E TREINAMENTOS
+      { titulo: 'Omnissa Learning', descricao: 'Portal de treinamentos, cursos e preparação para certificações Omnissa.', url: 'https://learning.omnissa.com/learn/', grupo: 'Certificações e treinamentos' },
+      { titulo: 'Provas de certificação (Pearson VUE)', descricao: 'Agendamento das provas de certificação Omnissa.', url: 'https://www.pearsonvue.com/us/en/omnissa.html', grupo: 'Certificações e treinamentos' },
+
+
     ],
     dicas: ['Atualize Connection Server antes dos agentes nas VMs.', 'Teste a imagem dourada em pool de homologação antes de publicar.'],
     comprovacoes: [] },
   { id: 'processadores', nome: 'Processadores', sigla: 'CPU', cor: '#6B4FBB', descricao: 'Intel Xeon e AMD EPYC: especificações, segurança (microcódigo) e compatibilidade de gerações no vSphere.',
     sites: [
-      { titulo: 'Intel — especificações (ARK)', descricao: 'Núcleos, frequências, TDP e recursos de cada processador; permite comparar modelos.', url: 'https://www.intel.com/content/www/us/en/ark.html' },
-      { titulo: 'Intel — central de segurança', descricao: 'Avisos de vulnerabilidades e atualizações de microcódigo.', url: 'https://www.intel.com/content/www/us/en/security-center/default.html' },
-      { titulo: 'AMD EPYC — linha de servidores', descricao: 'Gerações, modelos e especificações dos processadores EPYC.', url: 'https://www.amd.com/en/products/processors/server/epyc.html' },
-      { titulo: 'AMD — segurança de produtos', descricao: 'Boletins de segurança e correções de firmware.', url: 'https://www.amd.com/en/resources/product-security.html' },
-      { titulo: 'Compatibilidade de EVC (VMware)', descricao: 'Modos EVC suportados por geração de CPU, para vMotion entre gerações.', url: 'https://knowledge.broadcom.com/external/article?legacyId=1003212' }
+     
     ],
     dicas: ['Misturar gerações no mesmo cluster exige ajustar o modo EVC.', 'Microcódigo vem no BIOS do servidor — atualize pelo pacote do fabricante.'] },
   { id: 'editais', nome: 'Comprovações para editais', sigla: 'EDT', cor: '#7E181C', descricao: 'Sites oficiais usados para comprovar requisitos de editais (associações, certificações de sistema operacional e de GPU).',

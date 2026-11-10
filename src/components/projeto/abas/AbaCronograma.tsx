@@ -15,7 +15,7 @@ import { EditarAtividade } from '../editores/EditarAtividade';
 interface Props { projeto: Projeto; faseSel: Fase | null; limparFase: () => void }
 
 export function AbaCronograma({ projeto, faseSel, limparFase }: Props) {
-  const aberto = projeto.situacaoCadastro !== 'Encerrado';   // encerrado: só consulta
+  const aberto = projeto.situacaoCadastro !== 'Encerrado';
   const { dados, hoje, fonte } = usePortal();
   const { pode, papel } = usePapel();
   const [equipe, setEquipe] = useState('Todas');

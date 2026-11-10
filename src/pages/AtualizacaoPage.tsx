@@ -30,6 +30,7 @@ const paraForm = (a: Atividade): Form => ({
   teveReuniao: a.teveReuniao === undefined ? (a.reuniaoUrl ? 'Sim' : '') : a.teveReuniao ? 'Sim' : 'Não', realizado: a.realizado || ''
 });
 const chave = (i: ItemSemana) => `${i.projeto.codigo}|${i.atividade.codigo}`;
+const normalizarBusca = (texto: string) => texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 /** a pessoa mudou a data prevista para depois da baseline */
 const reprograma = (a: Atividade, f: Form) => !!a.baselineTermino && f.termino !== a.termino && f.termino > a.baselineTermino;
 
@@ -64,6 +65,7 @@ export function AtualizacaoPage() {
         Number(minhas.has(`${y.projeto.codigo}|${y.atividade.codigo}`)) - Number(minhas.has(`${x.projeto.codigo}|${x.atividade.codigo}`)));
   }, [visiveis, dados, minhasSubs, hoje]);
   const [projetoFiltro, setProjetoFiltro] = useState('');
+  const [buscaAtividade, setBuscaAtividade] = useState('');
   /** atividade aberta a partir do cronograma que não está entre as da semana: fica fixada no topo da lista */
   const [fixa, setFixa] = useState<string | null>(null);
   /** PMO: painel completo da atividade (nome, fase, datas, pré-requisito, reunião, lançar tarefas) */
@@ -76,7 +78,15 @@ export function AtualizacaoPage() {
     const p = visiveis.find(x => x.codigo === cod), a = (dados.atividades[cod] || []).find(x => x.codigo === codigo);
     return p && a && !base.some(i => chave(i) === fixa) ? { projeto: p, atividade: a } : null;
   })();
-  const lista = [...(itemFixo ? [itemFixo] : []), ...base].filter(i => !projetoFiltro || i.projeto.codigo === projetoFiltro);
+  const itensParaFiltro = [...(itemFixo ? [itemFixo] : []), ...base];
+  // Quantidades incluem a atividade aberta diretamente pelo cronograma, se houver.
+  const quantidadePorProjeto = new Map<string, number>();
+  itensParaFiltro.forEach(i => quantidadePorProjeto.set(i.projeto.codigo, (quantidadePorProjeto.get(i.projeto.codigo) || 0) + 1));
+  const termoBusca = papel === 'PMO' ? normalizarBusca(buscaAtividade.trim()) : '';
+  const lista = itensParaFiltro.filter(i =>
+    (!projetoFiltro || i.projeto.codigo === projetoFiltro) &&
+    (!termoBusca || [i.atividade.codigo, i.atividade.nome].some(valor => normalizarBusca(valor).includes(termoBusca)))
+  );
   /** técnico: nova subatividade escolhendo projeto e atividade principal (no topo da lista) */
   const [novaSubLivre, setNovaSubLivre] = useState(false);
   /** lista paginada: 5 por página */
@@ -92,10 +102,11 @@ export function AtualizacaoPage() {
     if (!pedido) return;
     const idx = lista.findIndex(i => chave(i) === pedido);
     if (idx < 0 && projetoFiltro) { setProjetoFiltro(''); return; }   // pode estar escondida pelo filtro
+    if (idx < 0 && termoBusca) { setBuscaAtividade(''); return; } // não ocultar atividade aberta pelo cronograma
     if (idx >= 0) { setSel(pedido); setPagina(Math.floor(idx / POR_PAGINA)); }
     else { setFixa(pedido); setSel(pedido); setPagina(0); }   // fora da semana: aparece fixada no topo
     setParams({}, { replace: true });
-  }, [pedido, lista.length, projetoFiltro]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [pedido, lista.length, projetoFiltro, termoBusca]); // eslint-disable-line react-hooks/exhaustive-deps
   const irPagina = (k: number) => { setPagina(k); const primeiro = lista[k * POR_PAGINA]; if (primeiro) setSel(chave(primeiro)); };
   /** a subatividade abre só para leitura; "Atualizar status" libera o formulário */
   const [editando, setEditando] = useState(false);
@@ -159,12 +170,23 @@ export function AtualizacaoPage() {
         <aside className="card pad atvLista">
           <h2 className="h3" style={{ marginBottom: 2 }}>{ehTecnico ? 'Tarefas' : 'Atividades desta semana'} <span className="cnt">{lista.length}</span></h2>
           <div className="sub" style={{ marginBottom: 10 }}>{ehTecnico ? 'Dos projetos em que estou alocado' : 'Todos os projetos em andamento'}</div>
-          {visiveis.length > 1 && (
-            <label className="campo" style={{ marginBottom: 10 }}>Projeto
+          {(papel === 'PMO' || visiveis.length > 1) && (
+            <label className="campo" style={{ marginBottom: 10 }}>
+              {papel === 'PMO' ? 'Filtrar atividades por projeto' : 'Projeto'}
               <select className="ctl" value={projetoFiltro} onChange={e => { setProjetoFiltro(e.target.value); setPagina(0); }}>
-                <option value="">Todos os projetos</option>
-                {visiveis.map(p => <option key={p.codigo} value={p.codigo}>{p.codigo} · {p.nome}</option>)}
+                <option value="">Todos os projetos ({itensParaFiltro.length} atividades)</option>
+                {visiveis.map(p => <option key={p.codigo} value={p.codigo}>
+                  {p.codigo} · {p.nome} ({quantidadePorProjeto.get(p.codigo) || 0})
+                </option>)}
               </select>
+            </label>
+          )}
+          {papel === 'PMO' && (
+            <label className="campo" style={{ marginBottom: 10 }}>
+              Buscar atividade
+              <input className="ctl" type="search" placeholder="Buscar por código ou nome da atividade"
+                aria-label="Buscar atividade" value={buscaAtividade}
+                onChange={e => { setBuscaAtividade(e.target.value); setPagina(0); }} />
             </label>
           )}
 
@@ -198,7 +220,10 @@ export function AtualizacaoPage() {
               </nav>
             )}
             {!temProjetoAtivo ? <Mensagem tipo="info">{motivoSemProjeto}</Mensagem>
-              : !lista.length && <p className="sub">{ehTecnico ? 'Nenhuma tarefa aberta nos seus projetos.' : 'Nenhuma atividade aberta nesta semana.'}</p>}
+              : !lista.length && <p className="sub">{termoBusca
+                ? 'Nenhuma atividade encontrada para esta busca.'
+                : projetoFiltro ? 'Nenhuma atividade aberta nesta semana para o projeto selecionado.'
+                : ehTecnico ? 'Nenhuma tarefa aberta nos seus projetos.' : 'Nenhuma atividade aberta nesta semana.'}</p>}
           </div>
         </aside>
 
@@ -211,8 +236,6 @@ export function AtualizacaoPage() {
                 <span className="acoesAtv" style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
                   {pode('criarSubatividade') && !item.atividade.pai && !novaSub && !editando &&
                     <button type="button" className="btn pq" disabled={!temProjetoAtivo} title={temProjetoAtivo ? undefined : motivoSemProjeto} onClick={() => setNovaSub(true)}>+ Nova subatividade</button>}
-                  {pode('atualizarAtividade') && !editando &&
-                    <button type="button" className="btn pri" onClick={() => setEditando(true)}>Atualizar status{item.atividade.pai ? (ehTecnico ? ' da tarefa' : ' da subatividade') : ''}</button>}
                   {pode('gerenciarAtividades') && !editando &&
                     <button type="button" className="btn pq" onClick={() => setEditarAtv(chave(item))}>Editar atividade</button>}
                 </span>
@@ -236,6 +259,13 @@ export function AtualizacaoPage() {
                   filhos={(dados.atividades[item.projeto.codigo] || []).filter(x => x.pai === item.atividade.codigo)} />
                 <DocumentosAtividade projeto={item.projeto} a={item.atividade} somenteLeitura />
                 <AcompanhamentoAtividade projeto={item.projeto} a={item.atividade} />
+                {pode('atualizarAtividade') && (
+                  <div className="atvAcaoStatus">
+                    <button type="button" className="btn pri" onClick={() => setEditando(true)}>
+                      Atualizar status{item.atividade.pai ? (ehTecnico ? ' da tarefa' : ' da subatividade') : ''}
+                    </button>
+                  </div>
+                )}
               </>
             ) : (
               <>

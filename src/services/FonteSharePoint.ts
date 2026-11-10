@@ -2,6 +2,7 @@ import type { PortalConfig } from '../config/config';
 import type {
   Arquivo, Atividade, Dados, Fase, Gate, MembroEquipe, NovaReuniao, NovoProjeto, PastaDocumentos, Pendencia, Projeto, RegistroHistorico, Risco, Tecnico
 } from '../types/models';
+import { copiaParaCliente, dominioDe, dominiosDoCliente } from '../lib/publicacaoCliente';
 import { GATE_DA_FASE, PASTAS, normalizarTipo } from '../lib/constantes';
 import { hojeIso, isoDeDataHora, iso, linhas } from '../lib/datas';
 import type { Autenticador } from './auth';
@@ -53,7 +54,7 @@ const COLUNAS_PROJETO: Record<string, string> = {
   gerente: 'Gerente', arquiteto: 'Arquiteto', patrocinador: 'Patrocinador', contrato: 'Contrato',
   inicio: 'DataInicio', terminoBaseline: 'DataTerminoBaseline', terminoPrevisto: 'DataTerminoPrevista', objetivo: 'Objetivo',
   escopoIncluido: 'EscopoIncluido', escopoExcluido: 'EscopoExcluido', premissas: 'Premissas', dependencias: 'Dependencias', restricoes: 'Restricoes',
-  equipe: 'Equipe', dataAssinatura: 'DataAssinatura', modeloFaturamento: 'ModeloFaturamento', parceiro: 'Parceiro'
+  equipe: 'Equipe', dataAssinatura: 'DataAssinatura', modeloFaturamento: 'ModeloFaturamento', parceiro: 'Parceiro', ultimoStatusReport: 'UltimoStatusReport'
 };
 const COLUNAS_ATIVIDADE: Record<string, string> = {
   nome: 'Title', codigo: 'Codigo', fase: 'Fase', equipe: 'Equipe', duracao: 'Duracao', descricao: 'Descricao', marco: 'Marco',
@@ -106,6 +107,8 @@ export class FonteSharePoint implements FonteDados {
     // lista opcional: sem ela o portal funciona, só não oferece os técnicos
     this.idTecnicos = listas.find(x => x.displayName === 'Portal Tecnicos')?.id || '';
     this.idHistorico = listas.find(x => x.displayName === 'Portal Historico')?.id || '';
+    this.idNotificacoes = listas.find(x => x.displayName === 'Portal Notificacoes')?.id || '';
+    this.idModelos = listas.find(x => x.displayName === 'Portal Modelos')?.id || '';
     const colunas = await this.graph.todos<{ name: string }>(`/sites/${this.siteId}/lists/${this.ids.atividades}/columns?$select=name`);
     this.colunasAtividades = new Set(colunas.map(c => c.name));
     const drives = await this.graph.todos<{ id: string; name: string; webUrl: string }>(`/sites/${this.siteId}/drives?$select=id,name,webUrl`);
@@ -185,6 +188,7 @@ export class FonteSharePoint implements FonteDados {
         dataAssinatura: isoDeDataHora(f.DataAssinatura as string) || undefined,
         modeloFaturamento: txt(f.ModeloFaturamento) || undefined,
         parceiro: txt(f.Parceiro) || undefined,
+        ultimoStatusReport: isoDeDataHora(f.UltimoStatusReport as string) || undefined,
         criadoPor: (it as { createdBy?: { user?: { email?: string; displayName?: string } } }).createdBy?.user?.email || (it as { createdBy?: { user?: { displayName?: string } } }).createdBy?.user?.displayName || undefined,
         inicio: isoDeDataHora(f.DataInicio as string), terminoBaseline: isoDeDataHora(f.DataTerminoBaseline as string),
         terminoPrevisto: isoDeDataHora(f.DataTerminoPrevista as string), objetivo: txt(f.Objetivo),
@@ -376,6 +380,109 @@ export class FonteSharePoint implements FonteDados {
       for (const it of itens) for (const c of [it.fields.EMail, it.fields.UserName]) if (typeof c === 'string' && c.includes('@')) s.add(c.trim().toLowerCase());
       return s.size ? s : null;
     } catch { return null; }
+  }
+  /* ---------------- dados separados por cliente (biblioteca "Portal Clientes") ---------------- */
+  modoCliente = false;
+  private driveClientes: string | null | undefined;
+  private async idDriveClientes(siteId?: string): Promise<string | null> {
+    if (this.driveClientes !== undefined) return this.driveClientes;
+    const site = siteId || (await this.graph.get<{ id: string }>(`/sites/${this.cfg.sharepointHost}:${this.cfg.sitePath}`)).id;
+    const drives = await this.graph.todos<{ id: string; name: string }>(`/sites/${site}/drives?$select=id,name`);
+    this.driveClientes = drives.find(x => x.name === 'Portal Clientes')?.id || null;
+    return this.driveClientes;
+  }
+  /** último conteúdo publicado de cada projeto (para só regravar o que mudou) */
+  private publicado = new Map<string, string>();
+  async publicarParaClientes(d: Dados) {
+    await this.preparar();
+    const drive = await this.idDriveClientes(this.siteId);
+    if (!drive) return 0;
+    // só as pastas criadas pelo script (com a permissão do órgão) recebem a cópia
+    const pastas = new Set((await this.graph.todos<{ name: string; folder?: unknown }>(`/drives/${drive}/root/children?$select=name,folder`)).filter(x => x.folder).map(x => x.name.toLowerCase()));
+    let mudaram = 0;
+    for (const p of d.projetos.filter(x => x.situacaoCadastro === 'Ativo' || x.situacaoCadastro === 'Encerrado')) {
+      for (const dom of dominiosDoCliente(p).filter(x => pastas.has(x))) {
+        const copia = copiaParaCliente(p, d);
+        const json = JSON.stringify({ ...copia, gerado: '' });
+        const chave = `${dom}/${p.codigo}`;
+        if (this.publicado.get(chave) === json) continue;
+        const arq = new File([JSON.stringify(copia)], `${p.codigo}.json`, { type: 'application/json' });
+        await this.graph.enviar(`/drives/${drive}/root:/${encodeURIComponent(dom)}/${encodeURIComponent(p.codigo)}.json`, arq, 'replace');
+        this.publicado.set(chave, json); mudaram++;
+      }
+    }
+    return mudaram;
+  }
+  async carregarCliente(): Promise<Dados> {
+    this.modoCliente = true;
+    const dom = dominioDe(this.auth.email());
+    const drive = await this.idDriveClientes();
+    const vazio: Dados = { projetos: [], atividades: {}, riscos: {}, pendencias: {}, decisoes: {}, documentos: {}, tecnicos: [] } as unknown as Dados;
+    if (!drive || !dom) return vazio;
+    let arquivos: { id: string; name: string; file?: unknown }[] = [];
+    try { arquivos = await this.graph.todos(`/drives/${drive}/root:/${encodeURIComponent(dom)}:/children?$select=id,name,file`); }
+    catch { return vazio; }   // pasta ainda não liberada para este órgão
+    for (const a of arquivos.filter(x => x.file && x.name.endsWith('.json'))) {
+      try {
+        const c = JSON.parse(await (await this.graph.baixar(`/drives/${drive}/items/${a.id}/content`)).text()) as { projeto: Projeto; atividades: Atividade[] };
+        vazio.projetos.push(c.projeto); vazio.atividades[c.projeto.codigo] = c.atividades;
+        vazio.riscos[c.projeto.codigo] = []; vazio.pendencias[c.projeto.codigo] = []; vazio.decisoes[c.projeto.codigo] = []; vazio.documentos[c.projeto.codigo] = [];
+      } catch { /* arquivo inválido: ignora */ }
+    }
+    return vazio;
+  }
+  /* ---------------- notificações (lista "Portal Notificacoes") ---------------- */
+  private idNotificacoes = '';
+  private idModelos = '';
+  async notificacoes(email: string) {
+    if (this.modoCliente) return [];
+    await this.preparar();
+    if (!this.idNotificacoes) return null;
+    const filtro = encodeURIComponent(`fields/Para eq '${email.toLowerCase().replace(/'/g, "''")}'`);
+    const itens = await this.graph.todos<ItemLista & { createdDateTime?: string }>(
+      `/sites/${this.siteId}/lists/${this.idNotificacoes}/items?$expand=fields&$filter=${filtro}&$top=200`, { Prefer: 'HonorNonIndexedQueriesWarningMayFailRandomly' });
+    return itens.map(it => ({ id: it.id, para: txt(it.fields.Para), titulo: txt(it.fields.Title), texto: txt(it.fields.Texto), link: txt(it.fields.Link),
+      tipo: txt(it.fields.Tipo), quando: it.createdDateTime || txt(it.fields.Created), lida: !!it.fields.Lida }))
+      .sort((a, b) => b.quando.localeCompare(a.quando)).slice(0, 60);
+  }
+  async criarNotificacoes(itens: { para: string; titulo: string; texto: string; link: string; tipo: string }[]) {
+    await this.preparar();
+    if (!this.idNotificacoes) return;
+    await Promise.all(itens.map(n => this.graph.post(`/sites/${this.siteId}/lists/${this.idNotificacoes}/items`, {
+      fields: { Title: n.titulo.slice(0, 250), Para: n.para.toLowerCase(), Texto: n.texto, Link: n.link, Tipo: n.tipo, Lida: false } }).catch(() => undefined)));
+  }
+  async marcarNotificacoesLidas(ids: string[]) {
+    await this.preparar();
+    if (!this.idNotificacoes) return;
+    await Promise.all(ids.map(id => this.graph.pedir(`/sites/${this.siteId}/lists/${this.idNotificacoes}/items/${id}/fields`, { method: 'PATCH', json: { Lida: true } }).catch(() => undefined)));
+  }
+  /* ---------------- modelos de projeto (lista "Portal Modelos") ---------------- */
+  async modelos() {
+    await this.preparar();
+    if (!this.idModelos) return null;
+    const itens = await this.graph.todos<ItemLista & { lastModifiedDateTime?: string }>(`/sites/${this.siteId}/lists/${this.idModelos}/items?$expand=fields&$top=500`);
+    return itens.map(it => {
+      let lista: import('../lib/modelos').ItemModelo[] = [];
+      try { lista = JSON.parse(txt(it.fields.Conteudo) || '[]'); } catch { /* conteúdo inválido */ }
+      return { id: txt(it.fields.ModeloId) || it.id, nome: txt(it.fields.Title), tipo: txt(it.fields.TipoProjeto), descricao: txt(it.fields.Descricao),
+        itens: lista, atualizadoPor: txt(it.fields.AtualizadoPor) || undefined, atualizado: it.lastModifiedDateTime, _item: it.id };
+    }).filter(m => m.itens.length);
+  }
+  async salvarModelo(m: import('../lib/modelos').ModeloProjeto) {
+    await this.preparar();
+    if (!this.idModelos) throw new Error('A lista "Portal Modelos" não existe. Rode o script provisionar-portal.ps1 (sem -Piloto) e recarregue o portal');
+    const campos = { Title: m.nome.slice(0, 250), ModeloId: m.id, TipoProjeto: m.tipo, Descricao: m.descricao, Conteudo: JSON.stringify(m.itens), AtualizadoPor: this.auth.email() };
+    const filtro = encodeURIComponent(`fields/ModeloId eq '${m.id.replace(/'/g, "''")}'`);
+    const atuais = await this.graph.todos<ItemLista>(`/sites/${this.siteId}/lists/${this.idModelos}/items?$expand=fields&$filter=${filtro}`, { Prefer: 'HonorNonIndexedQueriesWarningMayFailRandomly' });
+    if (atuais[0]) await this.graph.pedir(`/sites/${this.siteId}/lists/${this.idModelos}/items/${atuais[0].id}/fields`, { method: 'PATCH', json: campos });
+    else await this.graph.post(`/sites/${this.siteId}/lists/${this.idModelos}/items`, { fields: campos });
+  }
+  async excluirModelo(id: string) {
+    await this.preparar();
+    if (!this.idModelos) return;
+    const filtro = encodeURIComponent(`fields/ModeloId eq '${id.replace(/'/g, "''")}'`);
+    const atuais = await this.graph.todos<ItemLista>(`/sites/${this.siteId}/lists/${this.idModelos}/items?$expand=fields&$filter=${filtro}`, { Prefer: 'HonorNonIndexedQueriesWarningMayFailRandomly' });
+    for (const it of atuais) await this.graph.pedir(`/sites/${this.siteId}/lists/${this.idModelos}/items/${it.id}`, { method: 'DELETE' });
   }
   /** Lista "Portal Wiki": um item por documento (o conteúdo vai em JSON na coluna Conteudo). */
   private listaWiki: string | null | undefined;

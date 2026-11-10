@@ -7,7 +7,11 @@ import { NUMERO_FASE, codigoDaFase } from '../../lib/constantes';
 
 const diaUtilIso = (s: string) => { const d = dia(s); return !!d && diaUtil(d); };
 
-export interface LinhaAtividade { codigo: string; nome: string; fase: Fase; equipe: string; inicio: string; termino: string; marco: boolean }
+export interface LinhaAtividade { codigo: string; nome: string; fase: Fase; equipe: string; inicio: string; termino: string; marco: boolean;
+  /** vindos de um modelo de projeto */
+  horasPlanejadas?: number; predecessoras?: string[]; descricao?: string }
+/** Tarefa (subatividade) vinda de um modelo: criada junto com o projeto, em preparação (o PMO lança depois). */
+export interface TarefaModelo extends LinhaAtividade { pai: string }
 export interface LinhaRisco { codigo: string; descricao: string; probabilidade: Nivel; impacto: Nivel; mitigacao: string; responsavel: string }
 
 export interface FormProjeto {
@@ -15,6 +19,8 @@ export interface FormProjeto {
   patrocinador: string; contrato: string; dataAssinatura: string; modeloFaturamento: string; parceiro: string; inicio: string; termino: string; objetivo: string;
   escopoIncluido: string; escopoExcluido: string; premissas: string; dependencias: string; restricoes: string;
   atividades: LinhaAtividade[];
+  /** tarefas do modelo aplicado (criadas junto com o projeto) */
+  tarefasModelo?: TarefaModelo[];
   riscos: LinhaRisco[];
   equipe: MembroEquipe[];
   /** e-mail do arquiteto escolhido na tabela de técnicos */
@@ -34,7 +40,7 @@ export const novoRisco = (n: number): LinhaRisco => ({ codigo: 'R-' + n, descric
 export const formVazio = (): FormProjeto => ({
   codigo: '', nome: '', cliente: '', tipo: 'VMware', gerente: '', arquiteto: '', patrocinador: '', contrato: '', dataAssinatura: '', modeloFaturamento: '', parceiro: '',
   inicio: '', termino: '', objetivo: '', escopoIncluido: '', escopoExcluido: '', premissas: '', dependencias: '', restricoes: '',
-  atividades: [novaAtividade([], 'Iniciação')], riscos: [novoRisco(1)], equipe: []
+  atividades: [novaAtividade([], 'Iniciação')], riscos: [novoRisco(1)], equipe: [], tarefasModelo: []
 });
 
 /** Lista do que falta para enviar (vazia = pode enviar). */
@@ -65,8 +71,19 @@ export function montarProjeto(f: FormProjeto, situacao: SituacaoCadastro, aprova
     codigo: a.codigo, nome: a.nome.trim(), fase: a.fase, equipe: a.equipe.trim() || 'Systech',
     duracao: Math.max(1, diasUteis(a.inicio, a.termino)), descricao: '', marco: a.marco,
     inicio: a.inicio, termino: a.termino, baselineInicio: a.inicio, baselineTermino: a.termino,
-    status: 'Planejado', percentual: 0, pai: '', observacao: ''
+    status: 'Planejado', percentual: 0, pai: '', observacao: '',
+    ...(a.horasPlanejadas ? { horasPlanejadas: a.horasPlanejadas } : {}), ...(a.predecessoras?.length ? { predecessoras: a.predecessoras } : {}),
+    ...(a.descricao ? { descricao: a.descricao } : {})
   }));
+  // tarefas do modelo: só as que ainda têm a atividade principal; entram em preparação (o PMO lança para os técnicos)
+  const principais = new Set(atividades.map(a => a.codigo));
+  for (const t of f.tarefasModelo || []) {
+    if (!principais.has(t.pai) || !t.nome.trim()) continue;
+    atividades.push({ codigo: t.codigo, nome: t.nome.trim(), fase: t.fase, equipe: t.equipe || 'Systech', duracao: Math.max(1, diasUteis(t.inicio, t.termino)),
+      descricao: t.descricao || '', marco: !!t.marco, inicio: t.inicio, termino: t.termino, baselineInicio: t.inicio, baselineTermino: t.termino,
+      status: 'Planejado', percentual: 0, pai: t.pai, observacao: '', lancada: false,
+      ...(t.horasPlanejadas ? { horasPlanejadas: t.horasPlanejadas } : {}), ...(t.predecessoras?.length ? { predecessoras: t.predecessoras } : {}) });
+  }
   const fimDaFase = (fase: Fase) => atividades.filter(a => a.fase === fase).map(a => a.termino).sort().pop() || '';
   const gate = (fase: Fase, g: string, nome: string, data: string, info = '', sit: Gate['situacao'] = 'Pendente'): Gate => ({ fase, gate: g, nome, situacao: sit, data, info });
   const riscos: Risco[] = f.riscos.filter(r => r.descricao.trim()).map(r => ({

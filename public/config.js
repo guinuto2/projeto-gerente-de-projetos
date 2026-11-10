@@ -22,6 +22,8 @@ window.PORTAL_CONFIG = {
   emailAoMudarStatusSubatividade: true, // status de subatividade mudou              → PMO (gerente do projeto)
   emailAoAtrasar: true,              // atividade/subatividade ficou atrasada        → PMO (uma vez por atraso)
   emailAoLancarTarefa: true,         // PMO lançou tarefas                           → técnico responsável
+  statusReportAutomatico: true,      // status report semanal de cada projeto ativo   → GP, patrocinador e cliente
+  statusReportDia: 5,                // dia do envio: 1 = segunda … 5 = sexta (envia no primeiro acesso de um PMO nesse dia ou depois, na mesma semana)
   emailAoCriarProjeto: true,         // patrocinador cria projeto (já aprovado)      → gerente do projeto + patrocinador
 
   emailSomentePara: '',    // TESTE: preencha para mandar TODOS os e-mails do portal para um endereço só (vazio = cada e-mail vai para o papel certo)

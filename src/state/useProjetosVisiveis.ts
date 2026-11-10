@@ -37,6 +37,7 @@ export function useProjetosVisiveis() {
     if (p.situacaoCadastro === 'Rascunho') return papel === 'PMO';   // rascunho é só do PMO
     if (papel === 'Cliente') {
       if (p.situacaoCadastro !== 'Ativo' && p.situacaoCadastro !== 'Encerrado') return false;
+      if (fonte.modoCliente) return true;   // a pasta do órgão já tem só os projetos dele
       if (simulaCliente) return p.cliente === clienteSimulado;
       // projetos em que alguém da equipe do lado do cliente tem o mesmo domínio de e-mail (o mesmo órgão)
       return p.equipe.some(m => !!m.email && norm(m.empresa) !== 'systech' && dominio(m.email) === meuDominio);
