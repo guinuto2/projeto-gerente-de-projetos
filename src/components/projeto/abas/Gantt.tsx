@@ -4,7 +4,8 @@ import type { Atividade, Projeto } from '../../../types/models';
 import { usePortal } from '../../../state/PortalContext';
 import { estadoFase, macro } from '../../../lib/calculos';
 import { classeEquipe, FASES, SELO_STATUS } from '../../../lib/constantes';
-import { dia, dm, iso } from '../../../lib/datas';
+import { dia, dm, dma, iso } from '../../../lib/datas';
+import { diasCorridos, marcasCronograma } from '../../../lib/escalaCronograma';
 import { Selo } from '../../ui/Selo';
 import { TEMA } from '../../../lib/tema';
 import { DicaAtividade } from './DicaAtividade';
@@ -47,21 +48,20 @@ export function Gantt(props: Props) {
     const ini = dia(datas[0])!, fim = dia(datas[datas.length - 1])!;
     ini.setDate(ini.getDate() - ((ini.getDay() + 6) % 7));
     fim.setDate(fim.getDate() + 3);
-    const total = (fim.getTime() - ini.getTime()) / 864e5;
-    const semanas: string[] = [];
-    for (const d = new Date(ini); d <= fim; d.setDate(d.getDate() + 7)) semanas.push(iso(d));
-    return { ini: iso(ini), fim: iso(fim), total, semanas };
+    const inicio = iso(ini), termino = iso(fim);
+    const total = Math.max(1, diasCorridos(inicio, termino));
+    return { ini: inicio, fim: termino, total, marcas: marcasCronograma(inicio, termino) };
   }, [atividades, periodo]);
 
-  const pos = (s: string) => ((dia(s)!.getTime() - dia(escala.ini)!.getTime()) / 864e5) / escala.total * 100;
-  const larg = (a: string, b: string) => Math.max(0.6, ((dia(b)!.getTime() - dia(a)!.getTime()) / 864e5 + 1) / escala.total * 100);
+  const pos = (s: string) => diasCorridos(escala.ini, s) / escala.total * 100;
+  const larg = (a: string, b: string) => Math.max(0.6, (diasCorridos(a, b) + 1) / escala.total * 100);
   // atrasada: passou da data prevista sem concluir (a barra inteira fica avermelhada, mesmo com 0% feito)
   const atrasada = (a: Atividade) => a.status !== 'Concluído' && a.status !== 'Cancelado' && !!a.termino && a.termino < hoje;
   const corBarra = (a: Atividade) => a.status === 'Concluído' ? TEMA.concluido : (a.status === 'Bloqueado' || a.termino < hoje) ? TEMA.atrasado : TEMA.emCurso;
 
   const grade = (
     <>
-      {escala.semanas.map(s => <div key={s} className="gsem" style={{ left: `${pos(s)}%` }} />)}
+      {escala.marcas.map(m => <div key={m.data} className="gsem" style={{ left: `${pos(m.data)}%` }} />)}
       {hoje >= escala.ini && hoje <= escala.fim && <div className="ghoje" style={{ left: `${pos(hoje)}%` }} title="Hoje" />}
     </>
   );
@@ -85,7 +85,7 @@ export function Gantt(props: Props) {
       <div className="gantt">
         <div className="grow ghead">
           <div className="gcel">{props.plano ? <span className="gnome">Tarefa</span> : <><span className="gcod">Cód.</span><span className="gnome">Atividade</span><span>Equipe</span></>}</div>
-          <div className="gtl">{escala.semanas.map(s => <span key={s} className="gsemL" style={{ left: `${pos(s)}%` }}>{dm(s)}</span>)}</div>
+          <div className="gtl">{escala.marcas.map(m => <span key={m.data} className={`gsemL${pos(m.data) > 92 ? ' final' : ''}`} title={dma(m.data)} style={{ left: `${pos(m.data)}%` }}>{m.rotulo}</span>)}</div>
         </div>
         {props.plano && props.plano.map(t => (
           <div key={t.codigo} className={`grow gclick prazo-${situacaoPrazo(t, hoje) || 'ok'}`} role="button" tabIndex={0} onClick={() => aoAbrir(t.codigo)} onKeyDown={e => { if (e.key === 'Enter') aoAbrir(t.codigo); }}>

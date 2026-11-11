@@ -41,6 +41,8 @@ export function Cabecalho() {
         </nav>
         {config.dataSimulada && <span className="dataSimulada" title="config.js: dataSimulada">Data simulada · {config.dataSimulada.split('-').reverse().join('/')}</span>}
         {papel !== 'Cliente' && <Sino />}
+        <img className="logoAniversarioHeader" src={`${import.meta.env.BASE_URL}Systech20anos.png`}
+          alt="Systech — 20 anos" width="806" height="180" />
         <MenuUsuario nome={piloto ? 'Modo piloto' : usuario} piloto={piloto} papel={papel} disponiveis={disponiveis}
           status={piloto ? 'Modo piloto · sem conexão' : sincronizando ? 'SharePoint · atualizando…' : `SharePoint · atualizado às ${atualizadoEm}`}
           sincronizando={sincronizando}

@@ -1,7 +1,7 @@
 import { faltasFaturamento } from '../../lib/validacoes';
 import type { Atividade, Dados, Fase, Gate, MembroEquipe, Nivel, NovoProjeto, Risco, SituacaoCadastro, Tecnico } from '../../types/models';
-import { tecnicoPorNome } from '../../lib/pessoas';
-import { dia, diasUteis, diaUtil, linhas, somarDiasUteis, hojeIso } from '../../lib/datas';
+import { gerentesParaCadastro, tecnicoPorNome } from '../../lib/pessoas';
+import { dia, diasUteis, diaUtil, diferencaDiasCorridos, linhas, somarDiasCorridos, somarDiasUteis, hojeIso } from '../../lib/datas';
 import { CRONOGRAMA_SYSTECH, RISCOS_SYSTECH } from '../../lib/modeloSystech';
 import { NUMERO_FASE, codigoDaFase } from '../../lib/constantes';
 
@@ -12,6 +12,40 @@ export interface LinhaAtividade { codigo: string; nome: string; fase: Fase; equi
   horasPlanejadas?: number; predecessoras?: string[]; descricao?: string }
 /** Tarefa (subatividade) vinda de um modelo: criada junto com o projeto, em preparação (o PMO lança depois). */
 export interface TarefaModelo extends LinhaAtividade { pai: string }
+/** Move início e término juntos, mantendo a duração original em dias corridos. */
+export function deslocarPeriodo<T extends { inicio: string; termino: string }>(linha: T, dias: number): T {
+  if (!dias) return linha;
+  return { ...linha, inicio: somarDiasCorridos(linha.inicio, dias), termino: somarDiasCorridos(linha.termino, dias) };
+}
+
+/**
+ * Reprograma o cronograma durante o cadastro: alterar o início desloca também o término da
+ * própria atividade; alterar o término mantém seu início. Em ambos os casos, todas as atividades
+ * seguintes e as tarefas do modelo ligadas às atividades afetadas acompanham a diferença.
+ */
+export function reprogramarCronograma(
+  atividades: LinhaAtividade[], tarefas: TarefaModelo[], indice: number,
+  campo: 'inicio' | 'termino', valor: string
+): { atividades: LinhaAtividade[]; tarefas: TarefaModelo[] } {
+  const atual = atividades[indice];
+  if (!atual) return { atividades, tarefas };
+  const dias = diferencaDiasCorridos(atual[campo], valor);
+  // Sem duas datas válidas, não há diferença confiável para propagar.
+  if (dias === null || !dias) {
+    return { atividades: atividades.map((a, i) => i === indice ? { ...a, [campo]: valor } : a), tarefas };
+  }
+  const novas = atividades.map((a, i) => {
+    if (i < indice) return a;
+    if (i > indice || campo === 'inicio') return {
+      ...deslocarPeriodo(a, dias), ...(i === indice ? { inicio: valor } : {})
+    };
+    return { ...a, termino: valor };
+  });
+  const afetadas = new Set(atividades.slice(indice + (campo === 'inicio' ? 0 : 1)).map(a => a.codigo));
+  const novasTarefas = tarefas.map(t => afetadas.has(t.pai) ? deslocarPeriodo(t, dias) : t);
+  return { atividades: novas, tarefas: novasTarefas };
+}
+
 export interface LinhaRisco { codigo: string; descricao: string; probabilidade: Nivel; impacto: Nivel; mitigacao: string; responsavel: string }
 
 export interface FormProjeto {
@@ -54,6 +88,7 @@ export function validar(f: FormProjeto, d: Dados, _hoje: string): string[] {   /
   if (!f.modeloFaturamento) e.push('escolha o modelo de faturamento');
   e.push(...faltasFaturamento(f));
   if (!f.gerente.trim()) e.push('informe o GP');
+  else if (!tecnicoPorNome(gerentesParaCadastro(d.tecnicos || []), f.gerente)) e.push('escolha um gerente ativo com função Gerente no Portal Tecnicos');
   if (!f.inicio || !f.termino) e.push('informe início e término');
   else if (f.termino < f.inicio) e.push('o término do projeto é antes do início');
   if (!f.objetivo.trim()) e.push('descreva o objetivo');
@@ -158,4 +193,15 @@ export function colocarNaEquipe(equipe: FormProjeto['equipe'], funcao: string, n
   const j = equipe.findIndex(m => m.funcao === funcao && (funcao === 'Gerente de projeto' || funcao === 'Arquiteto'));
   const pessoa = { nome, funcao, empresa: 'Systech', email };
   return j >= 0 ? equipe.map((m, k) => (k === j ? { ...m, ...pessoa } : m)) : [...equipe, pessoa];
+}
+
+/** Responsáveis indicados em Dados gerais são a fonte oficial das suas linhas na equipe. */
+export function atualizarResponsavelEquipe(equipe: MembroEquipe[], funcao: 'Gerente de projeto' | 'Arquiteto', nome: string, email: string): MembroEquipe[] {
+  const igual = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+  const atual = equipe.find(m => m.funcao === funcao && igual(m.nome, nome));
+  // Reescolher o mesmo responsável não pode apagar telefone ou outros dados existentes.
+  if (atual && nome.trim()) return equipe.filter(m => m.funcao !== funcao || m === atual)
+    .map(m => m === atual ? { ...m, nome, email: email || m.email } : m);
+  const semAnterior = equipe.filter(m => m.funcao !== funcao);
+  return nome.trim() ? colocarNaEquipe(semAnterior, funcao, nome, email) : semAnterior;
 }

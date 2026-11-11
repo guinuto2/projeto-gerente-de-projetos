@@ -10,11 +10,12 @@ import { Confirmacao } from '../components/ui/Confirmacao';
 import { PassoDadosGerais } from '../components/novo/PassoDadosGerais';
 import { PassoEscopo } from '../components/novo/PassoEscopo';
 import { datasDoItem, modeloPadrao, type ItemModelo, type ModeloProjeto } from '../lib/modelos';
+import { diferencaDiasCorridos, somarDiasCorridos } from '../lib/datas';
 import { PassoCronograma } from '../components/novo/PassoCronograma';
 import { PassoRiscos } from '../components/novo/PassoRiscos';
 import { EditorEquipe } from '../components/novo/EditorEquipe';
 import { ConferenciaEquipe, useConferencia } from '../components/novo/ConferenciaEquipe';
-import { formVazio, montarEquipe, montarProjeto, riscosModelo, validar, type FormProjeto, colocarNaEquipe } from '../components/novo/formulario';
+import { formVazio, montarEquipe, montarProjeto, riscosModelo, validar, type FormProjeto, atualizarResponsavelEquipe, deslocarPeriodo, reprogramarCronograma } from '../components/novo/formulario';
 
 const PASSOS = ['Dados gerais e termo de abertura', 'Escopo, premissas e restrições', 'Cronograma e marcos', 'Riscos'];
 
@@ -30,7 +31,28 @@ export function NovoProjetoPage() {
   const [erro, setErro] = useState('');
   useBloqueioSincronizacao('novo-projeto', true);
 
-  const mudar = (c: keyof FormProjeto, v: string) => setForm(f => ({ ...f, [c]: v }));
+  const mudar = (c: keyof FormProjeto, v: string) => setForm(f => {
+    if (c !== 'inicio') return { ...f, [c]: v };
+    // Se o início do projeto mudar após aplicar um modelo, todo o cronograma acompanha.
+    const dias = diferencaDiasCorridos(f.inicio, v);
+    if (dias === null || !dias) return { ...f, inicio: v };
+    return { ...f, inicio: v, termino: somarDiasCorridos(f.termino, dias),
+      atividades: f.atividades.map(a => deslocarPeriodo(a, dias)),
+      tarefasModelo: f.tarefasModelo?.map(t => deslocarPeriodo(t, dias)) };
+  });
+  const mudarDataAtividade = (indice: number, campo: 'inicio' | 'termino', valor: string) => setForm(f => {
+    const original = f.atividades[indice];
+    if (!original) return f;
+    const dias = diferencaDiasCorridos(original[campo], valor);
+    const antes = [...f.atividades, ...(f.tarefasModelo || [])].map(a => a.termino).filter(Boolean).sort().pop() || '';
+    const { atividades, tarefas } = reprogramarCronograma(f.atividades, f.tarefasModelo || [], indice, campo, valor);
+    const depois = [...atividades, ...tarefas].map(a => a.termino).filter(Boolean).sort().pop() || '';
+    // Mantém o término geral coerente com o cronograma, preservando um prazo maior
+    // informado manualmente. Limpar temporariamente uma data não deve encurtá-lo.
+    const recalcular = dias !== null && f.termino === antes;
+    const termino = depois && (!f.termino || f.termino < depois || recalcular) ? depois : f.termino;
+    return { ...f, atividades, tarefasModelo: tarefas, termino };
+  });
   const hoje = fonte.hoje();
   const pendencias = validar(form, dados, hoje);
 
@@ -104,12 +126,12 @@ export function NovoProjetoPage() {
       <section className="card" style={{ padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: 18 }}>
         {passo === 0 && <>
           <PassoDadosGerais form={form} mudar={mudar} aoEscolherArquiteto={(nome, email) => setForm(f => (f ? { ...f, arquiteto: nome, arquitetoEmail: email } : f))}
-            aoEscolherPessoa={(funcao: string, nome: string, email: string) => setForm(f => (f ? { ...f, equipe: colocarNaEquipe(f.equipe, funcao, nome, email) } : f))} />
+            aoEscolherPessoa={(funcao: string, nome: string, email: string) => setForm(f => (f ? { ...f, equipe: atualizarResponsavelEquipe(f.equipe, funcao as 'Gerente de projeto' | 'Arquiteto', nome, email) } : f))} />
           <h3 className="h3" style={{ fontSize: 15 }}>Equipe do projeto</h3>
-          <EditorEquipe equipe={form.equipe} aoMudar={e => setForm(f => ({ ...f, equipe: e }))} />
+          <EditorEquipe equipe={form.equipe} gerente={form.gerente} arquiteto={form.arquiteto} aoMudar={e => setForm(f => ({ ...f, equipe: e }))} />
         </>}
         {passo === 1 && <PassoEscopo form={form} mudar={mudar} />}
-        {passo === 2 && <PassoCronograma linhas={form.atividades} aoMudar={l => setForm(f => ({ ...f, atividades: l }))} modelos={modelos} tipo={form.tipo} tarefasDoModelo={(form.tarefasModelo || []).filter(t => form.atividades.some(a => a.codigo === t.pai)).length} aoAplicarModelo={aplicarModelo} />}
+        {passo === 2 && <PassoCronograma linhas={form.atividades} aoMudar={l => setForm(f => ({ ...f, atividades: l }))} aoMudarData={mudarDataAtividade} modelos={modelos} tipo={form.tipo} tarefasDoModelo={(form.tarefasModelo || []).filter(t => form.atividades.some(a => a.codigo === t.pai)).length} aoAplicarModelo={aplicarModelo} />}
         {passo === 3 && <PassoRiscos linhas={form.riscos} aoMudar={l => setForm(f => ({ ...f, riscos: l }))} aoUsarModelo={() => setForm(f => ({ ...f, riscos: riscosModelo() }))} />}
         {erro && <Mensagem tipo="erro">{erro}</Mensagem>}
         <div className="linha" style={{ borderTop: '1px solid var(--borda2)', paddingTop: 16 }}>

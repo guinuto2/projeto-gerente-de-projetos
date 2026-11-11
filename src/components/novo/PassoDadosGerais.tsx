@@ -1,8 +1,7 @@
-import { useState } from 'react';
 import type { FormProjeto } from './formulario';
 import { CODIGO_PADRAO, clienteParecido, normalizarCodigo } from '../../lib/validacoes';
 import { MODELOS_FATURAMENTO, REGRA_FATURAMENTO, TIPOS_PROJETO } from '../../lib/constantes';
-import { ativos, pessoasComPapel, tecnicoPorNome, tecnicosParaCadastro } from '../../lib/pessoas';
+import { ativos, gerentesParaCadastro, tecnicoPorNome, tecnicosParaCadastro } from '../../lib/pessoas';
 import { usePortal } from '../../state/PortalContext';
 
 type Campo = keyof Omit<FormProjeto, 'atividades' | 'riscos' | 'equipe' | 'tarefasModelo'>;
@@ -11,16 +10,16 @@ interface Props { form: FormProjeto; mudar: (c: Campo, v: string) => void; edica
   aoEscolherPessoa?: (funcao: string, nome: string, email: string) => void }
 
 export function PassoDadosGerais({ form, mudar, edicao = false, aoEscolherArquiteto, dataMinima, aoEscolherPessoa }: Props) {
-  const { dados } = usePortal();
+  const { dados, pessoasApp } = usePortal();
   // parceiros já usados em outros projetos (sugestões do campo)
   const parceiros = Array.from(new Set(dados.projetos.map(p => p.parceiro).filter((x): x is string => !!x))).sort();
-  const { pessoasApp } = usePortal();
   const tecnicos = tecnicosParaCadastro(ativos(dados.tecnicos || []), pessoasApp);
-  const pmos = pessoasComPapel(pessoasApp, 'PMO');
+  // Gerente é escolhido somente entre os profissionais ativos com Função = Gerente
+  // (ou Gerente de projeto) no Portal Tecnicos, sem fallback para PMOs ou técnicos.
+  const gerentesDisponiveis = gerentesParaCadastro(dados.tecnicos || []);
   // clientes já usados: sugestões e aviso de nome parecido (ex.: "TRF 1" e "TRF1")
   const clientes = Array.from(new Set(dados.projetos.map(p => p.cliente).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'pt-BR'));
   const parecido = form.cliente.trim() ? clienteParecido(form.cliente, clientes) : null;
-  const [gerenteLivre, setGerenteLivre] = useState(false);
   const antesDeHoje = (v: string) => !!dataMinima && !!v && v < dataMinima;
   const campo = (c: Campo, rotulo: string, extra: { type?: string; placeholder?: string; span?: boolean; bloqueado?: boolean; min?: string } = {}) => (
     <label className="campo" style={extra.span ? { gridColumn: 'span 2' } : undefined}>{rotulo}
@@ -67,33 +66,30 @@ export function PassoDadosGerais({ form, mudar, edicao = false, aoEscolherArquit
           <span className="dica">Empresa que vai executar o trabalho, quando a Systech terceirizar.</span>
         </label>
         <label className="campo">Gerente de projeto *
-          {pmos.length > 0 && !gerenteLivre ? (
-            <select className={`ctl ${!form.gerente ? 'vazioObrig' : ''}`} value={pmos.some(p => p.nome === form.gerente) ? form.gerente : form.gerente ? '__atual' : ''}
-              onChange={e => {
-                if (e.target.value === '__outra') { setGerenteLivre(true); return; }
-                if (e.target.value === '__atual') return;
-                const p = pmos.find(x => x.nome === e.target.value);
-                mudar('gerente', e.target.value);
-                if (p && aoEscolherPessoa) aoEscolherPessoa('Gerente de projeto', p.nome, p.email);
-              }}>
-              <option value="">— selecione —</option>
-              {pmos.map(p => <option key={p.email || p.nome} value={p.nome}>{p.nome}</option>)}
-              {form.gerente && !pmos.some(p => p.nome === form.gerente) && <option value="__atual">{form.gerente} (fora da lista)</option>}
-              <option value="__outra">Outra pessoa (digitar o nome)…</option>
-            </select>
-          ) : (
-            <input className="ctl" value={form.gerente} onChange={e => mudar('gerente', e.target.value)} autoFocus={gerenteLivre} />
-          )}
-          {gerenteLivre && pmos.length > 0 && <button type="button" className="linkBtn" style={{ alignSelf: 'flex-start' }} onClick={() => setGerenteLivre(false)}>← escolher da lista de PMOs</button>}
+          <select className={`ctl ${!form.gerente ? 'vazioObrig' : ''}`} value={form.gerente}
+            onChange={e => {
+              const nome = e.target.value;
+              const pessoa = gerentesDisponiveis.find(p => p.nome === nome);
+              mudar('gerente', nome);
+              aoEscolherPessoa?.('Gerente de projeto', pessoa?.nome || '', pessoa?.email || '');
+            }}>
+            <option value="">— selecione —</option>
+            {gerentesDisponiveis.map(p => <option key={p.email || p.nome} value={p.nome} disabled={p.nome === form.arquiteto}>{p.nome}</option>)}
+            {/* Em projetos antigos, exibe o gerente já salvo, mas não permite escolhê-lo novamente. */}
+            {edicao && form.gerente && !gerentesDisponiveis.some(p => p.nome === form.gerente) &&
+              <option value={form.gerente} disabled>{form.gerente} (não cadastrado como Gerente)</option>}
+          </select>
+          {!gerentesDisponiveis.length && <span className="dica">Nenhum gerente ativo encontrado. Cadastre ou atualize a função para Gerente de projeto na lista Portal Tecnicos.</span>}
         </label>
         <label className="campo">Arquiteto
           <select className="ctl" value={form.arquiteto} onChange={e => {
-            const t = tecnicoPorNome(tecnicos, e.target.value);
-            if (aoEscolherArquiteto) aoEscolherArquiteto(e.target.value, t?.email || ''); else mudar('arquiteto', e.target.value);
-            if (t && aoEscolherPessoa) aoEscolherPessoa('Arquiteto', t.nome, t.email);
+            const nome = e.target.value;
+            const t = tecnicoPorNome(tecnicos, nome);
+            if (aoEscolherArquiteto) aoEscolherArquiteto(nome, t?.email || ''); else mudar('arquiteto', nome);
+            aoEscolherPessoa?.('Arquiteto', t?.nome || '', t?.email || '');
           }}>
             <option value="">— selecione —</option>
-            {tecnicos.map(a => <option key={a.email || a.nome} value={a.nome}>{a.nome}</option>)}
+            {tecnicos.map(a => <option key={a.email || a.nome} value={a.nome} disabled={a.nome === form.gerente}>{a.nome}</option>)}
             {/* mantém o valor atual de projetos antigos, mesmo que não esteja na tabela */}
             {form.arquiteto && !tecnicoPorNome(tecnicos, form.arquiteto) && <option value={form.arquiteto}>{form.arquiteto} (fora da tabela)</option>}
           </select>

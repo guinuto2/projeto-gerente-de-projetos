@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import type { Atividade, StatusAtividade } from '../types/models';
 import { usePortal, useBloqueioSincronizacao } from '../state/PortalContext';
@@ -13,6 +13,7 @@ import { CAUSAS_ATRASO, STATUS_ATUALIZACAO } from '../lib/constantes';
 import { dm, dma } from '../lib/datas';
 import { Mensagem } from '../components/ui/Mensagem';
 import { NovaSubatividade } from '../components/atualizacao/NovaSubatividade';
+import { KanbanAtividades } from '../components/atualizacao/KanbanAtividades';
 import { EditarAtividade } from '../components/projeto/editores/EditarAtividade';
 import { DocumentosAtividade } from '../components/atualizacao/DocumentosAtividade';
 import { VisaoAtividade } from '../components/projeto/editores/VisaoAtividade';
@@ -66,6 +67,9 @@ export function AtualizacaoPage() {
   }, [visiveis, dados, minhasSubs, hoje]);
   const [projetoFiltro, setProjetoFiltro] = useState('');
   const [buscaAtividade, setBuscaAtividade] = useState('');
+  const [visao, setVisao] = useState<'lista' | 'kanban'>('lista');
+  const kanbanAtivo = papel === 'PMO' && visao === 'kanban';
+  const detalheRef = useRef<HTMLElement>(null);
   /** atividade aberta a partir do cronograma que não está entre as da semana: fica fixada no topo da lista */
   const [fixa, setFixa] = useState<string | null>(null);
   /** PMO: painel completo da atividade (nome, fase, datas, pré-requisito, reunião, lançar tarefas) */
@@ -79,14 +83,20 @@ export function AtualizacaoPage() {
     return p && a && !base.some(i => chave(i) === fixa) ? { projeto: p, atividade: a } : null;
   })();
   const itensParaFiltro = [...(itemFixo ? [itemFixo] : []), ...base];
+  // O Kanban é uma visão do portfólio inteiro: inclui atividades concluídas e futuras,
+  // diferentemente da lista semanal. Canceladas permanecem fora do quadro.
+  const itensKanban = useMemo(() => visiveis.flatMap(p => (dados.atividades[p.codigo] || [])
+    .filter(a => a.status !== 'Cancelado')
+    .map(a => ({ projeto: p, atividade: a }))), [visiveis, dados]);
   // Quantidades incluem a atividade aberta diretamente pelo cronograma, se houver.
   const quantidadePorProjeto = new Map<string, number>();
-  itensParaFiltro.forEach(i => quantidadePorProjeto.set(i.projeto.codigo, (quantidadePorProjeto.get(i.projeto.codigo) || 0) + 1));
+  (kanbanAtivo ? itensKanban : itensParaFiltro).forEach(i => quantidadePorProjeto.set(i.projeto.codigo, (quantidadePorProjeto.get(i.projeto.codigo) || 0) + 1));
   const termoBusca = papel === 'PMO' ? normalizarBusca(buscaAtividade.trim()) : '';
-  const lista = itensParaFiltro.filter(i =>
+  const aplicarFiltros = (i: ItemSemana) =>
     (!projetoFiltro || i.projeto.codigo === projetoFiltro) &&
-    (!termoBusca || [i.atividade.codigo, i.atividade.nome].some(valor => normalizarBusca(valor).includes(termoBusca)))
-  );
+    (!termoBusca || [i.atividade.codigo, i.atividade.nome].some(valor => normalizarBusca(valor).includes(termoBusca)));
+  const lista = itensParaFiltro.filter(aplicarFiltros);
+  const kanbanFiltrado = itensKanban.filter(aplicarFiltros);
   /** técnico: nova subatividade escolhendo projeto e atividade principal (no topo da lista) */
   const [novaSubLivre, setNovaSubLivre] = useState(false);
   /** lista paginada: 5 por página */
@@ -113,7 +123,8 @@ export function AtualizacaoPage() {
   const [novaSub, setNovaSub] = useState(false);
 
   const [sel, setSel] = useState<string>(lista[0] ? chave(lista[0]) : '');
-  const item = lista.find(i => chave(i) === sel) || lista[0];
+  const itensAtuais = kanbanAtivo ? kanbanFiltrado : lista;
+  const item = itensAtuais.find(i => chave(i) === sel) || itensAtuais[0];
   const [f, setF] = useState<Form | null>(item ? paraForm(item.atividade) : null);
   const [erro, setErro] = useState('');
   const [salvando, setSalvando] = useState(false);
@@ -156,6 +167,27 @@ export function AtualizacaoPage() {
   // criar tarefa/subatividade só com algum projeto em andamento (ativo) — a página abre do mesmo jeito
   const temProjetoAtivo = visiveis.some(p => p.situacaoCadastro === 'Ativo');
   const motivoSemProjeto = `Nenhum projeto em andamento${ehTecnico ? ' em que você está na equipe' : ''}: dá para criar tarefas quando houver um projeto ativo.`;
+  // Os mesmos controles são exibidos no painel da lista ou na barra do Kanban,
+  // evitando uma coluna de filtros isolada e espaço vazio no topo da página.
+  const filtrosPMO = papel === 'PMO' ? (
+    <>
+      <label className="campo">
+        Filtrar atividades por projeto
+        <select className="ctl" value={projetoFiltro} onChange={e => { setProjetoFiltro(e.target.value); setPagina(0); }}>
+          <option value="">Todos os projetos ({kanbanAtivo ? itensKanban.length : itensParaFiltro.length} atividades)</option>
+          {visiveis.map(p => <option key={p.codigo} value={p.codigo}>
+            {p.codigo} · {p.nome} ({quantidadePorProjeto.get(p.codigo) || 0})
+          </option>)}
+        </select>
+      </label>
+      <label className="campo">
+        Buscar atividade
+        <input className="ctl" type="search" placeholder="Buscar por código ou nome da atividade"
+          aria-label="Buscar atividade" value={buscaAtividade}
+          onChange={e => { setBuscaAtividade(e.target.value); setPagina(0); }} />
+      </label>
+    </>
+  ) : null;
 
   return (
     <main className="main">
@@ -164,15 +196,27 @@ export function AtualizacaoPage() {
         <div className="linha" style={{ marginTop: 8, alignItems: 'center' }}>
           <h1 className="ptit">Atualizar status</h1>
           {ehTecnico && pode('criarSubatividade') && <button type="button" className="btn pri" disabled={!temProjetoAtivo} title={temProjetoAtivo ? undefined : motivoSemProjeto} onClick={() => setNovaSubLivre(true)}>+ Nova tarefa</button>}
+          {papel === 'PMO' && (
+            <div className="atvVisao" role="group" aria-label="Visualização das atividades">
+              <button type="button" className={`atvVisaoBotao ${!kanbanAtivo ? 'on' : ''}`}
+                aria-pressed={!kanbanAtivo} onClick={() => setVisao('lista')}>Lista</button>
+              <button type="button" className={`atvVisaoBotao ${kanbanAtivo ? 'on' : ''}`}
+                aria-pressed={kanbanAtivo} onClick={() => setVisao('kanban')}>Kanban</button>
+            </div>
+          )}
         </div>
       </div>
-      <div className="cols">
-        <aside className="card pad atvLista">
+      {kanbanAtivo && (
+        <div className="card pad atvFiltrosPMO atvFiltrosKanban">{filtrosPMO}</div>
+      )}
+      <div className={kanbanAtivo ? 'atvModoKanban' : 'cols'}>
+        {!kanbanAtivo && <aside className="card pad atvLista">
           <h2 className="h3" style={{ marginBottom: 2 }}>{ehTecnico ? 'Tarefas' : 'Atividades desta semana'} <span className="cnt">{lista.length}</span></h2>
           <div className="sub" style={{ marginBottom: 10 }}>{ehTecnico ? 'Dos projetos em que estou alocado' : 'Todos os projetos em andamento'}</div>
-          {(papel === 'PMO' || visiveis.length > 1) && (
+          {papel === 'PMO' && <div className="atvFiltrosPMO atvFiltrosLista">{filtrosPMO}</div>}
+          {papel !== 'PMO' && visiveis.length > 1 && (
             <label className="campo" style={{ marginBottom: 10 }}>
-              {papel === 'PMO' ? 'Filtrar atividades por projeto' : 'Projeto'}
+              Projeto
               <select className="ctl" value={projetoFiltro} onChange={e => { setProjetoFiltro(e.target.value); setPagina(0); }}>
                 <option value="">Todos os projetos ({itensParaFiltro.length} atividades)</option>
                 {visiveis.map(p => <option key={p.codigo} value={p.codigo}>
@@ -181,15 +225,6 @@ export function AtualizacaoPage() {
               </select>
             </label>
           )}
-          {papel === 'PMO' && (
-            <label className="campo" style={{ marginBottom: 10 }}>
-              Buscar atividade
-              <input className="ctl" type="search" placeholder="Buscar por código ou nome da atividade"
-                aria-label="Buscar atividade" value={buscaAtividade}
-                onChange={e => { setBuscaAtividade(e.target.value); setPagina(0); }} />
-            </label>
-          )}
-
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
             {visiveisNaPagina.map(i => {
               const [txt, cor] = rotulo(i.atividade), on = item && chave(i) === chave(item);
@@ -225,10 +260,18 @@ export function AtualizacaoPage() {
                 : projetoFiltro ? 'Nenhuma atividade aberta nesta semana para o projeto selecionado.'
                 : ehTecnico ? 'Nenhuma tarefa aberta nos seus projetos.' : 'Nenhuma atividade aberta nesta semana.'}</p>}
           </div>
-        </aside>
+        </aside>}
+
+        {kanbanAtivo && (
+          <KanbanAtividades itens={kanbanFiltrado} hoje={hoje} selecionada={item ? chave(item) : ''}
+            aoSelecionar={i => {
+              setSel(chave(i));
+              window.requestAnimationFrame(() => detalheRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+            }} />
+        )}
 
         {item && f ? (
-          <section className="card formAtual">
+          <section ref={detalheRef} className="card formAtual">
             <div>
               <div className="sub" style={{ fontSize: 13 }}>{item.projeto.codigo} · {item.projeto.nome} · Fase de {item.atividade.fase.toLowerCase()}</div>
               <div className="linha" style={{ alignItems: 'flex-start' }}>

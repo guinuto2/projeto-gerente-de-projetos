@@ -1,5 +1,6 @@
 import { PublicClientApplication, type AccountInfo, InteractionRequiredAuthError } from '@azure/msal-browser';
 import type { PortalConfig } from '../config/config';
+import { encerrarEntrada } from '../lib/acessoInicial';
 
 /** Escopos delegados: o portal age em nome de quem está logado. */
 export const ESCOPOS = ['User.Read', 'Sites.ReadWrite.All'];
@@ -111,6 +112,7 @@ export class AutenticadorMsal implements Autenticador {
   }
 
   async sair(): Promise<void> {
+    encerrarEntrada();
     await this.pca.logoutRedirect({ account: this.conta || undefined });
   }
 }
@@ -124,7 +126,7 @@ export class AutenticadorTeste implements Autenticador {
   /** testes automatizados: as funções vêm de localStorage (portal-pmo-roles-teste), padrão PMO */
   papeis() { try { return JSON.parse(localStorage.getItem('portal-pmo-roles-teste') || '["PMO"]'); } catch { return ['PMO']; } }
   async tokenSilencioso() { return 'token-de-teste'; }
-  async sair() { /* nada */ }
+  async sair() { encerrarEntrada(); }
 }
 
 /** Traduz os erros mais comuns do Entra ID para a ação que resolve. */

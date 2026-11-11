@@ -18,6 +18,13 @@ export const ativos = (lista: Tecnico[]): Tecnico[] =>
 export const tecnicoPorNome = (lista: Tecnico[], nome: string): Tecnico | undefined =>
   lista.find(t => t.nome.toLowerCase() === nome.trim().toLowerCase());
 
+/** Somente profissionais ativos cuja Função no Portal Tecnicos seja Gerente (ou Gerente de projeto).
+ * O campo aceita múltiplas funções separadas por vírgula, ponto e vírgula ou barra.
+ * Ter perfil PMO, isoladamente, não torna a pessoa elegível como gerente do projeto.
+ */
+export const gerentesParaCadastro = (lista: Tecnico[]): Tecnico[] =>
+  ativos(lista).filter(t => (t.funcao || '').split(/[,;|/]/).some(f => /^gerente(?: de projetos?)?$/i.test(f.trim())));
+
 /** Pessoa da lista Portal Tecnicos, com os perfis do portal (pela coluna Função). */
 export interface PessoaApp { nome: string; email: string; papeis: ('PMO' | 'Patrocinador' | 'Técnico' | 'Cliente')[] }
 

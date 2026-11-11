@@ -9,26 +9,26 @@ export interface RiscoModelo { codigo: string; descricao: string; probabilidade:
 
 export const CRONOGRAMA_SYSTECH: AtividadeModelo[] = [
   { codigo: '1.0', nome: 'Reunião de kickoff interna', fase: 'Iniciação', equipe: 'Systech', dias: 1 },
-  { codigo: '1.1', nome: 'Kickoff com o cliente e alinhamento de escopo', fase: 'Iniciação', equipe: 'Systech e Cliente', dias: 1 },
-  { codigo: '1.2', nome: 'Termo de abertura assinado', fase: 'Iniciação', equipe: 'Systech e Cliente', dias: 1, marco: true },
+  { codigo: '1.1', nome: 'Kickoff com o cliente e alinhamento de escopo', fase: 'Iniciação', equipe: 'Systech/Cliente', dias: 1 },
+  { codigo: '1.2', nome: 'Termo de abertura assinado', fase: 'Iniciação', equipe: 'Systech/Cliente', dias: 1, marco: true },
 
   { codigo: '2.0', nome: 'Levantamento técnico do ambiente (assessment)', fase: 'Planejamento', equipe: 'Systech', dias: 3 },
   { codigo: '2.1', nome: 'Desenho da solução e documento de arquitetura', fase: 'Planejamento', equipe: 'Systech', dias: 3 },
   { codigo: '2.2', nome: 'Cronograma detalhado, matriz RACI e plano de comunicação', fase: 'Planejamento', equipe: 'Systech', dias: 1 },
   { codigo: '2.3', nome: 'Plano de implantação e plano de rollback', fase: 'Planejamento', equipe: 'Systech', dias: 2 },
-  { codigo: '2.4', nome: 'Aprovação da linha de base com o cliente', fase: 'Planejamento', equipe: 'Systech e Cliente', dias: 1, marco: true },
+  { codigo: '2.4', nome: 'Aprovação da linha de base com o cliente', fase: 'Planejamento', equipe: 'Systech/Cliente', dias: 1, marco: true },
 
   { codigo: '3.0', nome: 'Preparação do ambiente e pré-requisitos (rede, acessos, licenças)', fase: 'Execução', equipe: 'Cliente', dias: 2 },
   { codigo: '3.1', nome: 'Implantação e configuração da solução', fase: 'Execução', equipe: 'Systech', dias: 5 },
-  { codigo: '3.2', nome: 'Migração e integração com o ambiente do cliente', fase: 'Execução', equipe: 'Systech e Cliente', dias: 3 },
-  { codigo: '3.3', nome: 'Testes de aceite e validação funcional', fase: 'Execução', equipe: 'Systech e Cliente', dias: 2, marco: true },
+  { codigo: '3.2', nome: 'Migração e integração com o ambiente do cliente', fase: 'Execução', equipe: 'Systech/Cliente', dias: 3 },
+  { codigo: '3.3', nome: 'Testes de aceite e validação funcional', fase: 'Execução', equipe: 'Systech/Cliente', dias: 2, marco: true },
 
   { codigo: '4.0', nome: 'Status report semanal ao cliente', fase: 'Monitoramento', equipe: 'Systech', dias: 0, paralela: true },
   { codigo: '4.1', nome: 'Controle de riscos, pendências e mudanças', fase: 'Monitoramento', equipe: 'Systech', dias: 0, paralela: true },
 
   { codigo: '5.0', nome: 'Documentação as-built', fase: 'Encerramento', equipe: 'Systech', dias: 2 },
-  { codigo: '5.1', nome: 'Repasse de conhecimento (handover) para a operação', fase: 'Encerramento', equipe: 'Systech e Cliente', dias: 1 },
-  { codigo: '5.2', nome: 'Termo de aceite final', fase: 'Encerramento', equipe: 'Systech e Cliente', dias: 1, marco: true },
+  { codigo: '5.1', nome: 'Repasse de conhecimento (handover) para a operação', fase: 'Encerramento', equipe: 'Systech/Cliente', dias: 1 },
+  { codigo: '5.2', nome: 'Termo de aceite final', fase: 'Encerramento', equipe: 'Systech/Cliente', dias: 1, marco: true },
   { codigo: '5.3', nome: 'Lições aprendidas e encerramento interno', fase: 'Encerramento', equipe: 'Systech', dias: 1 }
 ];
 
