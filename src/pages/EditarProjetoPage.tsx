@@ -11,7 +11,8 @@ import { PassoDadosGerais } from '../components/novo/PassoDadosGerais';
 import { ConferenciaEquipe, useConferencia } from '../components/novo/ConferenciaEquipe';
 import { faltasFaturamento } from '../lib/validacoes';
 import { PassoEscopo } from '../components/novo/PassoEscopo';
-import { montarEquipe, type FormProjeto, colocarNaEquipe } from '../components/novo/formulario';
+import { montarEquipe, type FormProjeto, atualizarResponsavelEquipe } from '../components/novo/formulario';
+import { gerentesParaCadastro, tecnicoPorNome } from '../lib/pessoas';
 import { EditorEquipe } from '../components/novo/EditorEquipe';
 
 const paraForm = (p: Projeto): FormProjeto => ({
@@ -45,6 +46,11 @@ export function EditarProjetoPage() {
   const salvar = async () => {
     const faltas = [!form.nome.trim() && 'nome', !form.cliente.trim() && 'cliente', !form.modeloFaturamento && 'modelo de faturamento', !form.gerente.trim() && 'GP', !form.inicio && 'início', !form.termino && 'término'].filter(Boolean);
     if (faltas.length) { setErro('Preencha: ' + faltas.join(', ') + '.'); return; }
+    // Permite salvar outros dados em projetos antigos sem obrigar a trocar o gerente já existente.
+    // Qualquer novo gerente, porém, precisa estar ativo e cadastrado com essa função.
+    if (form.gerente !== p.gerente && !tecnicoPorNome(gerentesParaCadastro(dados.tecnicos || []), form.gerente)) {
+      setErro('Selecione um gerente ativo com função Gerente no Portal Tecnicos.'); return;
+    }
     if (conf.erros.length) { setErro('Corrija antes de gravar: ' + conf.erros.join('; ') + '.'); return; }
     const regras = faltasFaturamento(form);
     if (regras.length) { setErro('Corrija antes de gravar: ' + regras.join('; ') + '.'); return; }
@@ -77,7 +83,7 @@ export function EditarProjetoPage() {
       <section className="card" style={{ padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: 18 }}>
         <h2 className="h3">Dados gerais</h2>
         <PassoDadosGerais form={form} mudar={mudar} aoEscolherArquiteto={(nome, email) => setForm(f => (f ? { ...f, arquiteto: nome, arquitetoEmail: email } : f))} edicao
-          aoEscolherPessoa={(funcao, nome, email) => setForm(f => (f ? { ...f, equipe: colocarNaEquipe(f.equipe, funcao, nome, email) } : f))} />
+          aoEscolherPessoa={(funcao, nome, email) => setForm(f => (f ? { ...f, equipe: atualizarResponsavelEquipe(f.equipe, funcao as 'Gerente de projeto' | 'Arquiteto', nome, email) } : f))} />
         <label className="campo" style={{ maxWidth: 320 }}>Farol
           <select className="ctl" value={farol} onChange={e => setFarol(e.target.value as Projeto['farol'])}>
             <option>Verde</option><option>Amarelo</option><option>Vermelho</option>
@@ -86,7 +92,7 @@ export function EditarProjetoPage() {
       </section>
       <section className="card" style={{ padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: 18 }}>
         <h2 className="h3">Equipe</h2>
-        <EditorEquipe equipe={form.equipe} aoMudar={e => setForm(f => (f ? { ...f, equipe: e } : f))} />
+        <EditorEquipe equipe={form.equipe} gerente={form.gerente} arquiteto={form.arquiteto} aoMudar={e => setForm(f => (f ? { ...f, equipe: e } : f))} />
         <ConferenciaEquipe conf={conf} />
       </section>
       <section className="card" style={{ padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: 18 }}>

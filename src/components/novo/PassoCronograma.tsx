@@ -4,11 +4,13 @@ import type { ModeloProjeto } from '../../lib/modelos';
 import { FASES } from '../../lib/constantes';
 import { novaAtividade, renumerar, type LinhaAtividade } from './formulario';
 
-interface Props { linhas: LinhaAtividade[]; aoMudar: (l: LinhaAtividade[]) => void; dataMinima?: string;
+const EQUIPES_ATIVIDADE = ['Systech', 'Cliente', 'Systech/Cliente', 'Systech/Fabricante', 'Systech/Cliente/Fabricante'] as const;
+
+interface Props { linhas: LinhaAtividade[]; aoMudar: (l: LinhaAtividade[]) => void; aoMudarData: (indice: number, campo: 'inicio' | 'termino', data: string) => void; dataMinima?: string;
   /** modelos disponíveis (os do tipo do projeto primeiro) e quantas tarefas do modelo aplicado serão criadas */
   modelos: ModeloProjeto[]; tipo: string; tarefasDoModelo: number; aoAplicarModelo: (m: ModeloProjeto) => void }
 
-export function PassoCronograma({ linhas, aoMudar, dataMinima, modelos, tipo, tarefasDoModelo, aoAplicarModelo }: Props) {
+export function PassoCronograma({ linhas, aoMudar, aoMudarData, dataMinima, modelos, tipo, tarefasDoModelo, aoAplicarModelo }: Props) {
   const ordenados = [...modelos].sort((a, b) => Number(b.tipo === tipo) - Number(a.tipo === tipo) || Number(!!b.padrao) - Number(!!a.padrao) || a.nome.localeCompare(b.nome, 'pt-BR'));
   const [escolhido, setEscolhido] = useState('');
   const atual = ordenados.find(m => m.id === (escolhido || ordenados[0]?.id));
@@ -19,7 +21,7 @@ export function PassoCronograma({ linhas, aoMudar, dataMinima, modelos, tipo, ta
   return (
     <>
       <div className="linha">
-        <p className="sub">Liste as atividades macro. As datas informadas viram a baseline do projeto. Marque como marco as entregas que exigem aceite do cliente.</p>
+        <p className="sub">Liste as atividades macro. As datas informadas viram a baseline do projeto. Ao mudar uma data, as atividades seguintes acompanham a diferença de dias, preservando suas durações. Marque como marco as entregas que exigem aceite do cliente.</p>
       </div>
       <div className="modeloEscolha">
         <label className="campo">Modelo de cronograma
@@ -40,9 +42,17 @@ export function PassoCronograma({ linhas, aoMudar, dataMinima, modelos, tipo, ta
                 <td style={{ width: 70 }}><input className="ctl mono" aria-label="Código" value={a.codigo} disabled title="Gerado pela fase: Iniciação 1.x, Planejamento 2.x, Execução 3.x, Monitoramento 4.x, Encerramento 5.x" /></td>
                 <td style={{ minWidth: 240 }}><input className="ctl" aria-label="Atividade" value={a.nome} onChange={e => mudar(i, 'nome', e.target.value)} /></td>
                 <td><select className="ctl" aria-label="Fase" value={a.fase} onChange={e => mudar(i, 'fase', e.target.value as Fase)}>{FASES.map(f => <option key={f}>{f}</option>)}</select></td>
-                <td style={{ minWidth: 120 }}><input className="ctl" aria-label="Equipe" value={a.equipe} onChange={e => mudar(i, 'equipe', e.target.value)} /></td>
-                <td><input className={`ctl ${dataMinima && a.inicio && a.inicio < dataMinima ? 'erro' : ''}`} type="date" aria-label="Início" min={dataMinima} value={a.inicio} onChange={e => mudar(i, 'inicio', e.target.value)} /></td>
-                <td><input className="ctl" type="date" aria-label="Término" min={a.inicio || dataMinima} value={a.termino} onChange={e => mudar(i, 'termino', e.target.value)} /></td>
+                <td style={{ minWidth: 210 }}>
+                  <select className="ctl" aria-label="Equipe" value={a.equipe} onChange={e => mudar(i, 'equipe', e.target.value)}>
+                    {!a.equipe && <option value="" disabled>Selecione a equipe</option>}
+                    {a.equipe && !EQUIPES_ATIVIDADE.some(equipe => equipe === a.equipe) && (
+                      <option value={a.equipe}>{a.equipe} (valor do modelo)</option>
+                    )}
+                    {EQUIPES_ATIVIDADE.map(equipe => <option key={equipe} value={equipe}>{equipe}</option>)}
+                  </select>
+                </td>
+                <td><input className={`ctl ${dataMinima && a.inicio && a.inicio < dataMinima ? 'erro' : ''}`} type="date" aria-label="Início" min={dataMinima} value={a.inicio} onChange={e => aoMudarData(i, 'inicio', e.target.value)} /></td>
+                <td><input className="ctl" type="date" aria-label="Término" min={a.inicio || dataMinima} value={a.termino} onChange={e => aoMudarData(i, 'termino', e.target.value)} /></td>
                 <td style={{ textAlign: 'center' }}><input type="checkbox" aria-label="Marco" checked={a.marco} onChange={e => mudar(i, 'marco', e.target.checked)} /></td>
                 <td><button type="button" className="rm" aria-label="Remover atividade" onClick={() => aoMudar(renumerar(linhas.filter((_, k) => k !== i)))}>×</button></td>
               </tr>

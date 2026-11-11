@@ -45,6 +45,24 @@ export function diasUteis(a?: string, b?: string): number {
   return sinal * n;
 }
 
+/** Diferença em dias corridos entre datas ISO, independente do fuso horário e horário de verão. */
+const carimboDiaUtc = (data: string): number | null => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) return null;
+  const ms = Date.parse(`${data}T00:00:00Z`);
+  return Number.isFinite(ms) && new Date(ms).toISOString().slice(0, 10) === data ? ms : null;
+};
+
+export function diferencaDiasCorridos(antes: string, depois: string): number | null {
+  const a = carimboDiaUtc(antes), b = carimboDiaUtc(depois);
+  return a === null || b === null ? null : (b - a) / 86400000;
+}
+
+/** Soma dias corridos a uma data ISO sem converter para o fuso horário local. */
+export function somarDiasCorridos(data: string, dias: number): string {
+  const ms = carimboDiaUtc(data);
+  return ms === null ? data : new Date(ms + dias * 86400000).toISOString().slice(0, 10);
+}
+
 /** Desloca uma data em n dias úteis. */
 export function somarDiasUteis(s: string, n: number): string {
   const d = dia(s);

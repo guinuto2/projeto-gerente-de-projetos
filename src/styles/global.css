@@ -175,7 +175,8 @@ button, input, select, textarea { font-family: inherit; }
 .ghead { background: var(--cinza); font-size: 11px; font-weight: 600; color: var(--suave); text-transform: uppercase; letter-spacing: .03em; }
 .gfase { background: #FAFAFA; font-weight: 700; color: var(--preto); }
 .gsem { position: absolute; top: 0; bottom: 0; border-left: 1px dashed #ECECEE; }
-.gsemL { position: absolute; top: 8px; font-size: 11px; color: var(--suave); font-family: var(--mono); padding-left: 4px; }
+.gsemL { position: absolute; top: 8px; font-size: 11px; color: var(--suave); font-family: var(--mono); padding-left: 4px; white-space: nowrap; }
+.gsemL.final { transform: translateX(-100%); padding-left: 0; padding-right: 4px; }
 .ghoje { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--vinho); opacity: .85; }
 .gbar { position: absolute; top: 9px; height: 12px; border-radius: 99px; overflow: hidden; }
 .gbar i { position: absolute; left: 0; top: 0; bottom: 0; display: block; }
@@ -943,7 +944,40 @@ textarea.ctl.wikiTextarea { min-height: max(640px, calc(100vh - 300px)); height:
 .sinoTit { font-size: 13px; font-weight: 700; }
 .sinoDesc { font-size: 12.5px; color: var(--medio); line-height: 1.4; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .sinoQuando { font-size: 11px; color: var(--suave); }
-@media (max-width: 760px) { .sino { order: 2; } .menuBtn { order: 3; } .menuUsuario { order: 4; } }
+@media (max-width: 760px) {
+  .sino { order: 2; }
+  .menuBtn { order: 3; }
+  .menuUsuario { order: 4; }
+  /* No celular, a janela acompanha a largura da tela, não a posição do sino. */
+  .sinoCaixa {
+    position: fixed;
+    top: calc(64px + env(safe-area-inset-top, 0px));
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+    width: min(420px, calc(100% - 24px));
+    max-height: min(70vh, calc(100vh - 84px - env(safe-area-inset-top, 0px)));
+    max-height: min(70dvh, calc(100dvh - 84px - env(safe-area-inset-top, 0px)));
+  }
+  .sinoTopo { gap: 10px; }
+  .sinoTopo .linkBtn { max-width: 65%; white-space: normal; text-align: right; }
+  .sinoLista { min-height: 0; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+  .sinoItem { min-width: 0; }
+  .sinoTit, .sinoDesc { overflow-wrap: anywhere; }
+  .sinoIco { flex-shrink: 0; }
+  .logoTxt { overflow: hidden; text-overflow: ellipsis; }
+  /* Avisos temporários: manter mensagens longas dentro da área visível. */
+  .toast {
+    width: calc(100% - 24px);
+    max-width: 420px;
+    max-height: 40vh;
+    max-height: 40dvh;
+    overflow-y: auto;
+    overflow-wrap: anywhere;
+    line-height: 1.45;
+    text-align: center;
+  }
+}
 
 /* v4.5: modelos de projeto no cadastro */
 .modeloEscolha { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; margin: 6px 0 12px; }
@@ -953,3 +987,108 @@ textarea.ctl.wikiTextarea { min-height: max(640px, calc(100vh - 300px)); height:
 /* v4.5: status report */
 .statusReportModal { width: min(860px, 96vw); max-height: 92vh; display: flex; flex-direction: column; gap: 8px; }
 .statusReportPrevia { width: 100%; height: min(60vh, 640px); border: 1px solid var(--borda); border-radius: 10px; background: #fff; }
+
+/* Tela de boas-vindas: aparece antes de iniciar o login no Microsoft Entra ID. */
+.entrada {
+  position: relative;
+  isolation: isolate;
+  min-height: 100vh;
+  min-height: 100dvh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  color: #fff;
+  background: radial-gradient(ellipse 65% 70% at 90% 76%, rgba(126, 24, 28, .27), transparent 72%),
+    radial-gradient(ellipse 55% 56% at 5% 0%, rgba(90, 29, 34, .22), transparent 65%),
+    linear-gradient(135deg, #111216 0%, #08090c 62%, #191013 100%);
+}
+.entradaDetalhe {
+  pointer-events: none;
+  position: absolute;
+  z-index: -1;
+  right: -15vw;
+  top: 8%;
+  width: 56vw;
+  height: 56vw;
+  border: 1px solid rgba(255, 255, 255, .055);
+  border-radius: 50%;
+  box-shadow: 0 0 0 90px rgba(255,255,255,.012), 0 0 0 185px rgba(255,255,255,.008);
+}
+.entradaRodape { width: 100%; max-width: 1380px; margin-inline: auto; padding-inline: clamp(20px, 5vw, 72px); }
+.entradaCentro { position: relative; width: min(100% - 40px, 750px); margin: auto; padding: 46px 0 60px; display: flex; flex-direction: column; align-items: center; text-align: center; }
+.entradaSelo { display: inline-flex; align-items: center; justify-content: center; gap: 9px; max-width: 100%; padding: 8px 14px; border: 1px solid rgba(255,255,255,.13); border-radius: 99px; background: rgba(255,255,255,.035); color: #D7D7DB; text-align: center; text-transform: uppercase; letter-spacing: .16em; font-size: 10px; font-weight: 700; }
+.entradaSelo span { width: 7px; height: 7px; border-radius: 50%; background: #C66B71; }
+.entradaLogo { display: block; width: min(100%, 585px); height: auto; margin: clamp(38px, 7vh, 70px) 0 34px; object-fit: contain; }
+.entradaCentro h1 { font-size: clamp(25px, 4vw, 40px); line-height: 1.18; font-weight: 700; letter-spacing: -.035em; }
+.entradaDescricao { margin-top: 17px; font-size: clamp(14px, 1.8vw, 16px); line-height: 1.75; max-width: 540px; color: #B8B9C0; }
+.entradaBotao { display: inline-flex; align-items: center; justify-content: center; gap: 14px; margin-top: 36px; min-height: 54px; padding: 0 21px; border: 1px solid rgba(255,255,255,.13); border-radius: 9px; background: rgba(255,255,255,.035); color: #D7D7DB; font-size: 14px; font-weight: 700; cursor: pointer; box-shadow: 0 7px 28px rgba(0,0,0,.24); transition: background .16s ease, transform .16s ease; }
+.entradaBotao:hover { background: rgba(255,255,255,.085); transform: translateY(-1px); }
+.entradaBotao:focus-visible { outline: 3px solid #F5D9DB; outline-offset: 4px; }
+.entradaSeta { font-size: 19px; margin-left: 6px; font-weight: 400; }
+.entradaMicrosoft { display: grid; grid-template-columns: repeat(2, 9px); grid-template-rows: repeat(2, 9px); gap: 2px; }
+.entradaMicrosoft i:nth-child(1) { background: #F25022; }
+.entradaMicrosoft i:nth-child(2) { background: #7FBA00; }
+.entradaMicrosoft i:nth-child(3) { background: #00A4EF; }
+.entradaMicrosoft i:nth-child(4) { background: #FFB900; }
+.entradaAviso { margin-top: 18px; font-size: 12px; color: #9FA0A8; }
+.entradaRodape { text-align: center; color: #898B92; font-size: 12px; padding-block: 22px; border-top: 1px solid rgba(255,255,255,.07); }
+
+/* Selo de 20 anos no canto superior direito do portal após o login. */
+.logoAniversarioHeader { display: block; width: 146px; height: auto; max-height: 40px; object-fit: contain; flex-shrink: 0; order: 1; }
+@media (min-width: 761px) { .menuUsuario { order: 3; } }
+@media (max-width: 1100px) and (min-width: 761px) { .logoAniversarioHeader { margin-left: auto; } }
+@media (max-width: 760px) {
+  .logo { flex-grow: 0; }
+  .logoTxt { display: none !important; }
+  .logoAniversarioHeader { order: 1; margin-left: auto; width: clamp(77px, 23vw, 121px); max-height: 34px; }
+}
+@media (max-width: 360px) {
+  .headerIn { gap: 6px !important; }
+  .logoAniversarioHeader { width: 76px; }
+}
+@media (max-width: 500px) {
+  .entradaLogo { margin-block: 40px 28px; }
+  .entradaCentro { padding-block: 38px 48px; }
+  .entradaDescricao { line-height: 1.65; }
+  .entradaBotao { width: min(100%, 300px); }
+}
+@media (prefers-reduced-motion: reduce) { .entradaBotao { transition: none; } }
+
+/* PMO: visualização Kanban em Atualizar status; técnicos mantêm a lista semanal. */
+.atvVisao { display: inline-flex; gap: 3px; padding: 4px; border: 1px solid var(--borda); border-radius: 9px; background: var(--cinza); margin-left: auto; }
+.atvVisaoBotao { border: 0; border-radius: 6px; padding: 8px 17px; background: transparent; color: var(--medio); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.atvVisaoBotao:hover { color: var(--texto); }
+.atvVisaoBotao.on { background: var(--superficie); color: var(--vinho); box-shadow: 0 1px 4px rgba(0,0,0,.12); }
+.atvFiltrosPMO .campo { margin: 0; min-width: 0; }
+/* Lista: os filtros acompanham as atividades, sem ocupar uma faixa vazia no topo. */
+.atvFiltrosLista { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; margin-bottom: 16px; }
+/* Kanban: uma barra compacta de filtros distribuída na largura do quadro. */
+.atvFiltrosKanban { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; align-items: end; width: 100%; }
+.atvModoKanban { display: flex; flex-direction: column; gap: 20px; }
+.atvModoKanban .formAtual { scroll-margin-top: 86px; }
+.kanbanArea { min-width: 0; }
+.kanbanResumo { margin-bottom: 14px; }
+.kanbanResumo .sub { margin-top: 5px; }
+.kanbanGrade { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; align-items: start; }
+.kanbanColuna { background: var(--cinza); border: 1px solid var(--borda); border-radius: 11px; min-width: 0; overflow: hidden; }
+.kanbanTopo { display: flex; gap: 10px; align-items: center; justify-content: space-between; padding: 13px 14px; border-top: 4px solid var(--borda); border-bottom: 1px solid var(--borda); }
+.kanbanTopo h3 { font-size: 14px; font-weight: 700; }
+.kanban-planejadas .kanbanTopo { border-top-color: #8A94A3; }
+.kanban-andamento .kanbanTopo { border-top-color: #C28C1F; }
+.kanban-bloqueadas .kanbanTopo { border-top-color: #D33A2C; }
+.kanban-concluidas .kanbanTopo { border-top-color: #1F8A5B; }
+.kanbanCartoes { padding: 10px; display: flex; flex-direction: column; gap: 10px; max-height: 58vh; overflow-y: auto; overscroll-behavior: contain; }
+.kanbanCartao { border: 1px solid var(--borda); border-radius: 9px; padding: 12px; display: flex; flex-direction: column; gap: 8px; text-align: left; width: 100%; min-width: 0; background: var(--superficie); color: var(--texto); font: inherit; cursor: pointer; transition: border-color .12s, box-shadow .12s; }
+.kanbanCartao:hover { border-color: var(--vinhoBorda); box-shadow: 0 2px 9px rgba(0,0,0,.07); }
+.kanbanCartao.on { border-color: var(--vinho); box-shadow: inset 3px 0 0 var(--vinho); }
+.kanbanCodigo { font-size: 11px; font-weight: 600; color: var(--suave); overflow-wrap: anywhere; }
+.kanbanNome { font-size: 13px; font-weight: 650; line-height: 1.45; overflow-wrap: anywhere; }
+.kanbanDados { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-size: 11px; color: var(--medio); }
+.kanbanEtiquetas { display: flex; flex-wrap: wrap; gap: 5px; }
+.kanbanEtiqueta { display: inline-block; border-radius: 5px; padding: 3px 6px; background: var(--borda2); color: var(--medio); font-size: 10px; font-weight: 650; }
+.kanbanEtiqueta.atraso, .kanbanEtiqueta.bloqueio { background: #FBE3DC; color: #9A2E12; }
+.kanbanVazia { padding: 12px 4px; text-align: center; color: var(--suave); font-size: 12px; }
+:root[data-theme="dark"] .kanbanEtiqueta.atraso, :root[data-theme="dark"] .kanbanEtiqueta.bloqueio { background: #3A2321; color: #F4A79B; }
+@media (max-width: 1250px) { .kanbanGrade { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 680px) { .kanbanGrade { grid-template-columns: minmax(0, 1fr); } .atvFiltrosKanban { grid-template-columns: minmax(0, 1fr); gap: 12px; } .atvVisao { margin-left: 0; } .kanbanCartoes { max-height: 340px; } }
+@media (prefers-reduced-motion: reduce) { .kanbanCartao { transition: none; } }

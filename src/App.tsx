@@ -1,4 +1,8 @@
+import { useState } from 'react';
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { TelaInicial } from './components/layout/TelaInicial';
+import { entradaSolicitada, solicitarEntrada } from './lib/acessoInicial';
+import { modoPiloto } from './config/config';
 import { ToastProvider } from './state/ToastContext';
 import { PortalProvider } from './state/PortalContext';
 import { PapelProvider } from './state/PapelContext';
@@ -17,6 +21,12 @@ import { WikiPage } from './pages/WikiPage';
  * sem regra de reescrita no servidor.
  */
 export default function App() {
+  const [acesso, setAcesso] = useState(entradaSolicitada);
+
+  if (!acesso) return (
+    <TelaInicial piloto={modoPiloto} aoEntrar={() => { solicitarEntrada(); setAcesso(true); }} />
+  );
+
   return (
     <ToastProvider>
       <PapelProvider>
