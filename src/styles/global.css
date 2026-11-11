@@ -988,12 +988,25 @@ textarea.ctl.wikiTextarea { min-height: max(640px, calc(100vh - 300px)); height:
 .statusReportModal { width: min(860px, 96vw); max-height: 92vh; display: flex; flex-direction: column; gap: 8px; }
 .statusReportPrevia { width: 100%; height: min(60vh, 640px); border: 1px solid var(--borda); border-radius: 10px; background: #fff; }
 
+/* A tela pública ocupa também as áreas de segurança do celular.
+   A regra só vale antes do login; o portal autenticado mantém seus espaçamentos. */
+:root:has(.entrada) {
+  padding-top: 0;
+  padding-bottom: 0;
+  background: #08090c;
+}
+body:has(.entrada) { background: #08090c; }
+
 /* Tela de boas-vindas: aparece antes de iniciar o login no Microsoft Entra ID. */
 .entrada {
   position: relative;
   isolation: isolate;
+  width: 100%;
   min-height: 100vh;
+  min-height: 100svh;
   min-height: 100dvh;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
   overflow: hidden;
   display: flex;
   flex-direction: column;
