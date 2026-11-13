@@ -13,6 +13,7 @@ import { descrever } from '../lib/historico';
 import { iniciaria, pendentes } from '../lib/dependencias';
 import { usePapel } from './PapelContext';
 import { DOMINIOS_SYSTECH, dominioDe } from '../lib/publicacaoCliente';
+import { destinatariosAviso } from '../lib/notificacoes';
 import { emailsDoCliente, inicioDaSemana, montarStatusReport } from '../lib/statusReport';
 import { lancadaParaTecnico } from '../lib/dependencias';
 import { ConflitoEdicao } from '../services/FonteSharePoint';
@@ -218,9 +219,7 @@ async function reunioesRemarcadas(fonte: FonteDados, d: Dados): Promise<{ cod: s
  */
 function notificar(fonte: FonteDados, para: string, n: { titulo: string; texto: string; link: string; tipo: string }) {
   if (!fonte.criarNotificacoes) return;
-  const eu = (fonte.modo === 'sharepoint' ? fonte.email() : '').toLowerCase();
-  const emails = Array.from(new Set((para || '').split(/[,;]\s*/).map(e => e.trim().toLowerCase()).filter(e => e.includes('@') && e !== eu)));
-  if (fonte.modo === 'piloto') emails.splice(0, emails.length, '*');   // piloto: aparece para quem estiver testando
+  const emails = destinatariosAviso(para, fonte.modo === 'sharepoint' ? fonte.email() : '', fonte.modo === 'piloto');
   if (!emails.length) return;
   fonte.criarNotificacoes(emails.map(e => ({ ...n, para: e }))).then(() => window.dispatchEvent(new Event('portal-notificacoes'))).catch(() => undefined);
 }
