@@ -5,8 +5,14 @@
   "type": "module",
   "scripts": {
     "dev": "vite --port 8080",
+    "typecheck": "tsc -b",
+    "test": "node scripts/run-tests.mjs",
+    "test:unit": "node scripts/run-tests.mjs --unit",
     "build": "tsc -b && vite build",
-    "preview": "vite preview --port 8080"
+    "preview": "vite preview --port 8080",
+    "test:components": "node scripts/run-tests.mjs --components",
+    "test:integration": "node scripts/run-tests.mjs --integration",
+    "test:mutations": "node scripts/verificar-mutacoes.mjs"
   },
   "dependencies": {
     "@azure/msal-browser": "4.30.0",

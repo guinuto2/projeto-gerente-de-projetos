@@ -1,0 +1,42 @@
+name: Mutações (25 regras críticas)
+
+# Verificação INFORMATIVA (não deve ser marcada como obrigatória).
+# Roda só quando o PR mexe nos arquivos vigiados pelo teste de mutação, todo dia às 6h de Brasília e sob demanda.
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/lib/permissoes.ts'
+      - 'src/lib/publicacaoCliente.ts'
+      - 'src/lib/statusReport.ts'
+      - 'src/lib/validacoes.ts'
+      - 'src/lib/notificacoes.ts'
+      - 'src/state/useProjetosVisiveis.ts'
+      - 'src/state/PortalContext.tsx'
+      - 'src/services/FonteSharePoint.ts'
+      - 'tests/**'
+      - 'scripts/run-tests.mjs'
+      - 'scripts/verificar-mutacoes.mjs'
+  schedule:
+    - cron: '0 9 * * *'   # 9h UTC = 6h em Brasília
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mutacoes:
+    name: mutacoes / verificar
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar código
+        uses: actions/checkout@v4
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Instalar dependências do lockfile
+        run: npm ci
+      - name: Testes de mutação das 25 regras críticas
+        run: npm run test:mutations
