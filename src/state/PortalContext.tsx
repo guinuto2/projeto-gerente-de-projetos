@@ -5,6 +5,7 @@ import { diasUteis } from '../lib/datas';
 import type { FonteDados } from '../services/FonteDados';
 import { criarFonte } from '../services/criarFonte';
 import { config } from '../config/config';
+import { chaveAtividade, montarEventoAtividade, validarOpcoesAgenda, type EventoAgenda, type OpcoesAgenda } from '../lib/agenda';
 import { horaAgora } from '../lib/datas';
 import { corpoReuniao, emailTarefasLancadas, emailAtrasos, emailStatusSubatividade, emailReprogramacao, emailProjetoExcluido, emailReuniaoAlterada, emailGateAprovado, emailProjetoCriadoPeloPmo, emailSolicitacaoGate, emailSolicitacaoProjeto } from '../lib/emailProjeto';
 import { percentualPrincipal, progressoFase } from '../lib/calculos';
@@ -21,6 +22,7 @@ import { CAMPOS_STATUS, checklistGate, conferirDatas, conferirStatus, riscoAltoS
 import { pessoasDaLista, type PessoaApp } from '../lib/pessoas';
 import { PAPEIS, papelDaFuncao, type Papel } from '../lib/permissoes';
 import { useToast } from './ToastContext';
+import { ehPatrocinador, patrocinadorPodeVer, emailsPatrocinadoresDoProjeto, emailsEquipePermitida, notificacaoVisivelPatrocinador, dadosParaPatrocinador } from '../lib/patrocinadores';
 import { Carregando } from '../components/ui/Carregando';
 import { Mensagem } from '../components/ui/Mensagem';
 
@@ -64,6 +66,12 @@ interface PortalValor {
   pessoasApp: PessoaApp[];
   /** envia agora o status report do projeto (versão interna e versão do cliente); devolve os destinatários */
   enviarStatusReport(cod: string): Promise<string[]>;
+  /** agenda do Outlook/Teams de quem está logado (de/até em AAAA-MM-DD; interativo=false não abre janela de consentimento) */
+  agenda(de: string, ate: string, interativo: boolean): Promise<EventoAgenda[]>;
+  /** compromisso da agenda que o portal criou para a atividade, ou null (interativo=false: sem janela de consentimento) */
+  eventoDaAtividade(cod: string, codigo: string, interativo?: boolean): Promise<EventoAgenda | null>;
+  /** adiciona a atividade à agenda, ou atualiza o compromisso que já existe (título, descrição e horário) */
+  salvarAtividadeNaAgenda(cod: string, codigo: string, opcoes: OpcoesAgenda, titulo?: string): Promise<EventoAgenda>;
   /** avisos do sino de quem está logado (mais recentes primeiro) */
   notificacoes: Notificacao[];
   marcarNotificacoesLidas(ids: string[]): Promise<void>;
@@ -158,7 +166,7 @@ export function testeReuniao(): string[] | null {
  * (3) só em último caso, o endereço fixo do config.js (emailPatrocinador / emailPmo).
  */
 let pessoasAtuais: Tecnico[] = [];   // lista Portal Tecnicos (atualizada pelo portal a cada leitura)
-const daLista = (papel: 'PMO' | 'Patrocinador') => pessoasDaLista(pessoasAtuais).filter(x => x.papeis.includes(papel) && x.email).map(x => x.email);
+const daLista = (papel: 'PMO') => pessoasDaLista(pessoasAtuais).filter(x => x.papeis.includes(papel) && x.email).map(x => x.email);
 /** Gerente do projeto: membro da equipe com função de gerente (ou com o nome do gerente). */
 function emailDoGp(p: Projeto): string {
   const m = p.equipe.find(x => x.email && /gerente|^gp$/i.test(x.funcao)) || p.equipe.find(x => x.email && x.nome.trim().toLowerCase() === p.gerente.trim().toLowerCase());
@@ -169,14 +177,14 @@ function pmosDe(p?: Projeto): string {
   const gp = p ? emailDoGp(p) : '';
   if (gp) return gp;
   const l = daLista('PMO');
-  return l.length ? l.join(', ') : (config.emailPmo || config.emailPatrocinador || '');
+  return l.length ? l.join(', ') : (config.emailPmo || '');
 }
-/** Patrocinador de um projeto: quem tem a função Patrocinador na equipe; senão os da lista Portal Tecnicos. */
+/** Destinatários patrocinadores por tipo do projeto; exige função explícita no Portal Tecnicos.
+ * Não usa o e-mail genérico de config.js, que poderia enviar um projeto alheio ao patrocinador VMware.
+ */
 function patrocinadoresDe(p?: Projeto): string {
-  const doProjeto = (p?.equipe || []).filter(m => m.email && /patrocinador/i.test(m.funcao)).map(m => m.email);
-  if (doProjeto.length) return doProjeto.join(', ');
-  const l = daLista('Patrocinador');
-  return l.length ? l.join(', ') : (config.emailPatrocinador || config.emailPmo || '');
+  if (!p) return '';
+  return emailsPatrocinadoresDoProjeto(p, pessoasAtuais).join(', ');
 }
 /** Destinatários sem repetição; em teste (emailSomentePara) tudo vai para um endereço só. */
 function destinatarios(...grupos: string[]): string {
@@ -394,13 +402,13 @@ export function PortalProvider({ children }: { children: ReactNode }) {
   const [notificacoes, setNotificacoes] = useState<Notificacao[]>([]);
   useEffect(() => {
     if (!fonte || !dados || !fonte.notificacoes || fonte.modoCliente) return;   // cliente não tem sino nem acesso às listas
-    const ler = () => { fonte.notificacoes!(fonte.modo === 'sharepoint' ? fonte.email() : '').then(l => { if (l) setNotificacoes(l); }).catch(() => undefined); };
+    const ler = () => { fonte.notificacoes!(fonte.modo === 'sharepoint' ? fonte.email() : '').then(l => { if (l) setNotificacoes(l.filter(n => notificacaoVisivelPatrocinador(n, papel, dados.projetos))); }).catch(() => undefined); };
     ler();
     const t = window.setInterval(ler, 60000);
     const ev = () => window.setTimeout(ler, 600);
     window.addEventListener('portal-notificacoes', ev);
     return () => { window.clearInterval(t); window.removeEventListener('portal-notificacoes', ev); };
-  }, [fonte, !!dados]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [fonte, dados?.projetos, papel]); // eslint-disable-line react-hooks/exhaustive-deps
   /** situação da gravação do histórico */
   const [statusHistorico, setStatusHistorico] = useState<{ pendentes: number; erro: string }>({ pendentes: lerPendentes().length, erro: '' });
   const erroAvisado = useRef('');
@@ -472,14 +480,14 @@ export function PortalProvider({ children }: { children: ReactNode }) {
         assinatura.current = assinar(d);
         ultimaSync.current = Date.now();
         setAtualizadoEm(horaAgora());
-        aplicarRemarcadas(f, d);
+        if (meus.includes('PMO') || meus.includes('Técnico')) aplicarRemarcadas(f, d);
         if (f.modo === 'sharepoint') reenviarPendentes(f);
         if (meus.includes('PMO')) statusReportsDaSemana(f, d).then(r => {
           if (!r.length) return;
           setDados(prev => (prev ? { ...prev, projetos: prev.projetos.map(x => { const e = r.find(y => y.cod === x.codigo); return e ? { ...x, ultimoStatusReport: e.data } : x; }) } : prev));
           toast(`Status report semanal enviado de ${r.length} projeto(s).`);
         });
-        verificarAtrasos(f, d).then(m => {
+        if (meus.includes('PMO')) verificarAtrasos(f, d).then(m => {
           if (!m.length) return;
           setDados(prev => { if (!prev) return prev; let n = prev; for (const x of m) n = comItem<Atividade>(n, 'atividades', x.cod, x.codigo, x.campos); assinatura.current = assinar(n); return n; });
           if (meus.includes('PMO')) toast(`PMO e técnicos avisados por e-mail de ${m.length} atividade(s) atrasada(s).`);
@@ -523,7 +531,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
       ultimaSync.current = Date.now();
       setAtualizadoEm(horaAgora());
       if (mudou) { setDados(novo); assinatura.current = nova; }
-      aplicarRemarcadas(fonte, novo);
+      if (papel === 'PMO' || papel === 'Técnico') aplicarRemarcadas(fonte, novo);
       reenviarPendentes(fonte);
       if (manual) toast(mudou ? 'Dados atualizados do SharePoint.' : 'Nada mudou desde a última leitura.');
       else if (mudou) toast('Há alterações novas no SharePoint. A tela foi atualizada.');
@@ -586,7 +594,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
     };
 
     const v: PortalValor = {
-      fonte, dados, usuario, email: fonte.email(), hoje: hojeAtual || fonte.hoje(), sincronizando, ocupado: emAndamento > 0, atualizadoEm, atualizar,
+      fonte, dados: dadosParaPatrocinador(dados, papel), usuario, email: fonte.email(), hoje: hojeAtual || fonte.hoje(), sincronizando, ocupado: emAndamento > 0, atualizadoEm, atualizar,
       bloquear,
 
       async salvarAtividade(cod, codigo, campos) {
@@ -638,6 +646,8 @@ export function PortalProvider({ children }: { children: ReactNode }) {
       },
       async decidirGate(cod, gate, { aprovar, parecer, congelarBaseline }) {
         const p = projeto(cod), g = p.fases.find(x => x.gate === gate)!;
+        if (ehPatrocinador(papel) && (!patrocinadorPodeVer(papel, p) || gate === 'G1'))
+          throw new Error('Seu perfil não pode aprovar gates deste projeto.');
         if (aprovar) await exigirChecklist(p, gate);
         const hojeAgora = fonte.hoje();
         const camposGate = aprovar
@@ -714,7 +724,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
       },
       async avisarExclusaoProjeto(p, removidos, documentos) {
         if (!fonte.enviarEmail) throw new Error('no modo piloto o e-mail não é enviado');
-        const equipe = p.equipe.map(m => m.email).filter(Boolean).join(', ');
+        const equipe = emailsEquipePermitida(p, pessoasAtuais).join(', ');
         const para = destinatarios(equipe, pmosDe(p), patrocinadoresDe(p));
         if (!para) throw new Error('ninguém da equipe tem e-mail e não há PMO nem patrocinador na lista Portal Tecnicos');
         const { assunto, html } = emailProjetoExcluido(p, usuario, fonte.hoje(), removidos, documentos);
@@ -740,7 +750,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
         if (g1) await fonte.salvarGate(p, g1, aprov);
         aplicar({ ...dados, projetos: dados.projetos.map(x => x.codigo !== cod ? x : {
           ...x, situacaoCadastro: 'Ativo', fase: 'Planejamento', fases: x.fases.map(g => (g.gate === 'G1' ? { ...g, ...aprov } : g)) }) });
-        notificar(fonte, [pmosDe(p), patrocinadoresDe(p), ...p.equipe.map(m => m.email)].filter(Boolean).join(', '), { titulo: `Projeto aprovado · ${p.codigo}`, texto: `${usuario} aprovou o cadastro de “${p.nome}”. O projeto está ativo, na fase Planejamento.`, link: `/projeto/${encodeURIComponent(cod)}`, tipo: 'aprovacao' });
+        notificar(fonte, [pmosDe(p), patrocinadoresDe(p), ...emailsEquipePermitida(p, pessoasAtuais)].filter(Boolean).join(', '), { titulo: `Projeto aprovado · ${p.codigo}`, texto: `${usuario} aprovou o cadastro de “${p.nome}”. O projeto está ativo, na fase Planejamento.`, link: `/projeto/${encodeURIComponent(cod)}`, tipo: 'aprovacao' });
         if (config.emailAoCriarProjeto && fonte.enviarEmail) {
           const { assunto, html } = emailProjetoCriadoPeloPmo({ ...novoProj, projeto: { ...p, situacaoCadastro: 'Ativo', fase: 'Planejamento' } }, usuario);
           fonte.enviarEmail(assunto, html, destinatarios(pmosDe(p), patrocinadoresDe(p)) || undefined).catch(() => undefined);
@@ -925,6 +935,27 @@ export function PortalProvider({ children }: { children: ReactNode }) {
           documentos: { ...dados.documentos, [c]: [] }
         });
       },
+      async agenda(de, ate, interativo) {
+        if (!fonte.agenda) return [];
+        return fonte.agenda(de, ate, interativo);
+      },
+      async eventoDaAtividade(cod, codigo, interativo = false) {
+        if (!fonte.eventoDaAtividade) return null;
+        return fonte.eventoDaAtividade(chaveAtividade(cod, codigo), interativo);
+      },
+      async salvarAtividadeNaAgenda(cod, codigo, opcoes, titulo) {
+        if (!fonte.salvarEventoAtividade || !fonte.eventoDaAtividade) throw new Error('A agenda não está disponível neste modo.');
+        const p = projeto(cod);
+        const a = (dados.atividades[cod] || []).find(x => x.codigo === codigo);
+        if (!a) throw new Error('Atividade não encontrada.');
+        const problema = validarOpcoesAgenda(opcoes, a);
+        if (problema) throw new Error(problema);
+        const urlPortal = config.urlPortal || `${window.location.origin}${window.location.pathname}`;
+        const existente = await fonte.eventoDaAtividade(chaveAtividade(cod, codigo), true);
+        const salvo = await fonte.salvarEventoAtividade(montarEventoAtividade(p, a, opcoes, urlPortal, titulo), existente?.id);
+        window.dispatchEvent(new Event('portal-agenda'));   // o cabeçalho relê a agenda
+        return salvo;
+      },
       async enviarStatusReport(cod) {
         const p = projeto(cod);
         const r = await enviarStatusReport(fonte, dados, p);
@@ -952,16 +983,16 @@ export function PortalProvider({ children }: { children: ReactNode }) {
       async avisarAprovacao(cod, gate, parecer) {
         if (!fonte.enviarEmail) throw new Error('no modo piloto o e-mail não é enviado');
         const p = projeto(cod), g = p.fases.find(x => x.gate === gate)!;
-        const para = destinatarios(pmosDe(p), patrocinadoresDe(p), p.equipe.map(m => m.email).filter(Boolean).join(', '));
+        const para = destinatarios(pmosDe(p), patrocinadoresDe(p), emailsEquipePermitida(p, pessoasAtuais).join(', '));
         if (!para) throw new Error('ninguém do projeto tem e-mail e não há PMO nem patrocinador na lista Portal Tecnicos');
         const proxima = gate === 'G4' ? 'Encerrado' : (PROXIMA_FASE[g.fase] || p.fase);
-        notificar(fonte, [pmosDe(p), patrocinadoresDe(p), ...p.equipe.map(m => m.email)].filter(Boolean).join(', '), { titulo: `${gate} aprovado · ${p.codigo}`, texto: gate === 'G4' ? `${usuario} aprovou o encerramento do projeto “${p.nome}”.` : `${usuario} aprovou o ${gate}. O projeto segue para ${proxima}.`, link: `/projeto/${encodeURIComponent(cod)}`, tipo: 'aprovacao' });
+        notificar(fonte, [pmosDe(p), patrocinadoresDe(p), ...emailsEquipePermitida(p, pessoasAtuais)].filter(Boolean).join(', '), { titulo: `${gate} aprovado · ${p.codigo}`, texto: gate === 'G4' ? `${usuario} aprovou o encerramento do projeto “${p.nome}”.` : `${usuario} aprovou o ${gate}. O projeto segue para ${proxima}.`, link: `/projeto/${encodeURIComponent(cod)}`, tipo: 'aprovacao' });
         const { assunto, html } = emailGateAprovado(p, g, { por: usuario, em: fonte.hoje(), parecer, proximaFase: proxima });
         return fonte.enviarEmail(assunto, html, para);
       },
       async enviarEmailCriacao(novoProjeto) {
         if (!fonte.enviarEmail) throw new Error('no modo piloto o e-mail não é enviado');
-        notificar(fonte, [patrocinadoresDe(novoProjeto.projeto), ...novoProjeto.projeto.equipe.map(m => m.email)].filter(Boolean).join(', '), { titulo: `Novo projeto · ${novoProjeto.projeto.codigo}`, texto: `${usuario} criou o projeto “${novoProjeto.projeto.nome}” (${novoProjeto.projeto.cliente}).`, link: `/projeto/${encodeURIComponent(novoProjeto.projeto.codigo)}`, tipo: 'projeto' });
+        notificar(fonte, [patrocinadoresDe(novoProjeto.projeto), ...emailsEquipePermitida(novoProjeto.projeto, pessoasAtuais)].filter(Boolean).join(', '), { titulo: `Novo projeto · ${novoProjeto.projeto.codigo}`, texto: `${usuario} criou o projeto “${novoProjeto.projeto.nome}” (${novoProjeto.projeto.cliente}).`, link: `/projeto/${encodeURIComponent(novoProjeto.projeto.codigo)}`, tipo: 'projeto' });
         // projeto criado pelo PMO já nasce aprovado: avisa GP e PMO
         const para = destinatarios(pmosDe(novoProjeto.projeto), patrocinadoresDe(novoProjeto.projeto));
         const { assunto, html } = emailProjetoCriadoPeloPmo(novoProjeto, usuario);
@@ -978,7 +1009,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
     const ACOES_BLOQUEADAS_ENCERRADO = new Set<string>(['salvarAtividade', 'criarAtividade', 'excluirAtividade', 'atualizarSemanal', 'lancarTarefas',
       'salvarRisco', 'criarRisco', 'excluirRisco', 'salvarPendencia', 'criarPendencia', 'excluirPendencia',
       'agendarReuniao', 'atualizarReuniao', 'cancelarReuniao', 'solicitarGate', 'decidirGate']);
-    const SEM_INDICADOR = new Set(['marcarNotificacoesLidas', 'atualizar', 'bloquear', 'historico', 'lerReuniao', 'reenviarHistorico', 'carregarPessoasApp']);
+    const SEM_INDICADOR = new Set(['agenda', 'eventoDaAtividade', 'marcarNotificacoesLidas', 'atualizar', 'bloquear', 'historico', 'lerReuniao', 'reenviarHistorico', 'carregarPessoasApp']);
     const quem = `${usuario} (${papel})`;
     for (const k of Object.keys(v) as (keyof PortalValor)[]) {
       const fn = v[k];
@@ -987,6 +1018,12 @@ export function PortalProvider({ children }: { children: ReactNode }) {
         // projeto encerrado: somente leitura (atividades, riscos, pendências, reuniões e gates)
         if (ACOES_BLOQUEADAS_ENCERRADO.has(k) && typeof args[0] === 'string' && dados.projetos.find(p => p.codigo === args[0])?.situacaoCadastro === 'Encerrado')
           return Promise.reject(new Error('Projeto encerrado: somente leitura. Não é possível alterar atividades, riscos, pendências, reuniões ou gates.'));
+        // Conferência de escopo também no ponto central de execução das ações.
+        if (ehPatrocinador(papel) && typeof args[0] === 'string' && k !== 'atualizar') {
+          const alvo = dados.projetos.find(p => p.codigo === args[0]);
+          if (alvo && !patrocinadorPodeVer(papel, alvo))
+            return Promise.reject(new Error('Seu perfil não tem acesso a este projeto.'));
+        }
         const r = (fn as (...a: unknown[]) => unknown).apply(v, args);
         if (r instanceof Promise) {
           setEmAndamento(n => n + 1);
@@ -1024,7 +1061,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
         <div className="vazioIcone" aria-hidden="true">?</div>
         <h1 className="h2" style={{ fontSize: 22, fontWeight: 700 }}>Você ainda não tem um perfil na Central Systech</h1>
         <p className="sub" style={{ fontSize: 14, lineHeight: 1.6 }}>
-          Entrou como <b>{usuario || fonte.email()}</b>, mas nenhuma função do portal (PMO, Patrocinador, Técnico ou Cliente) está atribuída a esta conta
+          Entrou como <b>{usuario || fonte.email()}</b>, mas nenhuma função do portal (PMO, Patrocinador Geral, Patrocinador VMware, Técnico ou Cliente) está atribuída a esta conta
           no aplicativo <b>Portal PMO</b> do Entra ID. Peça ao PMO ou à TI para atribuir o seu perfil e entre de novo.
         </p>
         <button type="button" className="btn pri" onClick={() => fonte.sair()}>Sair e entrar com outra conta</button>

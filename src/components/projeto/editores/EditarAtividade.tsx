@@ -226,7 +226,7 @@ export function EditarAtividade({ projeto, codigo, faseInicial, aoFechar, aoCria
                 <button type="button" className="btn pri" onClick={() => navegar(`/atualizar?item=${encodeURIComponent(`${projeto.codigo}|${existente.codigo}`)}`)}>Atualizar status</button>)
             : podeEditar && <button type="button" className="btn pri" onClick={() => setLiberada(true)}>✎ Liberar edição</button>}
         </>}>
-        <VisaoAtividade projeto={projeto} a={existente} filhos={filhos} lista={lista} mostrarLancamento={papel === 'PMO' || papel === 'Patrocinador'} />
+        <VisaoAtividade projeto={projeto} a={existente} filhos={filhos} lista={lista} mostrarLancamento={papel === 'PMO' || papel === 'Patrocinador Geral' || papel === 'Patrocinador VMware'} />
         {existente.reuniaoUrl && (
           <div className="reuniaoAgendada">
             <span>Reunião do Teams{existente.reuniaoTipo ? ` · ${existente.reuniaoTipo}` : ''}{existente.reuniaoInicio ? ` em ${quando(existente.reuniaoInicio)}` : ''}</span>

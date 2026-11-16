@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import type { Atividade, Projeto } from '../../types/models';
 import { usePortal } from '../../state/PortalContext';
-import { useProjetosVisiveis } from '../../state/useProjetosVisiveis';
 import { SELO_STATUS } from '../../lib/constantes';
 import { diasUteis, dm } from '../../lib/datas';
 import { Selo } from '../ui/Selo';
@@ -14,9 +13,7 @@ import { aguardando, lancadaParaTecnico, situacaoPrazo } from '../../lib/depende
  */
 export function ListaAtividadesTecnico({ projeto: p }: { projeto: Projeto }) {
   const { dados, hoje } = usePortal();
-  const { identidade } = useProjetosVisiveis();
   const [aberta, setAberta] = useState<string | null>(null);
-  const meuEmail = (identidade.email || p.equipe.find(m => m.nome.toLowerCase() === identidade.nome.toLowerCase())?.email || '').toLowerCase();
   const todas = dados.atividades[p.codigo] || [];
   const abertaSt = (a: Atividade) => a.status !== 'Concluído' && a.status !== 'Cancelado';
   const atraso = (a: Atividade) => (a.termino && a.termino < hoje ? Math.max(1, diasUteis(a.termino, hoje) - 1) : 0);
@@ -26,12 +23,13 @@ export function ListaAtividadesTecnico({ projeto: p }: { projeto: Projeto }) {
   const linha = (a: Atividade, sub: boolean) => {
     const d = abertaSt(a) ? atraso(a) : 0;
     return (
-      <button key={a.codigo} type="button" className={`tecLinha ${sub ? 'sub' : ''} ${abertaSt(a) ? '' : 'feita'} prazo-${situacaoPrazo(a, hoje) || 'ok'}`}
-        onClick={() => setAberta(a.codigo)}>
+      <div key={a.codigo} role="button" tabIndex={0} className={`tecLinha ${sub ? 'sub' : ''} ${abertaSt(a) ? '' : 'feita'} prazo-${situacaoPrazo(a, hoje) || 'ok'}`}
+        onClick={() => setAberta(a.codigo)}
+        onKeyDown={e => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); setAberta(a.codigo); } }}>
         <span className="tecNome">
           {sub && <span className="tecSeta" aria-hidden="true">↳</span>}<span className="tecProj">{p.codigo}</span>{a.nome}
-          {a.responsavel && a.responsavel.toLowerCase() === meuEmail && <span className="minhaTag">minha</span>}
           {aguardando(a, todas) && <span className="tagLock">aguarda pré-req.</span>}
+          <SeloReuniao a={a} hoje={hoje} />
         </span>
         <span className="tecInfo">
           {a.responsavel && <span className="sub">{nome(a.responsavel)}</span>}
@@ -39,7 +37,7 @@ export function ListaAtividadesTecnico({ projeto: p }: { projeto: Projeto }) {
           <span className="mono">{a.percentual}%</span>
           <span className={d ? 'tecAtraso' : situacaoPrazo(a, hoje) === 'perto' ? 'tecPerto' : 'sub'}>{!abertaSt(a) ? (a.dataReal ? `concluída ${dm(a.dataReal)}` : `prevista ${dm(a.termino)}`) : d ? `${d} ${d > 1 ? 'dias úteis' : 'dia útil'} de atraso` : `prevista ${dm(a.termino)}`}</span>
         </span>
-      </button>
+      </div>
     );
   };
 
@@ -55,5 +53,23 @@ export function ListaAtividadesTecnico({ projeto: p }: { projeto: Projeto }) {
       </div>
       {aberta && <EditarAtividade projeto={p} codigo={aberta} aoFechar={() => setAberta(null)} />}
     </div>
+  );
+}
+
+/**
+ * Reunião do Teams ligada à atividade: data e hora e, se ainda não passou, o link "Entrar".
+ * O clique no link abre o Teams e não abre a atividade.
+ */
+function SeloReuniao({ a, hoje }: { a: Atividade; hoje: string }) {
+  if (!a.reuniaoUrl && !a.reuniaoInicio) return null;
+  const quando = a.reuniaoInicio ? `${a.reuniaoInicio.slice(8, 10)}/${a.reuniaoInicio.slice(5, 7)} ${a.reuniaoInicio.slice(11, 16)}`.trim() : '';
+  const passou = !!a.reuniaoInicio && a.reuniaoInicio.slice(0, 10) < hoje;
+  const texto = `📹 Teams${quando ? ` · ${quando}` : ''}${a.reuniaoTipo ? ` · ${a.reuniaoTipo}` : ''}`;
+  if (passou || !a.reuniaoUrl) return <span className="tagReuniao passada" title="Reunião do Teams desta atividade">{texto}</span>;
+  return (
+    <a className="tagReuniao" href={a.reuniaoUrl} target="_blank" rel="noopener noreferrer" title="Entrar na reunião do Teams"
+      onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
+      {texto} · <b>Entrar</b>
+    </a>
   );
 }

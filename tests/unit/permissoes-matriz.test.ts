@@ -14,7 +14,8 @@ const TODAS_AS_ACOES: Acao[] = [
 const ESPERADO: Record<Papel, Acao[]> = {
   PMO: ['criarProjeto', 'editarProjeto', 'excluirProjeto', 'aprovarCadastro', 'solicitarGate', 'gerenciarAtividades',
     'atualizarAtividade', 'criarSubatividade', 'editarRisco', 'responderPendencia', 'enviarDocumento'],
-  Patrocinador: ['aprovarGate'],
+  'Patrocinador Geral': ['aprovarGate'],
+  'Patrocinador VMware': ['aprovarGate'],
   'Técnico': ['atualizarAtividade', 'criarSubatividade', 'enviarDocumento'],
   Cliente: [],
 };

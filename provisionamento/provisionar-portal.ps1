@@ -21,13 +21,16 @@
   v3.73: biblioteca "Wiki Tecnicos" com os arquivos da pasta wiki-arquivos (Wiki dos técnicos).
   v3.81: coluna Parceiro em Portal Projetos (terceirização).
   v3.82: lista Portal Wiki (documentos da Wiki editados pelos técnicos).
-  v3.85: coluna Função de Portal Tecnicos aceita PMO e Patrocinador (e preenchimento livre).
+  v3.85: coluna Função de Portal Tecnicos aceita PMO e funções combinadas (preenchimento livre).
   v3.88: coluna Prazo em Portal Pendencias.
   v3.93: coluna Descricao na biblioteca Wiki Tecnicos.
   v4.5: listas Portal Notificacoes e Portal Modelos, coluna UltimoStatusReport, biblioteca Portal Clientes
         e liberação de um órgão:  -Cliente trf1.jus.br -UsuariosCliente 'fiscal@trf1.jus.br,gestor@trf1.jus.br'
 
 .EXEMPLOS
+  # somente atualizar as opções de patrocinador em Portal Tecnicos (sem reprovisionar o site)
+  .\provisionar-portal.ps1 -SiteUrl "https://suaempresa.sharepoint.com/sites/TesteProjetos" -ClientId "<id do app PnP>" -SomenteFuncoesPatrocinadores
+
   # só a estrutura (listas vazias)
   .\provisionar-portal.ps1 -SiteUrl "https://suaempresa.sharepoint.com/sites/TesteProjetos" -ClientId "<id do app PnP>"
 
@@ -51,7 +54,9 @@ param(
   # v4.5: libera um órgão (domínio de e-mail, ex.: trf1.jus.br) na biblioteca Portal Clientes,
   # com leitura só para as pessoas informadas (e-mails separados por vírgula)
   [string] $Cliente = '',
-  [string] $UsuariosCliente = ''
+  [string] $UsuariosCliente = '',
+  # Atualiza somente as opções da coluna Função em Portal Tecnicos.
+  [switch] $SomenteFuncoesPatrocinadores
 )
 $ErrorActionPreference = 'Stop'
 Import-Module PnP.PowerShell
@@ -60,6 +65,8 @@ Connect-PnPOnline -Url $SiteUrl -Interactive -ClientId $ClientId
 $FASES = @('Iniciação', 'Planejamento', 'Execução', 'Monitoramento', 'Encerramento')
 $PASTAS = @('01 · Iniciação', '02 · Planejamento', '03 · Execução', '04 · Monitoramento e controle', '05 · Encerramento')
 $BIB = 'Documentos de Projetos'
+# Opções da coluna Função. O nome legado "Patrocinador" foi retirado.
+$FUNCOES_TECNICOS = [string[]]@('Técnico', 'Arquiteto', 'PMO', 'Patrocinador Geral', 'Patrocinador VMware', 'Gerente de projeto')
 
 function Lista([string]$Titulo, [string]$Url, [string]$Modelo = 'GenericList') {
   if (-not (Get-PnPList -Identity $Titulo -ErrorAction SilentlyContinue)) {
@@ -91,6 +98,61 @@ function Atualizar-Opcoes([string]$Lista, [string]$Interno, [string[]]$Opcoes) {
   $campo.Update()
   Invoke-PnPQuery
   Write-Host "  opções de ${Interno}: $($Opcoes -join ', ')" -ForegroundColor DarkGray
+}
+
+# Atualiza a coluna existente sem recriar a lista nem modificar os cadastros.
+function Atualizar-FuncoesPatrocinadores {
+  $listaTecnicos = 'Portal Tecnicos'
+  if (-not (Get-PnPList -Identity $listaTecnicos -ErrorAction SilentlyContinue)) {
+    throw "A lista '$listaTecnicos' não existe. Execute o provisionamento completo para criá-la."
+  }
+  $campoFuncao = Get-PnPField -List $listaTecnicos -Identity 'Funcao' -ErrorAction Stop
+  if ($campoFuncao.TypeAsString -ne 'Choice') {
+    throw "A coluna Funcao de '$listaTecnicos' não é do tipo Choice. Nenhuma alteração foi realizada."
+  }
+
+  [xml]$esquema = $campoFuncao.SchemaXml
+  $no = $esquema.DocumentElement.SelectSingleNode('CHOICES')
+  if (-not $no) {
+    $no = $esquema.CreateElement('CHOICES')
+    [void]$esquema.DocumentElement.AppendChild($no)
+  }
+  $no.RemoveAll()
+  foreach ($opcao in $FUNCOES_TECNICOS) {
+    $item = $esquema.CreateElement('CHOICE')
+    $item.InnerText = $opcao
+    [void]$no.AppendChild($item)
+  }
+  # Preserva o preenchimento combinado: por exemplo, "PMO;Patrocinador Geral".
+  $esquema.DocumentElement.SetAttribute('FillInChoice', 'TRUE')
+  $padrao = $esquema.DocumentElement.SelectSingleNode('Default')
+  if ($padrao -and $padrao.InnerText.Trim() -eq 'Patrocinador') {
+    $padrao.InnerText = ''
+  }
+  $campoFuncao.SchemaXml = $esquema.OuterXml
+  $campoFuncao.Update()
+  Invoke-PnPQuery
+
+  # Consulta novamente a configuração: em caso de falha, encerra com erro.
+  $campoConfirmacao = Get-PnPField -List $listaTecnicos -Identity 'Funcao' -ErrorAction Stop
+  [xml]$esquemaConfirmacao = $campoConfirmacao.SchemaXml
+  $opcoesGravadas = [string[]]@($esquemaConfirmacao.DocumentElement.SelectNodes('CHOICES/CHOICE') | ForEach-Object { $_.InnerText })
+  if ($opcoesGravadas -contains 'Patrocinador') {
+    throw "A opção antiga 'Patrocinador' ainda existe na coluna Funcao. Confira as permissões e a configuração da coluna no SharePoint."
+  }
+  foreach ($esperada in $FUNCOES_TECNICOS) {
+    if ($opcoesGravadas -notcontains $esperada) {
+      throw "A opção '$esperada' não foi persistida na coluna Funcao."
+    }
+  }
+  Write-Host "Portal Tecnicos: opção 'Patrocinador' removida; novos patrocinadores disponíveis." -ForegroundColor Green
+  Write-Host 'Cadastros que já tinham a função antiga NÃO foram reclassificados automaticamente.' -ForegroundColor Yellow
+}
+
+# Modo seguro: não provisiona outras listas, não cria usuários e não altera projetos.
+if ($SomenteFuncoesPatrocinadores) {
+  Atualizar-FuncoesPatrocinadores
+  return
 }
 
 function Projeto([string]$L) {
@@ -302,12 +364,9 @@ Campo $L 'Impacto' 'Impacto / observação' 'Note'
 # ------------------------------------------------------------ Portal Tecnicos (tabela de técnicos da Systech)
 $L = 'Portal Tecnicos'; Lista $L 'Lists/PortalTecnicos'; Titulo $L 'Nome'
 Campo $L 'Email' 'E-mail' 'Text'
-Campo $L 'Funcao' 'Função' 'Choice' @('Técnico', 'Arquiteto', 'PMO', 'Patrocinador', 'Gerente de projeto')
-# v3.85: PMO e Patrocinador também nesta lista (o cadastro de projetos tira daqui gerente, arquiteto e equipe).
-# Preenchimento livre ligado: quem acumula papéis pode ficar como "PMO, Patrocinador".
-try {
-  Set-PnPField -List $L -Identity 'Funcao' -Values @{ Choices = [string[]]@('Técnico', 'Arquiteto', 'PMO', 'Patrocinador', 'Gerente de projeto'); FillInChoice = $true } | Out-Null
-} catch { Write-Warning "Não foi possível atualizar as opções da coluna Função de Portal Tecnicos: $($_.Exception.Message)" }
+Campo $L 'Funcao' 'Função' 'Choice' $FUNCOES_TECNICOS
+# Atualiza também a coluna já existente e verifica se o valor legado saiu.
+Atualizar-FuncoesPatrocinadores
 Campo $L 'Ativo' 'Ativo' 'Boolean'
 # cadastro inicial: inclui só quem ainda não está na lista (compara pelo e-mail)
 $TECNICOS = @(

@@ -92,7 +92,7 @@ export function EditarProjetoPage() {
       </section>
       <section className="card" style={{ padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: 18 }}>
         <h2 className="h3">Equipe</h2>
-        <EditorEquipe equipe={form.equipe} gerente={form.gerente} arquiteto={form.arquiteto} aoMudar={e => setForm(f => (f ? { ...f, equipe: e } : f))} />
+        <EditorEquipe equipe={form.equipe} gerente={form.gerente} arquiteto={form.arquiteto} tipoProjeto={form.tipo} aoMudar={e => setForm(f => (f ? { ...f, equipe: e } : f))} />
         <ConferenciaEquipe conf={conf} />
       </section>
       <section className="card" style={{ padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: 18 }}>

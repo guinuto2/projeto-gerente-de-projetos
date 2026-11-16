@@ -7,6 +7,7 @@ import { dm } from '../../lib/datas';
 import { TrilhaFases } from './TrilhaFases';
 import { usePapel } from '../../state/PapelContext';
 import { aguardando } from '../../lib/dependencias';
+import { ehPatrocinador } from '../../lib/patrocinadores';
 
 export function CardProjeto({ projeto: p }: { projeto: Projeto }) {
   const { dados, hoje } = usePortal();
@@ -22,7 +23,7 @@ export function CardProjeto({ projeto: p }: { projeto: Projeto }) {
   const realizadas = itens.reduce((s, a) => s + (a.horasRealizadas || 0), 0);
   const planejadas = itens.reduce((s, a) => s + (a.horasPlanejadas || 0), 0);
   const h = (v: number) => v.toLocaleString('pt-BR', { maximumFractionDigits: 1 });
-  if (papel === 'Técnico' || papel === 'Patrocinador' || papel === 'Cliente') {
+  if (papel === 'Técnico' || ehPatrocinador(papel) || papel === 'Cliente') {
     return (
       <Link className="pcard pcardTec" to={`/projeto/${encodeURIComponent(p.codigo)}`}>
         <div className="pcardTecTopo">

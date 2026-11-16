@@ -2,8 +2,9 @@ import type { MembroEquipe } from '../../types/models';
 import { usePortal } from '../../state/PortalContext';
 import { ativos, gerentesParaCadastro, pessoasComPapel, tecnicoPorNome, tecnicosParaCadastro } from '../../lib/pessoas';
 import { FUNCOES_EQUIPE } from '../../lib/constantes';
+import { projetoVmwareOuOmnissa } from '../../lib/patrocinadores';
 
-interface Props { equipe: MembroEquipe[]; gerente: string; arquiteto: string; aoMudar: (e: MembroEquipe[]) => void }
+interface Props { equipe: MembroEquipe[]; gerente: string; arquiteto: string; tipoProjeto: string; aoMudar: (e: MembroEquipe[]) => void }
 
 const ehTecnico = (m: MembroEquipe) => /^t[eé]cnico$/i.test(m.funcao.trim());
 const tecnicoVazio = (): MembroEquipe => ({ nome: '', funcao: 'Técnico', empresa: 'Systech', email: '' });
@@ -13,13 +14,15 @@ const pessoaVazia = (): MembroEquipe => ({ nome: '', funcao: 'Responsável do cl
  * Pessoas do projeto. Quem tem a função "Técnico" é escolhido na tabela de técnicos da Systech
  * (lista Portal Tecnicos): nome, e-mail e empresa vêm de lá.
  */
-export function EditorEquipe({ equipe, gerente, arquiteto, aoMudar }: Props) {
+export function EditorEquipe({ equipe, gerente, arquiteto, tipoProjeto, aoMudar }: Props) {
   const { dados, pessoasApp } = usePortal();
   const mesmoNome = (a: string, b: string) => !!a.trim() && a.trim().toLowerCase() === b.trim().toLowerCase();
   const tecnicos = tecnicosParaCadastro(ativos(dados.tecnicos || []), pessoasApp);
   // gerente e patrocinador: pessoas com essa função na lista Portal Tecnicos
   const opcoes = (funcao: string): { nome: string; email: string }[] =>
-    funcao === 'Gerente de projeto' ? gerentesParaCadastro(dados.tecnicos || []) : funcao === 'Patrocinador' ? pessoasComPapel(pessoasApp, 'Patrocinador') : [];
+    funcao === 'Gerente de projeto' ? gerentesParaCadastro(dados.tecnicos || [])
+      : funcao === 'Patrocinador Geral' ? pessoasComPapel(pessoasApp, 'Patrocinador Geral')
+      : funcao === 'Patrocinador VMware' && projetoVmwareOuOmnissa({ tipo: tipoProjeto }) ? pessoasComPapel(pessoasApp, 'Patrocinador VMware') : [];
   const mudar = (i: number, campos: Partial<MembroEquipe>) => aoMudar(equipe.map((m, k) => (k === i ? { ...m, ...campos } : m)));
   const escolherTecnico = (i: number, nome: string) => {
     const t = tecnicoPorNome(tecnicos, nome);
@@ -45,7 +48,7 @@ export function EditorEquipe({ equipe, gerente, arquiteto, aoMudar }: Props) {
                     <select className="ctl" aria-label="Função" value={m.funcao} disabled={fixo} onChange={e => mudar(i, ehTecnico({ ...m, funcao: e.target.value }) && !ehTecnico(m)
                       ? { funcao: e.target.value, nome: '', email: '', empresa: 'Systech' }   // virou técnico: escolhe na tabela
                       : { funcao: e.target.value })}>
-                      {FUNCOES_EQUIPE.map(f => <option key={f} disabled={(f === 'Gerente de projeto' && !!gerente) || (f === 'Arquiteto' && !!arquiteto)}>{f}</option>)}
+                      {FUNCOES_EQUIPE.map(f => <option key={f} disabled={(f === 'Gerente de projeto' && !!gerente) || (f === 'Arquiteto' && !!arquiteto) || (f === 'Patrocinador VMware' && !projetoVmwareOuOmnissa({ tipo: tipoProjeto }))}>{f}</option>)}
                       {/* projetos antigos com função fora da lista: mantém até alguém trocar */}
                       {m.funcao && !FUNCOES_EQUIPE.includes(m.funcao) && <option value={m.funcao}>{m.funcao} (fora da lista)</option>}
                     </select>

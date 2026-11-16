@@ -1,11 +1,12 @@
 import { Link } from 'react-router-dom';
 import { usePapel } from '../state/PapelContext';
 import { Mensagem } from '../components/ui/Mensagem';
+import { ehPatrocinador } from '../lib/patrocinadores';
 
 /** Financeiro (PMO e patrocinador) — página reservada; o conteúdo vem nas próximas versões. */
 export function FinanceiroPage() {
   const { papel } = usePapel();
-  if (papel !== 'PMO' && papel !== 'Patrocinador') return <main className="main"><Mensagem tipo="info">O financeiro é visível só para o PMO e o patrocinador.</Mensagem></main>;
+  if (papel !== 'PMO' && !ehPatrocinador(papel)) return <main className="main"><Mensagem tipo="info">O financeiro é visível só para o PMO e o patrocinador.</Mensagem></main>;
   return (
     <main className="main">
       <div>

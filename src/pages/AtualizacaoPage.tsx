@@ -14,6 +14,7 @@ import { dm, dma } from '../lib/datas';
 import { Mensagem } from '../components/ui/Mensagem';
 import { NovaSubatividade } from '../components/atualizacao/NovaSubatividade';
 import { KanbanAtividades } from '../components/atualizacao/KanbanAtividades';
+import { BotaoAgendaAtividade } from '../components/agenda/BotaoAgendaAtividade';
 import { EditarAtividade } from '../components/projeto/editores/EditarAtividade';
 import { DocumentosAtividade } from '../components/atualizacao/DocumentosAtividade';
 import { VisaoAtividade } from '../components/projeto/editores/VisaoAtividade';
@@ -274,13 +275,15 @@ export function AtualizacaoPage() {
           <section ref={detalheRef} className="card formAtual">
             <div>
               <div className="sub" style={{ fontSize: 13 }}>{item.projeto.codigo} · {item.projeto.nome} · Fase de {item.atividade.fase.toLowerCase()}</div>
-              <div className="linha" style={{ alignItems: 'flex-start' }}>
+              <div className="linha tituloAtv" style={{ alignItems: 'flex-start' }}>
                 <h2 className="h2" style={{ marginTop: 4, fontSize: 24, fontWeight: 700 }}>{ehTecnico ? item.atividade.nome : `${item.atividade.codigo} · ${item.atividade.nome}`}</h2>
                 <span className="acoesAtv" style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
                   {pode('criarSubatividade') && !item.atividade.pai && !novaSub && !editando &&
                     <button type="button" className="btn pq" disabled={!temProjetoAtivo} title={temProjetoAtivo ? undefined : motivoSemProjeto} onClick={() => setNovaSub(true)}>+ Nova subatividade</button>}
                   {pode('gerenciarAtividades') && !editando &&
                     <button type="button" className="btn pq" onClick={() => setEditarAtv(chave(item))}>Editar atividade</button>}
+                  {pode('atualizarAtividade') && !editando && item.atividade.status !== 'Concluído' && item.atividade.status !== 'Cancelado' &&
+                    <BotaoAgendaAtividade projeto={item.projeto} atividade={item.atividade} classe="btn pq" />}
                 </span>
               </div>
               {item.atividade.pai && <div className="sub" style={{ fontSize: 13 }}>{ehTecnico ? 'Tarefa da atividade' : 'Subatividade de'} {item.atividade.pai}</div>}

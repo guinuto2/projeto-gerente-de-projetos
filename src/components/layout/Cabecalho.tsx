@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { Sino } from './Sino';
+import { AgendaCabecalho } from './AgendaCabecalho';
 import { usePortal } from '../../state/PortalContext';
 import { useToast } from '../../state/ToastContext';
 import { config } from '../../config/config';
 import { usePapel } from '../../state/PapelContext';
 import { DESCRICAO_PAPEL, SIGLA_PAPEL, type Papel } from '../../lib/permissoes';
 import { aplicarTema, temaSalvo, type Tema } from '../../lib/tema';
+import { ehPatrocinador } from '../../lib/patrocinadores';
 
 const iniciais = (nome: string) => nome.split(/\s+/).filter(Boolean).slice(0, 2).map(p => p[0]).join('').toUpperCase() || '?';
 
@@ -37,9 +39,10 @@ export function Cabecalho() {
           {papel !== 'Cliente' && <NavLink to="/cronogramas" className={classe}>Cronogramas</NavLink>}
           {pode('atualizarAtividade') && <NavLink to="/atualizar" className={classe}>Atualizar status</NavLink>}
           {papel === 'Técnico' && <NavLink to="/wiki" className={classe}>Wiki</NavLink>}
-          {(papel === 'PMO' || papel === 'Patrocinador') && <NavLink to="/financeiro" className={classe}>Financeiro</NavLink>}
+          {(papel === 'PMO' || ehPatrocinador(papel)) && <NavLink to="/financeiro" className={classe}>Financeiro</NavLink>}
         </nav>
         {config.dataSimulada && <span className="dataSimulada" title="config.js: dataSimulada">Data simulada · {config.dataSimulada.split('-').reverse().join('/')}</span>}
+        {papel !== 'Cliente' && <AgendaCabecalho />}
         {papel !== 'Cliente' && <Sino />}
         <img className="logoAniversarioHeader" src={`${import.meta.env.BASE_URL}Systech20anos.png`}
           alt="Systech — 20 anos" width="806" height="180" />

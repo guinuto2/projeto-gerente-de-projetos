@@ -66,7 +66,7 @@ export const TIPOS_REUNIAO: TipoReuniao[] = [
 export const tipoReuniao = (nome?: string) => TIPOS_REUNIAO.find(t => t.nome === nome);
 
 /** Funções possíveis na equipe do projeto (lista fechada). */
-export const FUNCOES_EQUIPE = ['Técnico', 'Gerente de projeto', 'Arquiteto', 'Fiscal', 'Responsável do cliente', 'Responsável do fornecedor', 'Patrocinador'];
+export const FUNCOES_EQUIPE = ['Técnico', 'Gerente de projeto', 'Arquiteto', 'Fiscal', 'Responsável do cliente', 'Responsável do fornecedor', 'Patrocinador Geral', 'Patrocinador VMware'];
 
 /** Próximo código da sequência (R-7 → R-8, DA-A16 → DA-A17); usa o prefixo mais comum da lista. */
 export function proximoCodigoSeq(codigos: string[], prefixoPadrao: string): string {

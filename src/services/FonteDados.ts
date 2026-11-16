@@ -88,6 +88,15 @@ export interface FonteDados {
   linkBiblioteca(cod?: string): string;
   /** cria um evento com reunião do Teams no calendário de quem está logado e envia os convites */
   criarReuniaoTeams?(r: NovaReuniao, corpoHtml: string): Promise<{ id: string; joinUrl: string }>;
+  /**
+   * Agenda do Outlook/Teams de quem está logado entre duas datas (AAAA-MM-DD, fim incluído), no horário de Brasília.
+   * interativo=false: não abre janela de consentimento (lança AgendaSemPermissao se faltar a permissão).
+   */
+  agenda?(de: string, ate: string, interativo: boolean): Promise<import('../lib/agenda').EventoAgenda[]>;
+  /** compromisso que o portal criou para a atividade (pela etiqueta invisível), ou null; interativo=false não abre janela de consentimento */
+  eventoDaAtividade?(chave: string, interativo: boolean): Promise<import('../lib/agenda').EventoAgenda | null>;
+  /** cria o compromisso da atividade, ou atualiza o que já existe (pelo id); devolve o compromisso salvo */
+  salvarEventoAtividade?(corpo: Record<string, unknown>, idExistente?: string): Promise<import('../lib/agenda').EventoAgenda>;
   /** lê a reunião (para editar) */
   obterReuniaoTeams?(id: string): Promise<NovaReuniao>;
   /** altera a reunião; o Outlook manda a atualização aos convidados */
