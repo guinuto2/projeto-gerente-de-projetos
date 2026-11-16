@@ -15,6 +15,7 @@ import { Rascunhos } from '../components/portfolio/Rascunhos';
 import { PastasSemProjeto } from '../components/portfolio/PastasSemProjeto';
 import { Chips } from '../components/ui/Chips';
 import { Vazio } from '../components/ui/Vazio';
+import { ehPatrocinador } from '../lib/patrocinadores';
 
 const FILTROS = ['Todas', ...FASES.filter(f => f !== 'Monitoramento'), 'Aguardando aprovação'] as const;
 type Filtro = typeof FILTROS[number];
@@ -49,7 +50,7 @@ export function PortfolioPage() {
                 {papel === 'Técnico' && !projetos.length
                   ? <>Você ({identidade.nome || 'conta sem nome'}) ainda não está na equipe de nenhum projeto. Peça ao PMO para incluir seu nome ou e-mail na equipe.</>
                   : <>{dados.projetos.length ? 'Nenhum projeto com esse filtro.' : 'Nenhum projeto cadastrado ainda.'}
-                    {papel !== 'Técnico' && <><br /><br /><Link className="btn pri" to="/novo">Cadastrar projeto</Link></>}</>}
+                    {pode('criarProjeto') && <><br /><br /><Link className="btn pri" to="/novo">Cadastrar projeto</Link></>}</>}
               </Vazio>
             )}
             <Rascunhos projetos={rascunhos} />
@@ -59,7 +60,7 @@ export function PortfolioPage() {
           <aside className="aside">
               {papel !== 'Técnico' && <ProximosMarcos />}
               <EmAndamento />
-              {papel !== 'Patrocinador' && <AtividadesAtrasadas />}   {/* atrasos: só PMO e técnicos (cada técnico vê os dele) */}
+              {!ehPatrocinador(papel) && <AtividadesAtrasadas />}   {/* atrasos: só PMO e técnicos (cada técnico vê os dele) */}
             </aside>
           )}
         </div>

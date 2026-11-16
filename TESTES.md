@@ -39,7 +39,7 @@ Os arquivos estão em `tests/unit/`, `tests/components/`, `tests/integration/` e
 
 ### Regressões críticas e teste de mutação
 
-A suíte inclui **159 testes** (94 unitários, 12 de componentes e 53 de integração simulada).
+A suíte inclui **195 testes** (121 unitários, 12 de componentes e 62 de integração simulada).
 As verificações atacam diretamente 25 regressões apontadas nas duas rodadas de avaliação da suíte:
 
 | Área | Defeito que os testes devem identificar |
@@ -147,3 +147,11 @@ não precisam ser alterados para adicionar novos casos.
 O `typecheck` atual valida os arquivos da aplicação (`src/`); os testes são transpilados e executados
 separadamente. A validação estática completa dos próprios arquivos de teste pode ser introduzida em
 uma próxima etapa, caso sejam instaladas as tipagens correspondentes do ambiente Node.
+
+### Agenda do Outlook/Teams
+
+- `tests/unit/agenda.test.ts`: o compromisso montado a partir da atividade (dia inteiro × horário, fim exclusivo do dia
+  inteiro, descrição protegida contra HTML, link do portal e etiqueta invisível), a validação do horário e o agrupamento por dia.
+- `tests/integration/agenda-graph.test.ts`: as chamadas ao Microsoft Graph simulado (calendarView no fuso de Brasília,
+  páginas, compromissos cancelados, falta de permissão sem abrir janela, busca pela etiqueta, criação, atualização e
+  recriação quando o compromisso foi apagado no Outlook).

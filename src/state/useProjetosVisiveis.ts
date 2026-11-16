@@ -2,6 +2,7 @@ import { useCallback, useMemo } from 'react';
 import type { Projeto } from '../types/models';
 import { usePortal } from './PortalContext';
 import { usePapel } from './PapelContext';
+import { ehPatrocinador, patrocinadorPodeVer } from '../lib/patrocinadores';
 
 const norm = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
 /** Nomes que são só marcadores no cadastro, não pessoas. */
@@ -35,6 +36,7 @@ export function useProjetosVisiveis() {
   const clienteSimulado = dados.projetos.find(p => p.situacaoCadastro === 'Ativo')?.cliente || '';
   const podeVer = useCallback((p: Projeto) => {
     if (p.situacaoCadastro === 'Rascunho') return papel === 'PMO';   // rascunho é só do PMO
+    if (ehPatrocinador(papel)) return patrocinadorPodeVer(papel, p);
     if (papel === 'Cliente') {
       if (p.situacaoCadastro !== 'Ativo' && p.situacaoCadastro !== 'Encerrado') return false;
       if (fonte.modoCliente) return true;   // a pasta do órgão já tem só os projetos dele

@@ -3,6 +3,8 @@
  * (Nome, Email, Funcao, Ativo); TECNICOS_PADRAO é usado no modo piloto e pelo script para popular a lista.
  */
 import type { Tecnico } from '../types/models';
+import { papeisPatrocinioDaFuncao } from './patrocinadores';
+import type { Papel } from './permissoes';
 
 export const TECNICOS_PADRAO: Tecnico[] = [
   { nome: 'Guilherme Santos', email: 'guilherme.santos@systech.com.br', funcao: 'Técnico', ativo: true },
@@ -26,7 +28,7 @@ export const gerentesParaCadastro = (lista: Tecnico[]): Tecnico[] =>
   ativos(lista).filter(t => (t.funcao || '').split(/[,;|/]/).some(f => /^gerente(?: de projetos?)?$/i.test(f.trim())));
 
 /** Pessoa da lista Portal Tecnicos, com os perfis do portal (pela coluna Função). */
-export interface PessoaApp { nome: string; email: string; papeis: ('PMO' | 'Patrocinador' | 'Técnico' | 'Cliente')[] }
+export interface PessoaApp { nome: string; email: string; papeis: Papel[] }
 
 /** Técnicos para o cadastro: os do app (função Técnico) e os da lista Portal Tecnicos, sem repetir (pelo e-mail ou nome). */
 export function tecnicosParaCadastro(tabela: Tecnico[], app: PessoaApp[]): Tecnico[] {
@@ -47,8 +49,8 @@ export function pessoasDaLista(lista: Tecnico[]): PessoaApp[] {
     const f = (t.funcao || 'Técnico').toLowerCase();
     const papeis: PessoaApp['papeis'] = [];
     if (/pmo|gerente/.test(f)) papeis.push('PMO');
-    if (/patrocinador/.test(f)) papeis.push('Patrocinador');
-    if (/t[eé]cnico|arquiteto/.test(f) || !papeis.length) papeis.push('Técnico');
+    papeis.push(...papeisPatrocinioDaFuncao(t.funcao));
+    if (/t[eé]cnico|arquiteto/.test(f) || (!papeis.length && !/patrocinador/.test(f))) papeis.push('Técnico');
     return { nome: t.nome, email: (t.email || '').toLowerCase(), papeis };
   });
 }

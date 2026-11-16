@@ -7,18 +7,20 @@ import { atividadeTeste, dadosTeste, projetoTeste } from '../helpers/fixtures';
 // Testes negativos foram adicionados porque a suite anterior checava em grande parte casos positivos.
 test('segurança: só PMO exclui projeto; patrocinador mantém apenas aprovação', () => {
   assert.equal(pode('PMO', 'excluirProjeto'), true);
-  for (const papel of ['Patrocinador', 'Técnico', 'Cliente'] as const) {
+  for (const papel of ['Patrocinador Geral', 'Patrocinador VMware', 'Técnico', 'Cliente'] as const) {
     assert.equal(pode(papel, 'excluirProjeto'), false, `perfil ${papel}`);
   }
-  assert.equal(pode('Patrocinador', 'aprovarGate'), true);
-  assert.equal(pode('Patrocinador', 'editarProjeto'), false);
+  assert.equal(pode('Patrocinador Geral', 'aprovarGate'), true);
+  assert.equal(pode('Patrocinador Geral', 'editarProjeto'), false);
+  assert.equal(pode('Patrocinador VMware', 'aprovarGate'), true);
+  assert.equal(pode('Patrocinador VMware', 'excluirProjeto'), false);
 });
 
 test('segurança: Técnico não consegue gerenciar riscos, mesmo podendo atualizar atividade', () => {
   assert.equal(pode('Técnico', 'editarRisco'), false);
   assert.equal(pode('Técnico', 'atualizarAtividade'), true);
   assert.equal(pode('PMO', 'editarRisco'), true);
-  for (const papel of ['Cliente', 'Patrocinador'] as const) assert.equal(pode(papel, 'editarRisco'), false);
+  for (const papel of ['Cliente', 'Patrocinador Geral', 'Patrocinador VMware'] as const) assert.equal(pode(papel, 'editarRisco'), false);
 });
 
 test('status: 100% com status aberto deve ser recusado; concluído com dados obrigatórios é aceito', () => {

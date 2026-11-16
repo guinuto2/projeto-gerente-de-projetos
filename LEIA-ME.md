@@ -1,4 +1,22 @@
-# Central Systech — v4.7 (React)
+# Central Systech — v4.8 (React)
+
+**v4.8 — Agenda do Outlook/Teams**
+- Cabeçalho: botão de agenda (ao lado do sino) com os compromissos de hoje e dos próximos 7 dias, da agenda do Outlook de
+  quem está logado — a mesma do Teams. Mostra "Entrar no Teams", "Abrir no Outlook" e, nos compromissos criados pelo portal,
+  "Ver atividade". O número no ícone é a quantidade de compromissos de hoje. Não aparece para o perfil Cliente.
+- Atividades: botão "Adicionar à agenda" no painel de detalhes da página Atualizar status, para quem pode atualizar
+  atividades (Técnico e PMO), enquanto a atividade não estiver concluída ou cancelada. O compromisso leva
+  o título ("[PROJETO] nome da atividade", editável) e a descrição da atividade, com o link para o portal. Pode ser "dia
+  inteiro no período previsto" (livre) ou "horário específico" (ocupado, lembrete 15 min antes). Se a atividade já estiver na
+  agenda, adicionar de novo altera o mesmo compromisso (sem duplicar) e a janela avisa; se o compromisso tiver sido apagado
+  no Outlook, cria de novo.
+- O compromisso é marcado com uma propriedade estendida invisível do Outlook (CentralSystechAtividade = "PROJETO|ATIVIDADE"),
+  que permite achá-lo em qualquer computador, sem guardar nada no navegador.
+- Permissão: delegada **Calendars.ReadWrite** no app Portal PMO (a mesma das reuniões do Teams). A leitura automática do
+  cabeçalho não abre janela: se a permissão ainda não foi concedida, aparece o botão "Conectar agenda". Com o consentimento
+  do administrador concedido no Entra ID, ninguém precisa clicar.
+- Modo piloto: agenda de exemplo, guardada no navegador.
+
 
 **v4.7:** Wiki — wiki.ts da equipe: SPEC RATE 2017 nos servidores Dell, Lenovo, HPE e xFusion; Omnissa reorganizada (Portais Omnissa, Suporte e ferramentas, Certificações e treinamentos); Processadores sem links.
 

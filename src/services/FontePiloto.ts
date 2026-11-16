@@ -4,6 +4,8 @@ import pilotoTrf1 from '../data/piloto-trf1.json';
 import { PASTAS, normalizarTipo } from '../lib/constantes';
 import { TECNICOS_PADRAO } from '../lib/pessoas';
 import { config } from '../config/config';
+import { PROPRIEDADE_ATIVIDADE, type EventoAgenda } from '../lib/agenda';
+import { somarDiasCorridos } from '../lib/datas';
 
 const CHAVE = 'portal-pmo-piloto-v3';
 const original = pilotoTrf1 as unknown as Dados;
@@ -72,6 +74,37 @@ export class FontePiloto implements FonteDados {
     const l = (await this.notificacoes('')).map(n => (ids.includes(n.id) ? { ...n, lida: true } : n));
     localStorage.setItem('portal-pmo-notificacoes', JSON.stringify(l));
   }
+  /* ---------- agenda simulada: alguns compromissos de exemplo + os adicionados (ficam neste navegador) ---------- */
+  private lerAgenda(): EventoAgenda[] {
+    try { const s = localStorage.getItem('portal-pmo-agenda-piloto'); if (s) return JSON.parse(s) as EventoAgenda[]; } catch { /* sem armazenamento */ }
+    const h = this.hoje(), amanha = somarDiasCorridos(h, 1);
+    return [
+      { id: 'p1', titulo: 'Daily do time de infraestrutura', inicio: `${h}T09:00:00`, fim: `${h}T09:30:00`, diaInteiro: false, linkTeams: 'https://teams.microsoft.com/' },
+      { id: 'p2', titulo: 'Reunião de acompanhamento com o cliente', inicio: `${h}T14:00:00`, fim: `${h}T15:00:00`, diaInteiro: false, local: 'Microsoft Teams', linkTeams: 'https://teams.microsoft.com/' },
+      { id: 'p3', titulo: 'Revisão da arquitetura', inicio: `${amanha}T10:00:00`, fim: `${amanha}T11:30:00`, diaInteiro: false },
+      { id: 'p4', titulo: 'Janela de manutenção', inicio: `${somarDiasCorridos(h, 3)}T00:00:00`, fim: `${somarDiasCorridos(h, 4)}T00:00:00`, diaInteiro: true },
+    ];
+  }
+  private gravarAgenda(l: EventoAgenda[]) { try { localStorage.setItem('portal-pmo-agenda-piloto', JSON.stringify(l)); } catch { /* sem armazenamento */ } }
+  async agenda(de: string, ate: string): Promise<EventoAgenda[]> {
+    return this.lerAgenda().filter(e => e.inicio.slice(0, 10) <= ate && (e.diaInteiro ? somarDiasCorridos(e.fim.slice(0, 10), -1) : e.fim.slice(0, 10)) >= de)
+      .sort((x, y) => x.inicio.localeCompare(y.inicio));
+  }
+  async eventoDaAtividade(chave: string, _interativo?: boolean): Promise<EventoAgenda | null> {
+    return this.lerAgenda().find(e => e.atividade === chave) || null;
+  }
+  async salvarEventoAtividade(corpo: Record<string, unknown>, idExistente?: string): Promise<EventoAgenda> {
+    const c = corpo as { subject: string; isAllDay: boolean; start: { dateTime: string }; end: { dateTime: string }; singleValueExtendedProperties?: { id: string; value: string }[] };
+    const l = this.lerAgenda();
+    const ev: EventoAgenda = {
+      id: idExistente && l.some(e => e.id === idExistente) ? idExistente : `piloto-${Date.now()}`,
+      titulo: c.subject, inicio: c.start.dateTime.slice(0, 19), fim: c.end.dateTime.slice(0, 19), diaInteiro: !!c.isAllDay,
+      atividade: c.singleValueExtendedProperties?.find(p => p.id === PROPRIEDADE_ATIVIDADE)?.value,
+    };
+    this.gravarAgenda([...l.filter(e => e.id !== ev.id), ev]);
+    return ev;
+  }
+
   async wikiDocs() {
     try { return JSON.parse(localStorage.getItem('portal-pmo-wiki-docs') || '[]'); } catch { return []; }
   }

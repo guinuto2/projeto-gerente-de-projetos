@@ -5,8 +5,8 @@
  *
  * Fluxo: o PMO cadastra e conduz os projetos e solicita aprovações; o Patrocinador aprova.
  */
-export type Papel = 'Patrocinador' | 'PMO' | 'Técnico' | 'Cliente';
-export const PAPEIS: Papel[] = ['Patrocinador', 'PMO', 'Técnico', 'Cliente'];
+export type Papel = 'Patrocinador Geral' | 'Patrocinador VMware' | 'PMO' | 'Técnico' | 'Cliente';
+export const PAPEIS: Papel[] = ['Patrocinador Geral', 'Patrocinador VMware', 'PMO', 'Técnico', 'Cliente'];
 
 export type Acao =
   | 'criarProjeto' | 'editarProjeto' | 'excluirProjeto'
@@ -19,7 +19,8 @@ export type Acao =
 
 const MATRIZ: Record<Papel, Acao[]> = {
   // só aprova os gates G2 a G4 e visualiza; não cria, não edita, não exclui
-  Patrocinador: ['aprovarGate'],
+  'Patrocinador Geral': ['aprovarGate'],
+  'Patrocinador VMware': ['aprovarGate'],
   // cadastra, edita e conduz os projetos; envia para aprovação do patrocinador; exclui projetos
   PMO: ['criarProjeto', 'editarProjeto', 'excluirProjeto', 'aprovarCadastro', 'solicitarGate', 'gerenciarAtividades', 'atualizarAtividade', 'criarSubatividade', 'editarRisco', 'responderPendencia', 'enviarDocumento'],
   'Técnico': ['atualizarAtividade', 'criarSubatividade', 'enviarDocumento'],
@@ -28,14 +29,15 @@ const MATRIZ: Record<Papel, Acao[]> = {
 };
 
 export const DESCRICAO_PAPEL: Record<Papel, string> = {
-  Patrocinador: 'Aprova os gates G2 a G4 e visualiza os projetos',
+  'Patrocinador Geral': 'Visualiza todos os projetos e aprova os gates G2 a G4',
+  'Patrocinador VMware': 'Visualiza e aprova apenas projetos VMware e Omnissa',
   PMO: 'Cria projetos (já ativos), aprova cadastros de outros, edita e exclui; solicita os gates G2 a G4 ao patrocinador',
   'Técnico': 'Atualiza as atividades, inclui subatividades e envia documentos',
   Cliente: 'Acompanha os projetos do seu órgão: atividades, dashboard e cronograma'
 };
 
 /** Sigla exibida no cabeçalho conforme o perfil. */
-export const SIGLA_PAPEL: Record<Papel, string> = { Patrocinador: 'PAT', PMO: 'PMO', 'Técnico': 'TO', Cliente: 'CLI' };
+export const SIGLA_PAPEL: Record<Papel, string> = { 'Patrocinador Geral': 'PAT', 'Patrocinador VMware': 'VMW', PMO: 'PMO', 'Técnico': 'TO', Cliente: 'CLI' };
 
 export const pode = (papel: Papel, acao: Acao): boolean => MATRIZ[papel].includes(acao);
 
@@ -54,5 +56,9 @@ export function salvarPapel(p: Papel) { try { localStorage.setItem(CHAVE, p); } 
 /** Converte o valor da função do Entra ID (App Role) no perfil do portal. Valores desconhecidos são ignorados. */
 export function papelDaFuncao(valor: string): Papel | null {
   const v = valor.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
-  return v === 'pmo' ? 'PMO' : v === 'patrocinador' ? 'Patrocinador' : v === 'tecnico' ? 'Técnico' : v === 'cliente' ? 'Cliente' : null;
+  const valorRole = v.replace(/[\s._-]/g, '');
+  // A role legada 'Patrocinador' não é convertida em Geral: atribuí-la automaticamente daria acesso amplo indevido.
+  return valorRole === 'pmo' ? 'PMO' : valorRole === 'patrocinadorgeral' ? 'Patrocinador Geral'
+    : valorRole === 'patrocinadorvmware' ? 'Patrocinador VMware'
+    : valorRole === 'tecnico' ? 'Técnico' : valorRole === 'cliente' ? 'Cliente' : null;
 }

@@ -128,7 +128,7 @@ export function NovoProjetoPage() {
           <PassoDadosGerais form={form} mudar={mudar} aoEscolherArquiteto={(nome, email) => setForm(f => (f ? { ...f, arquiteto: nome, arquitetoEmail: email } : f))}
             aoEscolherPessoa={(funcao: string, nome: string, email: string) => setForm(f => (f ? { ...f, equipe: atualizarResponsavelEquipe(f.equipe, funcao as 'Gerente de projeto' | 'Arquiteto', nome, email) } : f))} />
           <h3 className="h3" style={{ fontSize: 15 }}>Equipe do projeto</h3>
-          <EditorEquipe equipe={form.equipe} gerente={form.gerente} arquiteto={form.arquiteto} aoMudar={e => setForm(f => ({ ...f, equipe: e }))} />
+          <EditorEquipe equipe={form.equipe} gerente={form.gerente} arquiteto={form.arquiteto} tipoProjeto={form.tipo} aoMudar={e => setForm(f => ({ ...f, equipe: e }))} />
         </>}
         {passo === 1 && <PassoEscopo form={form} mudar={mudar} />}
         {passo === 2 && <PassoCronograma linhas={form.atividades} aoMudar={l => setForm(f => ({ ...f, atividades: l }))} aoMudarData={mudarDataAtividade} modelos={modelos} tipo={form.tipo} tarefasDoModelo={(form.tarefasModelo || []).filter(t => form.atividades.some(a => a.codigo === t.pai)).length} aoAplicarModelo={aplicarModelo} />}

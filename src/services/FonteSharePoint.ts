@@ -8,6 +8,7 @@ import { hojeIso, isoDeDataHora, iso, linhas } from '../lib/datas';
 import type { Autenticador } from './auth';
 import type { FonteDados } from './FonteDados';
 import { GraphClient, fetchGraph } from './graph';
+import { AgendaSemPermissao, PROPRIEDADE_ATIVIDADE, type EventoAgenda } from '../lib/agenda';
 
 /** Nomes das listas criadas por provisionar-portal.ps1. */
 export const LISTAS = {
@@ -828,6 +829,75 @@ export class FonteSharePoint implements FonteDados {
     return { id: ev!.id, joinUrl: ev!.onlineMeeting?.joinUrl || ev!.webLink || '' };
   }
 
+  /* ---------------- agenda do Outlook/Teams de quem está logado ---------------- */
+
+  /** Converte um compromisso do Graph (com Prefer: outlook.timezone) para o formato do portal. */
+  private static paraEvento(e: GraphEvento): EventoAgenda {
+    const t = (s?: string) => (s || '').slice(0, 19);
+    return {
+      id: e.id, titulo: e.subject || '(sem título)', inicio: t(e.start?.dateTime), fim: t(e.end?.dateTime), diaInteiro: !!e.isAllDay,
+      local: e.location?.displayName || undefined, link: e.webLink || undefined, linkTeams: e.onlineMeeting?.joinUrl || undefined,
+      atividade: e.singleValueExtendedProperties?.find(p => p.id.toLowerCase() === PROPRIEDADE_ATIVIDADE.toLowerCase())?.value || undefined,
+    };
+  }
+  private static CAMPOS_EVENTO = 'id,subject,start,end,isAllDay,location,webLink,onlineMeeting,isCancelled';
+  private static EXPANDIR_ETIQUETA = `singleValueExtendedProperties($filter=id eq '${PROPRIEDADE_ATIVIDADE}')`;
+
+  async agenda(de: string, ate: string, interativo: boolean): Promise<EventoAgenda[]> {
+    const token = interativo ? await this.auth.tokenPara(['Calendars.ReadWrite']) : await this.auth.tokenSilencioso(['Calendars.ReadWrite']);
+    if (!token) throw new AgendaSemPermissao();
+    const fimExclusivo = new Date(Date.parse(`${ate}T00:00:00Z`) + 86400000).toISOString().slice(0, 10);
+    const q = new URLSearchParams({
+      startDateTime: `${de}T00:00:00-03:00`, endDateTime: `${fimExclusivo}T00:00:00-03:00`,
+      $select: FonteSharePoint.CAMPOS_EVENTO, $orderby: 'start/dateTime', $top: '200', $expand: FonteSharePoint.EXPANDIR_ETIQUETA,
+    });
+    const eventos: EventoAgenda[] = [];
+    let url: string | undefined = `https://graph.microsoft.com/v1.0/me/calendarView?${q}`;
+    for (let pagina = 0; url && pagina < 5; pagina++) {
+      const resp = await fetchGraph(url, { headers: { Authorization: 'Bearer ' + token, Prefer: `outlook.timezone="${FonteSharePoint.FUSO}"` } });
+      if (resp.status === 401 || resp.status === 403) throw new AgendaSemPermissao();
+      if (!resp.ok) throw new Error(`não foi possível ler a agenda (${resp.status})`);
+      const j = await resp.json() as { value: GraphEvento[]; '@odata.nextLink'?: string };
+      eventos.push(...j.value.filter(e => !e.isCancelled).map(FonteSharePoint.paraEvento));
+      url = j['@odata.nextLink'];
+    }
+    return eventos;
+  }
+
+  async eventoDaAtividade(chave: string, interativo: boolean): Promise<EventoAgenda | null> {
+    const filtro = `singleValueExtendedProperties/Any(ep: ep/id eq '${PROPRIEDADE_ATIVIDADE}' and ep/value eq '${chave.replace(/'/g, "''")}')`;
+    const q = new URLSearchParams({ $filter: filtro, $select: FonteSharePoint.CAMPOS_EVENTO, $expand: FonteSharePoint.EXPANDIR_ETIQUETA, $top: '5' });
+    let r: { value: GraphEvento[] } | null;
+    if (interativo) r = await this.calendario<{ value: GraphEvento[] }>(`/me/events?${q}`, 'GET');
+    else {
+      // verificação automática (ao abrir a atividade): sem janela de consentimento
+      const token = await this.auth.tokenSilencioso(['Calendars.ReadWrite']);
+      if (!token) throw new AgendaSemPermissao();
+      const resp = await fetchGraph(`https://graph.microsoft.com/v1.0/me/events?${q}`, { headers: { Authorization: 'Bearer ' + token, Prefer: `outlook.timezone="${FonteSharePoint.FUSO}"` } });
+      if (resp.status === 401 || resp.status === 403) throw new AgendaSemPermissao();
+      if (!resp.ok) throw new Error(`não foi possível consultar a agenda (${resp.status})`);
+      r = await resp.json() as { value: GraphEvento[] };
+    }
+    const e = (r?.value || []).find(x => !x.isCancelled);
+    return e ? FonteSharePoint.paraEvento(e) : null;
+  }
+
+  async salvarEventoAtividade(corpo: Record<string, unknown>, idExistente?: string): Promise<EventoAgenda> {
+    const sel = `?$select=${FonteSharePoint.CAMPOS_EVENTO}&$expand=${encodeURIComponent(FonteSharePoint.EXPANDIR_ETIQUETA)}`;
+    if (idExistente) {
+      try {
+        await this.calendario(`/me/events/${encodeURIComponent(idExistente)}`, 'PATCH', corpo);
+        const e = await this.calendario<GraphEvento>(`/me/events/${encodeURIComponent(idExistente)}${sel}`, 'GET');
+        return FonteSharePoint.paraEvento(e!);
+      } catch (erro) {
+        // apagado no Outlook depois de criado: cria de novo
+        if (!/não está no seu calendário/.test((erro as Error).message)) throw erro;
+      }
+    }
+    const criado = await this.calendario<GraphEvento>('/me/events', 'POST', corpo);
+    return FonteSharePoint.paraEvento(criado!);
+  }
+
   /** Lê o início atual das reuniões em lote. Reuniões de outro organizador (404) são ignoradas. */
   papeis() { return this.auth.papeis(); }
 
@@ -877,4 +947,11 @@ export class FonteSharePoint implements FonteDados {
   linkBiblioteca(cod?: string) {
     return this.driveUrl ? this.driveUrl + (cod ? '/' + encodeURIComponent(cod) : '') : '';
   }
+}
+
+/** Compromisso como o Microsoft Graph devolve (só os campos usados). */
+interface GraphEvento {
+  id: string; subject?: string; isAllDay?: boolean; isCancelled?: boolean; webLink?: string;
+  start?: { dateTime?: string }; end?: { dateTime?: string }; location?: { displayName?: string };
+  onlineMeeting?: { joinUrl?: string } | null; singleValueExtendedProperties?: { id: string; value: string }[];
 }

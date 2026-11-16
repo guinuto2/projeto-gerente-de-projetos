@@ -60,7 +60,7 @@ test('segurança: cliente externo não herda projetos da Systech ou de outro ór
 test('segurança: rascunhos de projeto nunca aparecem para Técnico, Cliente ou Patrocinador', () => {
   const rascunho = projetoTeste({ codigo: 'RASC-01', situacaoCadastro: 'Rascunho' });
   const ativo = projetoTeste({ codigo: 'ATIVO-01', situacaoCadastro: 'Ativo', equipe: equipe('a@orgao-a.gov.br') });
-  for (const papel of ['Técnico', 'Cliente', 'Patrocinador'] as Papel[]) {
+  for (const papel of ['Técnico', 'Cliente', 'Patrocinador Geral', 'Patrocinador VMware'] as Papel[]) {
     cenario = { papel, email: 'a@orgao-a.gov.br', modo: 'sharepoint', projetos: [rascunho, ativo] };
     const v = consultar();
     assert.equal(v.podeVer(rascunho), false, `${papel} não pode ver o rascunho`);
@@ -94,4 +94,23 @@ test('segurança: técnico só vê projetos ativos em que está na equipe (e enc
   assert.equal(v.podeVer(outraEquipe), false, 'não vê projeto ativo de outra equipe');
   assert.equal(v.podeVer(encerradoDeOutros), true, 'encerrados ficam abertos para consulta');
   assert.deepEqual(v.todos.map(p => p.codigo).sort(), ['ENCERRADO-OUTROS', 'MINHA-EQUIPE']);
+});
+
+
+test('patrocinador VMware enxerga somente projetos do tipo VMware/Omnissa e não acessa outra tecnologia por URL', () => {
+  const projetos = [
+    projetoTeste({ codigo: 'VCF-01', tipo: 'VMware' }),
+    projetoTeste({ codigo: 'EUC-02', tipo: 'Omnissa' }),
+    projetoTeste({ codigo: 'HW-03', tipo: 'Servidores' }),
+    projetoTeste({ codigo: 'BKP-04', tipo: 'Backup', situacaoCadastro: 'Encerrado' }),
+    projetoTeste({ codigo: 'RASC-05', tipo: 'VMware', situacaoCadastro: 'Rascunho' }),
+  ];
+  cenario = { papel: 'Patrocinador VMware', email: 'patrocinador@systech.com.br', modo: 'sharepoint', projetos };
+  const v = consultar();
+  assert.deepEqual(v.todos.map(p => p.codigo), ['VCF-01', 'EUC-02']);
+  assert.equal(v.podeVer(projetos[2]), false);
+  assert.equal(v.podeVer(projetos[3]), false);
+  assert.equal(v.podeVer(projetos[4]), false);
+  cenario = { ...cenario, papel: 'Patrocinador Geral' };
+  assert.deepEqual(consultar().todos.map(p => p.codigo), ['VCF-01', 'EUC-02', 'HW-03', 'BKP-04']);
 });
