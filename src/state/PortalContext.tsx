@@ -14,7 +14,7 @@ import { descrever } from '../lib/historico';
 import { iniciaria, pendentes } from '../lib/dependencias';
 import { usePapel } from './PapelContext';
 import { DOMINIOS_SYSTECH, dominioDe } from '../lib/publicacaoCliente';
-import { destinatariosAviso } from '../lib/notificacoes';
+import { avisoDentroDoPrazo, destinatariosAviso } from '../lib/notificacoes';
 import { emailsDoCliente, inicioDaSemana, montarStatusReport } from '../lib/statusReport';
 import { lancadaParaTecnico } from '../lib/dependencias';
 import { ConflitoEdicao } from '../services/FonteSharePoint';
@@ -402,7 +402,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
   const [notificacoes, setNotificacoes] = useState<Notificacao[]>([]);
   useEffect(() => {
     if (!fonte || !dados || !fonte.notificacoes || fonte.modoCliente) return;   // cliente não tem sino nem acesso às listas
-    const ler = () => { fonte.notificacoes!(fonte.modo === 'sharepoint' ? fonte.email() : '').then(l => { if (l) setNotificacoes(l.filter(n => notificacaoVisivelPatrocinador(n, papel, dados.projetos))); }).catch(() => undefined); };
+    const ler = () => { fonte.notificacoes!(fonte.modo === 'sharepoint' ? fonte.email() : '').then(l => { if (l) setNotificacoes(l.filter(n => avisoDentroDoPrazo(n) && notificacaoVisivelPatrocinador(n, papel, dados.projetos))); }).catch(() => undefined); };
     ler();
     const t = window.setInterval(ler, 60000);
     const ev = () => window.setTimeout(ler, 600);

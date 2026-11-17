@@ -9,6 +9,7 @@ import { CAUSAS_ATRASO, codigoDaFase, codigoSubatividade, FASES, STATUS_ATIVIDAD
 import { dma } from '../../../lib/datas';
 import { Drawer } from '../../ui/Drawer';
 import { convidados, formReuniaoInicial, ReuniaoTeams, type FormReuniao } from './ReuniaoTeams';
+import { LinkReuniao } from '../LinkReuniao';
 import { Confirmacao } from '../../ui/Confirmacao';
 import { VisaoAtividade } from './VisaoAtividade';
 import { Mensagem } from '../../ui/Mensagem';
@@ -230,7 +231,7 @@ export function EditarAtividade({ projeto, codigo, faseInicial, aoFechar, aoCria
         {existente.reuniaoUrl && (
           <div className="reuniaoAgendada">
             <span>Reunião do Teams{existente.reuniaoTipo ? ` · ${existente.reuniaoTipo}` : ''}{existente.reuniaoInicio ? ` em ${quando(existente.reuniaoInicio)}` : ''}</span>
-            <a className="btn pq" href={existente.reuniaoUrl} target="_blank" rel="noopener noreferrer">Entrar no Teams ↗</a>
+            <LinkReuniao atividade={existente} classe="btn pq" texto="Entrar no Teams ↗" textoExpirado="Reunião do Teams · horário encerrado" />
           </div>
         )}
         {papel !== 'Cliente' && <AcompanhamentoAtividade projeto={projeto} a={existente} compacto />}
@@ -349,7 +350,7 @@ export function EditarAtividade({ projeto, codigo, faseInicial, aoFechar, aoCria
         <div className="reuniaoAgendada">
           <span>Reunião do Teams{existente!.reuniaoTipo ? ` · ${existente!.reuniaoTipo}` : ''}{existente!.reuniaoInicio ? ` em ${quando(existente!.reuniaoInicio)}` : ''}</span>
           <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {existente!.reuniaoUrl && <a className="btn pq" href={existente!.reuniaoUrl} target="_blank" rel="noopener noreferrer">Entrar no Teams ↗</a>}
+            {existente!.reuniaoUrl && <LinkReuniao atividade={existente!} classe="btn pq" texto="Entrar no Teams ↗" textoExpirado="Reunião do Teams · horário encerrado" />}
             {estrutura && !editandoReuniao && <>
               <button type="button" className="btn pq" disabled={carregandoReuniao} onClick={abrirEdicaoReuniao}>{carregandoReuniao ? 'Abrindo…' : 'Editar reunião'}</button>
               <button type="button" className="btn pq perigo" onClick={() => setCancelar({ mensagem: '', ocupado: false, erro: '' })}>Cancelar reunião</button>

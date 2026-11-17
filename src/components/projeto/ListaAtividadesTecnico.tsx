@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { LinkReuniao } from './LinkReuniao';
 import type { Atividade, Projeto } from '../../types/models';
 import { usePortal } from '../../state/PortalContext';
 import { SELO_STATUS } from '../../lib/constantes';
@@ -29,7 +30,7 @@ export function ListaAtividadesTecnico({ projeto: p }: { projeto: Projeto }) {
         <span className="tecNome">
           {sub && <span className="tecSeta" aria-hidden="true">↳</span>}<span className="tecProj">{p.codigo}</span>{a.nome}
           {aguardando(a, todas) && <span className="tagLock">aguarda pré-req.</span>}
-          <SeloReuniao a={a} hoje={hoje} />
+          <SeloReuniao a={a} />
         </span>
         <span className="tecInfo">
           {a.responsavel && <span className="sub">{nome(a.responsavel)}</span>}
@@ -60,16 +61,9 @@ export function ListaAtividadesTecnico({ projeto: p }: { projeto: Projeto }) {
  * Reunião do Teams ligada à atividade: data e hora e, se ainda não passou, o link "Entrar".
  * O clique no link abre o Teams e não abre a atividade.
  */
-function SeloReuniao({ a, hoje }: { a: Atividade; hoje: string }) {
+function SeloReuniao({ a }: { a: Atividade }) {
   if (!a.reuniaoUrl && !a.reuniaoInicio) return null;
   const quando = a.reuniaoInicio ? `${a.reuniaoInicio.slice(8, 10)}/${a.reuniaoInicio.slice(5, 7)} ${a.reuniaoInicio.slice(11, 16)}`.trim() : '';
-  const passou = !!a.reuniaoInicio && a.reuniaoInicio.slice(0, 10) < hoje;
   const texto = `📹 Teams${quando ? ` · ${quando}` : ''}${a.reuniaoTipo ? ` · ${a.reuniaoTipo}` : ''}`;
-  if (passou || !a.reuniaoUrl) return <span className="tagReuniao passada" title="Reunião do Teams desta atividade">{texto}</span>;
-  return (
-    <a className="tagReuniao" href={a.reuniaoUrl} target="_blank" rel="noopener noreferrer" title="Entrar na reunião do Teams"
-      onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
-      {texto} · <b>Entrar</b>
-    </a>
-  );
+  return <LinkReuniao atividade={a} classe="tagReuniao" texto={texto} textoDisponivel={`${texto} · Entrar`} />;
 }

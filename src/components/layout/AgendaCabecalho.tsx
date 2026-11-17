@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePortal } from '../../state/PortalContext';
-import { agruparPorDia, horarioEvento, AgendaSemPermissao, type EventoAgenda } from '../../lib/agenda';
+import { agruparPorDia, contarEventosRestantes, horarioEvento, situacaoEventoAgenda, AgendaSemPermissao, type EventoAgenda } from '../../lib/agenda';
 import { somarDiasCorridos } from '../../lib/datas';
 
 const DIAS_SEMANA = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
@@ -26,6 +26,7 @@ export function AgendaCabecalho() {
   const [semPermissao, setSemPermissao] = useState(false);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState('');
+  const [agora, setAgora] = useState(() => new Date());
   const caixa = useRef<HTMLDivElement>(null);
   const ate = somarDiasCorridos(hoje, 6);
   // a função do portal muda a cada atualização dos dados; a referência evita reler a agenda à toa
@@ -48,6 +49,12 @@ export function AgendaCabecalho() {
     return () => { window.clearInterval(t); window.removeEventListener('portal-agenda', reler); };
   }, [ler]);
 
+  // Reavalia a situação dos compromissos sem precisar recarregar o Outlook.
+  useEffect(() => {
+    const timer = window.setInterval(() => setAgora(new Date()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
   useEffect(() => {
     if (!aberto) return;
     const fora = (e: MouseEvent) => { if (caixa.current && !caixa.current.contains(e.target as Node)) setAberto(false); };
@@ -58,18 +65,19 @@ export function AgendaCabecalho() {
 
   const lista = eventos || [];
   const doDiaDeHoje = agruparPorDia(lista, hoje, hoje)[0]?.eventos || [];
+  const restantesHoje = contarEventosRestantes(doDiaDeHoje, agora);
   const grupos = agruparPorDia(lista, hoje, periodo === 'hoje' ? hoje : ate);
   const piloto = fonte.modo === 'piloto';
 
   return (
     <div className="sino agendaCab" ref={caixa}>
       <button type="button" className="sinoBtn" aria-expanded={aberto}
-        aria-label={`Agenda${doDiaDeHoje.length ? `: ${doDiaDeHoje.length} compromisso(s) hoje` : ''}`} title="Agenda do Outlook/Teams"
-        onClick={() => { setAberto(v => !v); if (!aberto) ler(false); }}>
+        aria-label={`Agenda${restantesHoje ? `: ${restantesHoje} compromisso(s) restante(s) hoje` : ''}`} title="Agenda do Outlook/Teams"
+        onClick={() => { setAberto(v => !v); setAgora(new Date()); if (!aberto) ler(false); }}>
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
           <rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" />
         </svg>
-        {doDiaDeHoje.length > 0 && <span className="sinoN agendaN">{doDiaDeHoje.length > 9 ? '9+' : doDiaDeHoje.length}</span>}
+        {restantesHoje > 0 && <span className="sinoN agendaN">{restantesHoje > 9 ? '9+' : restantesHoje}</span>}
       </button>
       {aberto && (
         <div className="sinoCaixa agendaCaixa" role="dialog" aria-label="Agenda">
@@ -96,20 +104,27 @@ export function AgendaCabecalho() {
             {grupos.map(g => (
               <div key={g.dia} className="agendaDia">
                 {periodo === 'semana' && <div className="agendaDiaTit">{rotuloDia(g.dia, hoje)}</div>}
-                {g.eventos.map(e => (
-                  <div key={e.id + g.dia} className={`agendaItem ${e.atividade ? 'deAtividade' : ''}`}>
-                    <span className="agendaHora">{horarioEvento(e)}</span>
-                    <span className="agendaTxt">
-                      <span className="agendaTit">{e.titulo}</span>
-                      {e.local && <span className="agendaLocal">{e.local}</span>}
-                      <span className="agendaLinks">
-                        {e.atividade && <button type="button" className="linkBtn" onClick={() => { setAberto(false); navegar(`/atualizar?item=${encodeURIComponent(e.atividade!)}`); }}>Ver atividade</button>}
-                        {e.linkTeams && <a href={e.linkTeams} target="_blank" rel="noopener noreferrer">Entrar no Teams</a>}
-                        {e.link && <a href={e.link} target="_blank" rel="noopener noreferrer">Abrir no Outlook</a>}
+                {g.eventos.map(e => {
+                  const situacao = situacaoEventoAgenda(e, agora);
+                  return (
+                    <div key={e.id + g.dia} className={`agendaItem ${e.atividade ? 'deAtividade' : ''} ${situacao === 'encerrado' ? 'encerrado' : situacao === 'andamento' ? 'emAndamento' : ''}`}>
+                      <span className="agendaHora">{horarioEvento(e)}</span>
+                      <span className="agendaTxt">
+                        <span className="agendaTit">{e.titulo}</span>
+                        {situacao === 'encerrado' && <span className="agendaEstado encerrado">Horário encerrado</span>}
+                        {situacao === 'andamento' && <span className="agendaEstado emAndamento">Em andamento</span>}
+                        {e.local && <span className="agendaLocal">{e.local}</span>}
+                        <span className="agendaLinks">
+                          {e.atividade && <button type="button" className="linkBtn" onClick={() => { setAberto(false); navegar(`/atualizar?item=${encodeURIComponent(e.atividade!)}`); }}>Ver atividade</button>}
+                          {e.linkTeams && (situacao === 'futuro'
+                            ? <a href={e.linkTeams} target="_blank" rel="noopener noreferrer" onClick={clique => { if (situacaoEventoAgenda(e) !== 'futuro') { clique.preventDefault(); setAgora(new Date()); } }}>Entrar no Teams</a>
+                            : <span className="agendaLinkIndisponivel">Teams · horário já iniciado</span>)}
+                          {e.link && <a href={e.link} target="_blank" rel="noopener noreferrer">Abrir no Outlook</a>}
+                        </span>
                       </span>
-                    </span>
-                  </div>
-                ))}
+                    </div>
+                  );
+                })}
               </div>
             ))}
           </div>

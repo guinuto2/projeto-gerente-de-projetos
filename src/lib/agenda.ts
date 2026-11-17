@@ -108,5 +108,27 @@ export function agruparPorDia(eventos: EventoAgenda[], de: string, ate: string):
   return dias;
 }
 
+/**
+ * Situação de um compromisso segundo o horário de Brasília, usado nas respostas do Graph.
+ * Para eventos de dia inteiro, o fim é exclusivo (início do dia seguinte).
+ * Usa o término para distinguir um evento encerrado de um ainda em andamento.
+ */
+export function situacaoEventoAgenda(e: EventoAgenda, agora = new Date()): 'futuro' | 'andamento' | 'encerrado' {
+  const partes = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
+  }).formatToParts(agora);
+  const valor = (nome: string) => partes.find(p => p.type === nome)?.value || '00';
+  const horarioAtual = `${valor('year')}-${valor('month')}-${valor('day')}T${valor('hour')}:${valor('minute')}:${valor('second')}`;
+  if (e.fim.slice(0, 19) <= horarioAtual) return 'encerrado';
+  if (e.inicio.slice(0, 19) <= horarioAtual) return 'andamento';
+  return 'futuro';
+}
+
+/** Quantos compromissos exibidos ainda não terminaram (inclui os que estão em andamento). */
+export function contarEventosRestantes(eventos: EventoAgenda[], agora = new Date()): number {
+  return eventos.filter(e => situacaoEventoAgenda(e, agora) !== 'encerrado').length;
+}
+
 /** Horário para mostrar: "Dia inteiro" ou "09:00–10:00". */
 export const horarioEvento = (e: EventoAgenda) => (e.diaInteiro ? 'Dia inteiro' : `${e.inicio.slice(11, 16)}–${e.fim.slice(11, 16)}`);

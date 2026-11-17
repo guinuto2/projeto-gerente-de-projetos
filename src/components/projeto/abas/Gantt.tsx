@@ -10,6 +10,7 @@ import { Selo } from '../../ui/Selo';
 import { TEMA } from '../../../lib/tema';
 import { DicaAtividade } from './DicaAtividade';
 import { aguardando, situacaoPrazo } from '../../../lib/dependencias';
+import { LinkReuniao } from '../LinkReuniao';
 
 interface Props {
   /** subatividades abertas por atividade principal (controlado pela aba) */
@@ -92,8 +93,8 @@ export function Gantt(props: Props) {
             <div className="gcel">
               <span className="gnome" title={t.nome}>{t.nome}</span>
               {t.reuniaoUrl && (
-                <a className="teams" href={t.reuniaoUrl} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
-                  title="Entrar na reunião do Teams">{t.reuniaoTipo || 'Teams'}{t.reuniaoInicio ? ` ${t.reuniaoInicio.slice(8, 10)}/${t.reuniaoInicio.slice(5, 7)} ${t.reuniaoInicio.slice(11, 16)}` : ''}</a>
+                <LinkReuniao atividade={t} classe="teams"
+                  texto={`${t.reuniaoTipo || 'Teams'}${t.reuniaoInicio ? ` ${t.reuniaoInicio.slice(8, 10)}/${t.reuniaoInicio.slice(5, 7)} ${t.reuniaoInicio.slice(11, 16)}` : ''}`} />
               )}
               {t.status !== 'Planejado' && <Selo valor={t.status} cores={SELO_STATUS} />}
             </div>
@@ -120,8 +121,8 @@ export function Gantt(props: Props) {
                         <span className="gnome" title={a.nome}>{a.nome}</span>
                       {aguardando(a, atividades) && <span className="tagLock" title={`Aguarda: ${(a.predecessoras || []).join(', ')}`}>aguarda pré-req.</span>}
                         {a.reuniaoUrl && (
-                          <a className="teams" href={a.reuniaoUrl} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
-                            title={`Entrar na reunião do Teams${a.reuniaoTipo ? ` (${a.reuniaoTipo})` : ''}`}>{a.reuniaoTipo || 'Teams'}{a.reuniaoInicio ? ` ${a.reuniaoInicio.slice(8, 10)}/${a.reuniaoInicio.slice(5, 7)} ${a.reuniaoInicio.slice(11, 16)}` : ''}</a>
+                          <LinkReuniao atividade={a} classe="teams" titulo={`Entrar na reunião do Teams${a.reuniaoTipo ? ` (${a.reuniaoTipo})` : ''}`}
+                            texto={`${a.reuniaoTipo || 'Teams'}${a.reuniaoInicio ? ` ${a.reuniaoInicio.slice(8, 10)}/${a.reuniaoInicio.slice(5, 7)} ${a.reuniaoInicio.slice(11, 16)}` : ''}`} />
                         )}
                         {a.status !== 'Planejado' && <Selo valor={a.status} cores={SELO_STATUS} />}
                         <span className={`geq ${classeEquipe(a.equipe)}`}>{a.equipe}</span>
@@ -134,8 +135,8 @@ export function Gantt(props: Props) {
                           <span className="gcod" style={{ fontSize: 11.5 }}>{s.codigo}</span>
                           <span className="gnome sub" style={{ fontSize: 12.5, color: 'var(--medio)' }} title={s.nome}>{s.nome}</span>
                           {s.reuniaoUrl && (
-                            <a className="teams" href={s.reuniaoUrl} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
-                              title={`Entrar na reunião do Teams${s.reuniaoTipo ? ` (${s.reuniaoTipo})` : ''}`}>{s.reuniaoTipo || 'Teams'}{s.reuniaoInicio ? ` ${s.reuniaoInicio.slice(8, 10)}/${s.reuniaoInicio.slice(5, 7)} ${s.reuniaoInicio.slice(11, 16)}` : ''}</a>
+                            <LinkReuniao atividade={s} classe="teams" titulo={`Entrar na reunião do Teams${s.reuniaoTipo ? ` (${s.reuniaoTipo})` : ''}`}
+                              texto={`${s.reuniaoTipo || 'Teams'}${s.reuniaoInicio ? ` ${s.reuniaoInicio.slice(8, 10)}/${s.reuniaoInicio.slice(5, 7)} ${s.reuniaoInicio.slice(11, 16)}` : ''}`} />
                           )}
                           {s.lancada === false && <span className="tagPrep" title="Ainda não lançada para o técnico">não lançada</span>}
                           {aguardando(s, atividades) && <span className="tagLock" title={`Aguarda: ${(s.predecessoras || []).join(', ')}`}>aguarda pré-req.</span>}

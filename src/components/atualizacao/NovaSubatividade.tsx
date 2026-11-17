@@ -7,6 +7,8 @@ import { useToast } from '../../state/ToastContext';
 import { codigoSubatividade } from '../../lib/constantes';
 import { diasUteis } from '../../lib/datas';
 import { Mensagem } from '../ui/Mensagem';
+import { convidados, formReuniaoInicial, ReuniaoTeams } from '../projeto/editores/ReuniaoTeams';
+import { reuniaoPassou } from '../../lib/reunioes';
 
 interface Props {
   /** projetos em que a subatividade pode ser criada (um só, quando a atividade principal já é conhecida) */
@@ -23,7 +25,7 @@ interface Props {
 /** Inclusão rápida de subatividade (atualização semanal). */
 export function NovaSubatividade({ projetos, pai: paiFixo, meuEmail, aoCriada, aoCancelar, termo = 'subatividade' }: Props) {
   const Termo = termo[0].toUpperCase() + termo.slice(1);
-  const { dados, hoje, criarAtividade } = usePortal();
+  const { dados, hoje, criarAtividade, agendarReuniao, reuniaoGravavel, fonte } = usePortal();
   const { papel } = usePapel();
   const toast = useToast();
   const [cod, setCod] = useState(projetos[0]?.codigo || '');
@@ -40,15 +42,25 @@ export function NovaSubatividade({ projetos, pai: paiFixo, meuEmail, aoCriada, a
   const inicio = f.inicio || (pai ? (hoje > pai.inicio ? hoje : pai.inicio) : hoje);
   const termino = f.termino || (pai && pai.termino >= inicio ? pai.termino : inicio);
   const sobrecarga = avisoSobrecarga(tarefasNoPeriodo(dados, f.responsavel, inicio, termino));
+  const podeAgendar = !!fonte.criarReuniaoTeams && reuniaoGravavel;
+  const [reuniao, setReuniao] = useState(() => formReuniaoInicial(projetos[0]?.equipe || [], '', '', meuEmail));
   const [erro, setErro] = useState(''); const [salvando, setSalvando] = useState(false);
   const incluir = async () => {
     if (!projeto || !pai) { setErro('Escolha o projeto e a atividade principal.'); return; }
     if (!f.nome.trim()) { setErro(`Informe o nome da ${termo}.`); return; }
     if (termino < inicio) { setErro('O término não pode ser antes do início.'); return; }
     if (!f.responsavel) { setErro('Escolha o técnico responsável.'); return; }
+    const dataReuniao = reuniao.data || inicio;
+    if (reuniao.ativa) {
+      if (!podeAgendar) { setErro('A criação de reuniões no Teams não está disponível neste ambiente.'); return; }
+      if (!dataReuniao || !reuniao.hora || reuniaoPassou(`${dataReuniao}T${reuniao.hora}`)) {
+        setErro('Informe uma data e um horário futuros para a reunião do Teams.'); return;
+      }
+      if (!convidados(reuniao).length) { setErro('Marque ao menos um participante para a reunião.'); return; }
+    }
     setSalvando(true); setErro('');
     try {
-      await criarAtividade(projeto.codigo, {
+      const criada = await criarAtividade(projeto.codigo, {
         codigo, nome: f.nome.trim(), fase: pai.fase, equipe: pai.equipe, duracao: diasUteis(inicio, termino),
         inicio, termino, baselineInicio: inicio, baselineTermino: termino,
         status: 'Planejado', percentual: 0, marco: false, pai: pai.codigo, descricao: '', observacao: '', responsavel: f.responsavel,
@@ -56,7 +68,21 @@ export function NovaSubatividade({ projetos, pai: paiFixo, meuEmail, aoCriada, a
         lancada: papel === 'Técnico' ? true : f.lancar,
         horasPlanejadas: f.horas === '' ? undefined : Math.max(0, Number(f.horas) || 0)
       } as Atividade);
-      toast(termo === 'tarefa' ? `Tarefa “${f.nome.trim()}” incluída.` : `${Termo} ${codigo} incluída dentro de ${pai.codigo}.`);
+      if (reuniao.ativa) {
+        try {
+          const titulo = reuniao.titulo.trim() || `${reuniao.tipo} · ${projeto.codigo} · ${codigo} ${f.nome.trim()}`;
+          await agendarReuniao(projeto.codigo, criada, {
+            tipo: reuniao.tipo, titulo, inicio: `${dataReuniao}T${reuniao.hora}`,
+            duracaoMin: reuniao.duracaoMin, pauta: reuniao.pauta.trim(), participantes: convidados(reuniao)
+          });
+          toast(`${Termo} incluída. Reunião criada no Teams e convites enviados.`);
+        } catch (e) {
+          // A atividade já foi gravada: não repetir a criação nem ocultar a falha do Teams.
+          toast(`${Termo} incluída, mas a reunião do Teams não foi criada: ${(e as Error).message}`);
+        }
+      } else {
+        toast(termo === 'tarefa' ? `Tarefa “${f.nome.trim()}” incluída.` : `${Termo} ${codigo} incluída dentro de ${pai.codigo}.`);
+      }
       aoCriada(codigo, projeto.codigo);
     } catch (e) { setErro((e as Error).message); setSalvando(false); }
   };
@@ -67,7 +93,11 @@ export function NovaSubatividade({ projetos, pai: paiFixo, meuEmail, aoCriada, a
         <>
           {projetos.length > 1 && (
             <label className="campo">Projeto *
-              <select className="ctl" value={cod} onChange={e => { setCod(e.target.value); setCodPai(''); }}>
+              <select className="ctl" value={cod} onChange={e => {
+                setCod(e.target.value); setCodPai('');
+                const escolhido = projetos.find(p => p.codigo === e.target.value);
+                setReuniao(formReuniaoInicial(escolhido?.equipe || [], '', '', meuEmail));
+              }}>
                 {projetos.map(p => <option key={p.codigo} value={p.codigo}>{p.codigo} · {p.nome}</option>)}
               </select>
             </label>
@@ -98,6 +128,12 @@ export function NovaSubatividade({ projetos, pai: paiFixo, meuEmail, aoCriada, a
       {papel !== 'Técnico' && (
         <label className="chk"><input type="checkbox" checked={f.lancar} onChange={e => setF(s => ({ ...s, lancar: e.target.checked }))} /> Lançar para o técnico agora</label>
       )}
+      <ReuniaoTeams equipe={projeto?.equipe || []} meuEmail={meuEmail} dataMinima={hoje}
+        disponivel={podeAgendar}
+        motivo={!fonte.criarReuniaoTeams ? 'Disponível somente no modo conectado ao SharePoint.'
+          : !reuniaoGravavel ? 'Indisponível: faltam as colunas de reunião na lista Portal Atividades.' : ''}
+        form={{ ...reuniao, titulo: reuniao.titulo || `${reuniao.tipo} · ${projeto?.codigo || ''} · ${codigo} ${f.nome.trim()}`.trim(), data: reuniao.data || inicio }}
+        aoMudar={setReuniao} />
       {erro && <Mensagem tipo="erro">{erro}</Mensagem>}
       <div className="linha" style={{ justifyContent: 'flex-end' }}>
         <button type="button" className="btn pq" disabled={salvando} onClick={aoCancelar}>Cancelar</button>
