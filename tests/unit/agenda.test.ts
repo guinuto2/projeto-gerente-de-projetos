@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  agruparPorDia, chaveAtividade, horarioEvento, montarEventoAtividade, PROPRIEDADE_ATIVIDADE, tituloAgenda, validarOpcoesAgenda,
+  agruparPorDia, chaveAtividade, contarEventosRestantes, horarioEvento, montarEventoAtividade, PROPRIEDADE_ATIVIDADE, tituloAgenda, validarOpcoesAgenda,
   type EventoAgenda,
 } from '../../src/lib/agenda';
 import { atividadeTeste, projetoTeste } from '../helpers/fixtures';
@@ -75,4 +75,47 @@ test('agenda: agrupa por dia, com o dia inteiro primeiro e compromissos de vári
 test('agenda: horário para mostrar', () => {
   assert.equal(horarioEvento({ id: '1', titulo: '', inicio: '2026-11-16T09:00:00', fim: '2026-11-16T10:30:00', diaInteiro: false }), '09:00–10:30');
   assert.equal(horarioEvento({ id: '1', titulo: '', inicio: '2026-11-16T00:00:00', fim: '2026-11-17T00:00:00', diaInteiro: true }), 'Dia inteiro');
+});
+
+test('agenda: compromissos encerrados, em andamento e futuros respeitam o horário de Brasília', async () => {
+  const { situacaoEventoAgenda } = await import('../../src/lib/agenda');
+  const horario = (inicio: string, fim: string, diaInteiro = false): EventoAgenda => ({
+    id: 'horario', titulo: 'Compromisso', inicio, fim, diaInteiro,
+  });
+  // 16/11/2026 10:00 de Brasília = 13:00 UTC.
+  const agora = new Date('2026-11-16T13:00:00Z');
+  assert.equal(situacaoEventoAgenda(horario('2026-11-16T08:00:00', '2026-11-16T09:00:00'), agora), 'encerrado');
+  assert.equal(situacaoEventoAgenda(horario('2026-11-16T09:30:00', '2026-11-16T10:30:00'), agora), 'andamento');
+  assert.equal(situacaoEventoAgenda(horario('2026-11-16T10:01:00', '2026-11-16T11:00:00'), agora), 'futuro');
+  assert.equal(situacaoEventoAgenda(horario('2026-11-16T09:00:00', '2026-11-16T10:00:00'), agora), 'encerrado', 'horário final exato já encerrou');
+  assert.equal(situacaoEventoAgenda(horario('2026-11-16T00:00:00', '2026-11-17T00:00:00', true), agora), 'andamento', 'evento de dia inteiro termina à meia-noite seguinte');
+  assert.equal(situacaoEventoAgenda(horario('2026-11-15T00:00:00', '2026-11-16T00:00:00', true), agora), 'encerrado');
+});
+
+test('agenda: fuso da agenda é Brasília mesmo quando o usuário abre o portal em outro país', async () => {
+  const { situacaoEventoAgenda } = await import('../../src/lib/agenda');
+  const e: EventoAgenda = { id: 'fuso', titulo: 'Reunião', inicio: '2026-11-16T09:00:00', fim: '2026-11-16T10:00:00', diaInteiro: false };
+  assert.equal(situacaoEventoAgenda(e, new Date('2026-11-16T12:30:00Z')), 'andamento');
+  assert.equal(situacaoEventoAgenda(e, new Date('2026-11-16T13:00:00Z')), 'encerrado');
+});
+
+
+test('agenda: contador diminui à medida que os eventos de hoje terminam, sem ocultar eventos em andamento', () => {
+  const eventos: EventoAgenda[] = [
+    { id: 'a', titulo: 'Reunião cedo', inicio: '2026-11-16T08:00:00', fim: '2026-11-16T09:00:00', diaInteiro: false },
+    { id: 'b', titulo: 'Reunião de manhã', inicio: '2026-11-16T09:30:00', fim: '2026-11-16T10:30:00', diaInteiro: false },
+    { id: 'c', titulo: 'Reunião à tarde', inicio: '2026-11-16T14:00:00', fim: '2026-11-16T15:00:00', diaInteiro: false },
+  ];
+  const emBrasilia = (hora: string) => new Date(`2026-11-16T${hora}:00-03:00`);
+  assert.equal(contarEventosRestantes(eventos, emBrasilia('07:59')), 3);
+  assert.equal(contarEventosRestantes(eventos, emBrasilia('09:00')), 2, 'ao terminar a primeira reunião');
+  assert.equal(contarEventosRestantes(eventos, emBrasilia('10:00')), 2, 'evento em andamento continua no contador');
+  assert.equal(contarEventosRestantes(eventos, emBrasilia('10:30')), 1, 'ao terminar a segunda reunião');
+  assert.equal(contarEventosRestantes(eventos, emBrasilia('15:00')), 0, 'contador some quando todas terminam');
+});
+
+test('agenda: compromisso de dia inteiro permanece contado até o fim exclusivo', () => {
+  const evento: EventoAgenda = { id: 'dia', titulo: 'Dia inteiro', inicio: '2026-11-16T00:00:00', fim: '2026-11-17T00:00:00', diaInteiro: true };
+  assert.equal(contarEventosRestantes([evento], new Date('2026-11-16T23:59:00-03:00')), 1);
+  assert.equal(contarEventosRestantes([evento], new Date('2026-11-17T00:00:00-03:00')), 0);
 });
