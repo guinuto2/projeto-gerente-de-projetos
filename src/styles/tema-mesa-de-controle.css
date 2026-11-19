@@ -1,0 +1,114 @@
+/*
+ * Tema "mesa de controle" (Proposta A do protótipo do portfólio).
+ * Só aparência: cores, letra, cantos, a navegação na lateral e o resumo do portfólio numa faixa.
+ * Nenhuma regra muda o que a tela faz.
+ *
+ * PARA VOLTAR AO VISUAL ANTERIOR: apague a linha `import './styles/tema-mesa-de-controle.css';` em src/main.tsx
+ * (e, se quiser, a fonte Public Sans em index.html).
+ */
+
+/* ---------- cores e letra ---------- */
+:root {
+  --sans: 'Public Sans', 'Segoe UI', Arial, sans-serif;
+  --titulo: 'Public Sans', 'Segoe UI', Arial, sans-serif;
+  /* códigos e números deixam de usar fonte de código: mesma letra, com algarismos de largura fixa */
+  --mono: 'Public Sans', 'Segoe UI', Arial, sans-serif;
+
+  --preto: #1D2125; --grafite: #343A42;
+  --vinho: #8C1D2A; --vinhoEsc: #6F1621; --vinhoClaro: #F6E8EA; --vinhoBorda: #DDB0B5;
+  --texto: #1D2125; --suave: #5A6370; --medio: #3F4650;
+  --borda: #DCE0E5; --borda2: #ECEEF1; --campo: #CBD1D8;
+  --fundo: #F4F5F7; --cinza: #F7F8FA;
+  --lateral: #23272D; --lateralTxt: #D3D8DF; --lateralSuave: #AEB6C0; --lateralAtivo: #343A42; --lateralLinha: #3A4048;
+  --raio: 6px;
+}
+:root[data-theme="dark"] {
+  --preto: #E7E9EC;
+  --lateral: #15181C; --lateralAtivo: #2A2F36; --lateralLinha: #2C3138;
+}
+body { font-variant-numeric: tabular-nums; letter-spacing: 0; }
+.mono { font-variant-numeric: tabular-nums; }
+/* o editor de documentos da Wiki continua em fonte de código, onde ela ajuda */
+.wikiTextarea, textarea.ctl.wikiTextarea { font-family: 'IBM Plex Mono', Consolas, 'Courier New', monospace; }
+
+/* ---------- cantos, bordas e superfícies: discretos e iguais em tudo ---------- */
+.card, .kpi, .pcard, .modal, .drawer, .sinoCaixa, .menuCaixa, .tecGrupo { border-radius: var(--raio); box-shadow: none; }
+.btn { border-radius: var(--raio); }
+.selo, .sf { border-radius: 4px; padding: 3px 8px; }
+.tg { border-radius: 4px; }
+.h2 { font-weight: 700; letter-spacing: -0.01em; }
+.h3 { font-weight: 700; }
+
+/* ---------- filtros: abas sublinhadas no lugar das pílulas ---------- */
+.chip {
+  border: 0; border-radius: 0; background: transparent; color: #4A535E;
+  padding: 10px 12px; min-height: 40px; font-weight: 500;
+  border-bottom: 2px solid transparent; box-shadow: none;
+}
+.chip:hover { background: transparent; color: var(--texto); border-bottom-color: var(--campo); }
+.chip.on { background: transparent; color: var(--texto); font-weight: 600; border-bottom-color: var(--vinho); }
+:root[data-theme="dark"] .chip { color: var(--suave); background: transparent; border-color: transparent; }
+:root[data-theme="dark"] .chip.on { color: var(--texto); background: transparent; border-color: transparent; border-bottom-color: var(--vinho); }
+
+/* ---------- portfólio: os indicadores numa faixa única, com divisórias ---------- */
+.kpis { gap: 0; background: var(--superficie); border: 1px solid var(--borda); border-radius: var(--raio); overflow: hidden; }
+.kpis .kpi { border: 0; border-radius: 0; background: transparent; }
+.kpis .kpi + .kpi { border-left: 1px solid var(--borda2); }
+.pnome { color: var(--texto); font-weight: 700; }
+.pcard:hover { border-color: var(--campo); }
+
+/* ---------- navegação: barra lateral escura no computador ---------- */
+.header { background: var(--lateral); border-bottom: 0; }
+.nav a { color: var(--lateralTxt); }
+.nav a.ativo { background: var(--lateralAtivo); box-shadow: none; color: #FFFFFF; }
+
+@media (min-width: 761px) {
+  /* o conteúdo abre espaço para a barra (só depois do login, quando o cabeçalho existe) */
+  #root:has(> .header) { padding-left: 240px; }
+  .header {
+    position: fixed; top: 0; left: 0; bottom: 0; width: 240px; z-index: 30;
+    overflow-y: auto; overscroll-behavior: contain;
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+  .headerIn {
+    max-width: none; margin: 0; min-height: 100%; box-sizing: border-box;
+    padding: 22px 14px 16px; gap: 18px 4px; flex-wrap: nowrap;
+    display: grid; align-items: center;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-rows: auto auto auto auto 1fr auto;
+    grid-template-areas:
+      "aniversario aniversario aniversario"
+      "logo logo logo"
+      "nav nav nav"
+      "data data data"
+      ". . ."
+      "usuario agenda sino";
+  }
+  .logoAniversarioHeader { grid-area: aniversario; width: 150px; max-height: none; margin-left: 8px; order: 0; }
+  .logo { grid-area: logo; padding: 0 8px; gap: 10px; }
+  .marca { width: 28px; height: 28px; font-size: 11px; border-radius: 4px; }
+  .logoTxt { font-size: 14px; font-weight: 500; color: var(--lateralSuave); }
+  .menuBtn { display: none; }
+  .nav { grid-area: nav; flex-direction: column; flex-wrap: nowrap; gap: 2px; min-width: 0; }
+  .nav a { display: flex; align-items: center; min-height: 44px; padding: 0 12px; font-size: 15px; border-radius: var(--raio); white-space: normal; }
+  .nav a:hover { background: rgba(255, 255, 255, 0.06); color: #FFFFFF; }
+  .dataSimulada { grid-area: data; margin: 0 8px; white-space: normal; }
+  .menuUsuario { grid-area: usuario; margin-left: 0; min-width: 0; padding-top: 14px; }
+  .agendaCab { grid-area: agenda; padding-top: 14px; }
+  .sino:not(.agendaCab) { grid-area: sino; padding-top: 14px; }
+  /* uma linha só acima do usuário, da agenda e dos avisos */
+  .headerIn::after { content: ''; grid-row: 6; grid-column: 1 / -1; align-self: start; height: 1px; background: var(--lateralLinha); pointer-events: none; }
+  /* caixas que abrem a partir da barra: ao lado dela, de baixo para cima */
+  .header .sinoCaixa, .header .menuCaixa {
+    position: fixed; left: 248px; right: auto; top: auto; bottom: 16px; transform: none;
+    max-height: calc(100vh - 32px);
+  }
+  .header .menuCaixa { min-width: 280px; }
+  /* elementos que "grudam" no topo ao rolar: sem o cabeçalho no topo, encostam mais em cima */
+  .wikiLado { top: 20px; }
+}
+
+/* ---------- celular: barra no topo (como antes), nas cores novas ---------- */
+@media (max-width: 760px) {
+  .header { border-bottom: 0; }
+}
